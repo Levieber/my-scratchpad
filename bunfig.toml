@@ -1,0 +1,5 @@
+[install]
+# Pin exact versions when adding dependencies (no ^ ranges).
+exact = true
+# Refuse packages published less than a day ago: most malicious releases are pulled within hours.
+minimumReleaseAge = 86400
