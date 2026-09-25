@@ -4,14 +4,9 @@
 import { Client } from "../../src/client";
 import { config } from "../../src/config";
 import type { Note } from "../../src/db";
+import { withTimeout } from "./timeout";
 
 const MAX_PINNED_CHARS = 3000;
-
-const withTimeout = <T>(p: Promise<T>, ms = 1500) =>
-  Promise.race([
-    p,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
-  ]);
 
 const client = new Client(config.url, "claude-code");
 
@@ -40,6 +35,8 @@ try {
     `# Scratchpad (${config.url})`,
     "The user's shared scratchpad is available via the `scratchpad_*` MCP tools (or the `pad` CLI).",
     "Search it before asking the user to repeat context; save things they ask you to remember; append progress logs on long tasks.",
+    // Reference notes stay out of this context on purpose: they load on demand (review-hook.ts).
+    "The user's reference notes (practices, principles, checklists) aren't loaded here: after a turn that edits files you'll be asked to check the edits against the ones that apply.",
     pinned.length ? `\n## Pinned notes\n${pinnedText}` : "",
     recent.length ? `\n## Recent notes\n${recentText}` : "",
   ]

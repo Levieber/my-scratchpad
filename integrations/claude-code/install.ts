@@ -18,6 +18,8 @@ import { dirname, join, resolve } from "node:path";
 //   bun run setup:claude --uninstall     remove everything this script added
 import { $ } from "bun";
 
+import { HOOKS, hookScript, type Settings, withOurs, withoutOurs } from "./settings";
+
 const REPO = resolve(import.meta.dir, "../..");
 // Prefer the PATH entry (e.g. a mise shim) over execPath, which pins a version directory that upgrades remove.
 const BUN = Bun.which("bun") ?? process.execPath;
@@ -26,6 +28,7 @@ const CLAUDE_DIR = process.env.CLAUDE_CONFIG_DIR ?? join(HOME, ".claude");
 const SETTINGS = join(CLAUDE_DIR, "settings.json");
 const CLAUDE_MD = join(CLAUDE_DIR, "CLAUDE.md");
 const SKILL_LINK = join(CLAUDE_DIR, "skills", "scratchpad");
+const REVIEW_SKILL_LINK = join(CLAUDE_DIR, "skills", "pad-review");
 const PAD_LINK = join(HOME, ".local", "bin", "pad");
 const UNIT = join(
   process.env.XDG_CONFIG_HOME ?? join(HOME, ".config"),
@@ -33,8 +36,6 @@ const UNIT = join(
   "user",
   "scratchpad.service",
 );
-const HOOK_SCRIPT = join(REPO, "integrations/claude-code/session-start.ts");
-
 const args = new Set(process.argv.slice(2));
 const withService = !args.has("--no-service");
 
@@ -46,40 +47,12 @@ const link = (target: string, path: string) => {
   symlinkSync(target, path);
 };
 
-const ALLOW = [
-  ...["search", "get", "create", "append", "update", "daily"].map(
-    (t) => `mcp__scratchpad__scratchpad_${t}`,
-  ),
-  ...["pad ls:*", "pad show:*", "pad tags", "pad status"].map((c) => `Bash(${c})`),
-];
-
-type Hook = { type: string; command: string; timeout?: number };
-type Settings = {
-  hooks?: Record<string, { matcher?: string; hooks: Hook[] }[]>;
-  permissions?: { allow?: string[] };
-  [k: string]: unknown;
-};
-
-// Load settings with our previous entries stripped, let `fn` add new ones, write back (with a backup).
-function editSettings(fn: (s: Settings) => void) {
+// Read settings, apply `fn` (see settings.ts), write back with a backup.
+function editSettings(fn: (s: Settings) => Settings) {
   const exists = existsSync(SETTINGS);
-  const s: Settings = exists ? JSON.parse(readFileSync(SETTINGS, "utf8")) : {};
+  const cur: Settings = exists ? JSON.parse(readFileSync(SETTINGS, "utf8")) : {};
   if (exists) copyFileSync(SETTINGS, `${SETTINGS}.bak-scratchpad`);
-
-  if (s.hooks?.SessionStart) {
-    const groups = s.hooks.SessionStart.map((g) => ({
-      ...g,
-      hooks: g.hooks.filter(
-        (h) => !h.command.includes("integrations/claude-code/session-start.ts"),
-      ),
-    })).filter((g) => g.hooks.length);
-    if (groups.length) s.hooks.SessionStart = groups;
-    else delete s.hooks.SessionStart;
-  }
-  if (s.permissions?.allow)
-    s.permissions.allow = s.permissions.allow.filter((p) => !ALLOW.includes(p));
-
-  fn(s);
+  const s = fn(cur);
   mkdirSync(CLAUDE_DIR, { recursive: true });
   writeFileSync(SETTINGS, JSON.stringify(s, null, 2) + "\n");
 }
@@ -96,8 +69,8 @@ function editClaudeMd(block: string | null) {
 
 async function install() {
   step(`pad CLI -> ${PAD_LINK}`);
-  for (const f of ["src/cli.ts", "src/mcp.ts", "integrations/claude-code/session-start.ts"])
-    chmodSync(join(REPO, f), 0o755);
+  for (const f of ["src/cli.ts", "src/mcp.ts"]) chmodSync(join(REPO, f), 0o755);
+  for (const { script } of Object.values(HOOKS)) chmodSync(hookScript(REPO, script), 0o755);
   link(join(REPO, "src/cli.ts"), PAD_LINK);
 
   if (withService) {
@@ -128,18 +101,14 @@ WantedBy=default.target
   await $`claude mcp remove --scope user scratchpad`.quiet().nothrow();
   await $`claude mcp add --scope user scratchpad -- ${BUN} ${join(REPO, "src/mcp.ts")}`;
 
-  step(`skill -> ${SKILL_LINK}`);
+  step(`skills -> ${SKILL_LINK}, ${REVIEW_SKILL_LINK}`);
   link(join(REPO, "integrations/claude-code/skill"), SKILL_LINK);
+  link(join(REPO, "integrations/claude-code/review-skill"), REVIEW_SKILL_LINK);
 
-  step(`SessionStart hook + permissions -> ${SETTINGS} (backup: settings.json.bak-scratchpad)`);
-  editSettings((s) => {
-    s.hooks ??= {};
-    (s.hooks.SessionStart ??= []).push({
-      hooks: [{ type: "command", command: `${BUN} ${HOOK_SCRIPT}`, timeout: 5 }],
-    });
-    s.permissions ??= {};
-    s.permissions.allow = [...(s.permissions.allow ?? []), ...ALLOW];
-  });
+  step(
+    `hooks (${Object.keys(HOOKS).join(", ")}) + permissions -> ${SETTINGS} (backup: settings.json.bak-scratchpad)`,
+  );
+  editSettings((s) => withOurs(s, BUN, REPO));
 
   step(`instructions block -> ${CLAUDE_MD}`);
   editClaudeMd(readFileSync(join(import.meta.dir, "CLAUDE.snippet.md"), "utf8"));
@@ -147,7 +116,7 @@ WantedBy=default.target
   step("check");
   if (withService) await Bun.sleep(800);
   await $`${BUN} ${join(REPO, "src/cli.ts")} status`.nothrow();
-  console.log("\nDone. Restart Claude Code sessions to pick up the MCP server, skill and hook.");
+  console.log("\nDone. Restart Claude Code sessions to pick up the MCP server, skills and hooks.");
 }
 
 async function uninstall() {
@@ -159,8 +128,9 @@ async function uninstall() {
   }
   await $`claude mcp remove --scope user scratchpad`.quiet().nothrow();
   rmSync(SKILL_LINK, { force: true });
+  rmSync(REVIEW_SKILL_LINK, { force: true });
   rmSync(PAD_LINK, { force: true });
-  if (existsSync(SETTINGS)) editSettings(() => {});
+  if (existsSync(SETTINGS)) editSettings(withoutOurs);
   if (existsSync(CLAUDE_MD)) editClaudeMd(null);
   console.log("Removed. Your notes (the database) were kept.");
 }
