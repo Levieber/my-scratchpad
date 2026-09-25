@@ -3,9 +3,11 @@ import { join } from "node:path";
 import type { BunRequest } from "bun";
 
 import { config } from "./config";
-import { type NoteInput, Store } from "./db";
+import { type ListQuery, type NoteInput, Store } from "./db";
 import { ERROR_MESSAGES, type ErrorBody, type ErrorCode } from "./errors";
+import { isKind, KIND_NAMES } from "./kinds";
 import { llmsTxt, openapi } from "./openapi";
+import { parseQuery } from "./query";
 import homepage from "./web/index.html";
 
 const PUBLIC_DIR = join(import.meta.dir, "..", "public");
@@ -42,7 +44,7 @@ async function readInput(req: Request): Promise<NoteInput> {
   });
   if (!body || typeof body !== "object" || Array.isArray(body))
     throw new HttpError("invalidBody", 400, "Expected a JSON object");
-  const { title, body: text, tags, pinned } = body as Record<string, unknown>;
+  const { title, body: text, tags, pinned, kind } = body as Record<string, unknown>;
   if (title !== undefined && typeof title !== "string")
     throw new HttpError("invalidBody", 400, "title must be a string");
   if (text !== undefined && typeof text !== "string")
@@ -52,7 +54,30 @@ async function readInput(req: Request): Promise<NoteInput> {
   }
   if (pinned !== undefined && typeof pinned !== "boolean")
     throw new HttpError("invalidBody", 400, "pinned must be a boolean");
-  return { title, body: text, tags, pinned };
+  if (kind !== undefined && !isKind(kind)) throw kindError();
+  return { title, body: text, tags, pinned, kind };
+}
+
+const kindError = () =>
+  new HttpError("invalidKind", 400, `kind must be one of: ${KIND_NAMES.join(", ")}`);
+
+/**
+ * The list's query string as a store query. An explicit `kind` parameter is checked, since a
+ * program sent it; one typed into `q` is not, so a half-typed search just matches nothing.
+ */
+function readListQuery(p: URLSearchParams): ListQuery {
+  const kind = p.get("kind");
+  if (kind !== null && !isKind(kind)) throw kindError();
+  const parsed = parseQuery(p.get("q") ?? "");
+  const pinned = p.get("pinned");
+  return {
+    q: parsed.text || undefined,
+    kind: kind ?? parsed.kind,
+    tags: [...p.getAll("tag"), ...parsed.tags],
+    pinned: pinned === null ? undefined : pinned === "true",
+    limit: Number(p.get("limit") ?? 50) || 50,
+    offset: Number(p.get("offset") ?? 0) || 0,
+  };
 }
 
 async function readAppendText(req: Request): Promise<string> {
@@ -116,19 +141,7 @@ export function createRoutes(store: Store, { token }: { token?: string } = {}) {
     "/api/health": resource({ GET: () => json({ ok: true }) }, { auth: false }),
 
     "/api/notes": resource({
-      GET: (req) => {
-        const p = new URL(req.url).searchParams;
-        const pinned = p.get("pinned");
-        return json(
-          store.list({
-            q: p.get("q") ?? undefined,
-            tag: p.get("tag") ?? undefined,
-            pinned: pinned === null ? undefined : pinned === "true",
-            limit: Number(p.get("limit") ?? 50) || 50,
-            offset: Number(p.get("offset") ?? 0) || 0,
-          }),
-        );
-      },
+      GET: (req) => json(store.list(readListQuery(new URL(req.url).searchParams))),
       POST: async (req) => {
         const input = await readInput(req);
         if (!input.body?.trim() && !input.title?.trim()) throw new HttpError("emptyNote", 400);

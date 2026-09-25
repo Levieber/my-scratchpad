@@ -1,7 +1,18 @@
 // Thin typed client over the HTTP API. The CLI and MCP server both use this — never the DB directly.
 import { config } from "./config";
-import type { ListQuery, Note, NoteInput } from "./db";
+import type { Note, NoteInput } from "./db";
 import { readError } from "./errors";
+
+/** `GET /api/notes` parameters. `q` may carry `kind:x` and `#tag` operators (src/query.ts). */
+export type ListParams = {
+  q?: string;
+  kind?: string;
+  /** Notes must carry every one of these. */
+  tag?: string[];
+  pinned?: boolean;
+  limit?: number;
+  offset?: number;
+};
 
 export class ApiError extends Error {
   constructor(
@@ -47,10 +58,11 @@ export class Client {
     return data as T;
   }
 
-  list(q: ListQuery = {}) {
+  list(q: ListParams = {}) {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(q))
-      if (v !== undefined && v !== "") params.set(k, String(v));
+      for (const one of [v].flat())
+        if (one !== undefined && one !== "") params.append(k, String(one));
     const qs = params.toString();
     return this.req<Note[]>("GET", `/api/notes${qs ? "?" + qs : ""}`);
   }

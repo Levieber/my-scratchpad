@@ -18,6 +18,7 @@ An API-first scratchpad the user reads and writes from a PWA and the `pad` CLI; 
 - **Search before creating.** If a relevant note exists, `append` or `update` it instead of making a duplicate.
 - **Titles:** short and specific. The first line of the body becomes the title if you omit one.
 - **Tags:** lowercase, kebab-case. Use the project/repo name as a tag for project notes (e.g. `my-scratchpad`), plus a type when useful: `todo`, `idea`, `decision`, `log`, `snippet`.
+- **Kinds:** `note` (default) for anything used once or finished: to-dos, learnings, logs. `reference` for reusable rules to check work against: best practices, principles, checklists. A use case is a tag, not a kind: a launch checklist is `reference` + `#checklist #launch`. Search with operators: `kind:reference #launch`.
 - **Logs:** for multi-step work, create one note tagged `log` and `append` timestamped lines (`2026-09-23 14:02 — migrated schema`) rather than creating many notes.
 - **Pinned** notes are the user's standing context; they are injected at session start. Only pin/unpin when asked.
 - **Never delete** unless the user explicitly asks. Never store secrets (API keys, passwords, tokens) in notes.

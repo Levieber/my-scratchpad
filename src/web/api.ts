@@ -45,10 +45,10 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 }
 
 export const api = {
-  list: (q: { q?: string; tag?: string; limit?: number }) => {
+  list: (q: { q?: string; kind?: string; limit?: number }) => {
     const p = new URLSearchParams();
     if (q.q) p.set("q", q.q);
-    if (q.tag) p.set("tag", q.tag);
+    if (q.kind) p.set("kind", q.kind);
     if (q.limit) p.set("limit", String(q.limit));
     return req<Note[]>("GET", `/api/notes?${p}`);
   },

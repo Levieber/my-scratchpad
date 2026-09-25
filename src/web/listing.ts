@@ -49,9 +49,8 @@ export function groupNotes(notes: Note[], now = new Date()): Group[] {
   return groups.filter((g) => g.notes.length);
 }
 
-/** The first `limit` tags (the API sorts them by use), plus the selected one wherever it ranks. */
-export function visibleTags(tags: Tag[], selected: string, limit: number): Tag[] {
+/** The first `limit` tags (the API sorts them by use), plus the selected ones wherever they rank. */
+export function visibleTags(tags: Tag[], selected: string[], limit: number): Tag[] {
   const top = tags.slice(0, limit);
-  const extra = tags.find((t) => t.tag === selected && !top.includes(t));
-  return extra ? [...top, extra] : top;
+  return [...top, ...tags.slice(limit).filter((t) => selected.includes(t.tag))];
 }

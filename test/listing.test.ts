@@ -9,6 +9,7 @@ const note = (patch: Partial<Note>): Note => ({
   body: "",
   tags: [],
   pinned: false,
+  kind: "note",
   author: "human",
   created_at: "2026-09-25T12:00:00.000Z",
   updated_at: "2026-09-25T12:00:00.000Z",
@@ -85,10 +86,10 @@ describe("visibleTags", () => {
   const tags = ["a", "b", "c", "d"].map((tag, i) => ({ tag, count: 10 - i }));
 
   test("shows the most used tags up to the limit", () => {
-    expect(visibleTags(tags, "", 2).map((t) => t.tag)).toEqual(["a", "b"]);
+    expect(visibleTags(tags, [], 2).map((t) => t.tag)).toEqual(["a", "b"]);
   });
 
-  test("always shows the selected tag", () => {
-    expect(visibleTags(tags, "d", 2).map((t) => t.tag)).toEqual(["a", "b", "d"]);
+  test("always shows the selected tags", () => {
+    expect(visibleTags(tags, ["d", "a"], 2).map((t) => t.tag)).toEqual(["a", "b", "d"]);
   });
 });

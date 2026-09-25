@@ -8,6 +8,7 @@ export const ERROR_MESSAGES = {
   invalidBody: "Request body has the wrong shape",
   emptyNote: "Provide a body or a title",
   emptyAppend: "Provide text to append",
+  invalidKind: "Unknown kind",
   unauthorized: "Missing or invalid bearer token",
   noteNotFound: "Note not found",
   notFound: "No such endpoint",

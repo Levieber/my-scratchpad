@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
+import type { Kind } from "./kinds";
 import { migrate } from "./migrations";
 
 export type Note = {
@@ -10,6 +11,7 @@ export type Note = {
   body: string;
   tags: string[];
   pinned: boolean;
+  kind: Kind;
   author: string;
   created_at: string;
   updated_at: string;
@@ -20,11 +22,15 @@ export type NoteInput = {
   body?: string;
   tags?: string[];
   pinned?: boolean;
+  kind?: Kind;
 };
 
 export type ListQuery = {
+  /** Full-text search words; the search operators are parsed before this (src/query.ts). */
   q?: string;
-  tag?: string;
+  kind?: string;
+  /** Notes must carry every one of these. */
+  tags?: string[];
   pinned?: boolean;
   limit?: number;
   offset?: number;
@@ -60,7 +66,7 @@ export class Store {
     migrate(this.db);
   }
 
-  list({ q, tag, pinned, limit = 50, offset = 0 }: ListQuery = {}): Note[] {
+  list({ q, kind, tags = [], pinned, limit = 50, offset = 0 }: ListQuery = {}): Note[] {
     const where: string[] = [];
     const params: Record<string, string | number> = { limit: Math.min(limit, 500), offset };
     let from = "notes n";
@@ -75,10 +81,14 @@ export class Store {
       terms[terms.length - 1] += "*";
       params.q = terms.join(" ");
     }
-    if (tag) {
-      where.push("EXISTS (SELECT 1 FROM json_each(n.tags) WHERE value = $tag)");
-      params.tag = tag.toLowerCase();
+    if (kind) {
+      where.push("n.kind = $kind");
+      params.kind = kind;
     }
+    tags.forEach((tag, i) => {
+      where.push(`EXISTS (SELECT 1 FROM json_each(n.tags) WHERE value = $tag${i})`);
+      params[`tag${i}`] = tag.toLowerCase();
+    });
     if (pinned !== undefined) {
       where.push("n.pinned = $pinned");
       params.pinned = pinned ? 1 : 0;
@@ -102,14 +112,15 @@ export class Store {
       body,
       tags: normTags(input.tags),
       pinned: !!input.pinned,
+      kind: input.kind ?? "note",
       author,
       created_at: now,
       updated_at: now,
     };
     this.db
       .query(
-        `INSERT INTO notes (id, title, body, tags, pinned, author, created_at, updated_at)
-         VALUES ($id, $title, $body, $tags, $pinned, $author, $created_at, $updated_at)`,
+        `INSERT INTO notes (id, title, body, tags, pinned, kind, author, created_at, updated_at)
+         VALUES ($id, $title, $body, $tags, $pinned, $kind, $author, $created_at, $updated_at)`,
       )
       .run({ ...note, tags: JSON.stringify(note.tags), pinned: note.pinned ? 1 : 0 });
     return note;
@@ -127,11 +138,12 @@ export class Store {
       body: patch.body ?? cur.body,
       tags: patch.tags !== undefined ? normTags(patch.tags) : cur.tags,
       pinned: patch.pinned ?? cur.pinned,
+      kind: patch.kind ?? cur.kind,
       updated_at: new Date().toISOString(),
     };
     this.db
       .query(
-        `UPDATE notes SET title=$title, body=$body, tags=$tags, pinned=$pinned, updated_at=$updated_at WHERE id=$id`,
+        `UPDATE notes SET title=$title, body=$body, tags=$tags, pinned=$pinned, kind=$kind, updated_at=$updated_at WHERE id=$id`,
       )
       .run({
         id,
@@ -139,6 +151,7 @@ export class Store {
         body: next.body,
         tags: JSON.stringify(next.tags),
         pinned: next.pinned ? 1 : 0,
+        kind: next.kind,
         updated_at: next.updated_at,
       });
     return next;

@@ -82,6 +82,42 @@ describe("notes API", () => {
     expect((await call("GET", "/api/notes")).data[0].body).toBe("pinned one");
   });
 
+  test("kind defaults to note and can be set on create and patch", async () => {
+    const { data: n } = await call("POST", "/api/notes", { body: "a note" });
+    expect(n.kind).toBe("note");
+    const { data: r } = await call("POST", "/api/notes", { body: "rules", kind: "reference" });
+    expect(r.kind).toBe("reference");
+    expect((await call("PATCH", `/api/notes/${n.id}`, { kind: "reference" })).data.kind).toBe(
+      "reference",
+    );
+  });
+
+  test("filters by kind, by several tags, and by operators in q", async () => {
+    const note = (body: string, kind: string, tags: string[]) =>
+      call("POST", "/api/notes", { body, kind, tags });
+    await note("Launch checklist: domain, analytics", "reference", ["checklist", "launch"]);
+    await note("SEO checklist: sitemap", "reference", ["checklist", "seo"]);
+    await note("Tasks: launch the portfolio", "note", ["tasks", "launch"]);
+    const titles = async (qs: string) =>
+      ((await call("GET", `/api/notes?${qs}`)).data as Note[]).map((n) => n.title).sort();
+
+    expect(await titles("kind=reference")).toEqual([
+      "Launch checklist: domain, analytics",
+      "SEO checklist: sitemap",
+    ]);
+    expect(await titles("tag=checklist&tag=launch")).toEqual([
+      "Launch checklist: domain, analytics",
+    ]);
+    expect(await titles(`q=${encodeURIComponent("kind:reference #launch")}`)).toEqual([
+      "Launch checklist: domain, analytics",
+    ]);
+    expect(await titles(`q=${encodeURIComponent("#launch portfolio")}`)).toEqual([
+      "Tasks: launch the portfolio",
+    ]);
+    // A kind typed into the search box is forgiving: it just matches nothing.
+    expect(await titles(`q=${encodeURIComponent("kind:refer")}`)).toEqual([]);
+  });
+
   test("patch, append, delete", async () => {
     const { data: n } = await call("POST", "/api/notes", { body: "log" });
     const patched = (
@@ -105,6 +141,8 @@ describe("notes API", () => {
       ["POST", "/api/notes", { body: "" }, 400, "emptyNote"],
       ["POST", "/api/notes", { body: 1 }, 400, "invalidBody"],
       ["POST", "/api/notes", { tags: [1] }, 400, "invalidBody"],
+      ["POST", "/api/notes", { body: "x", kind: "checklist" }, 400, "invalidKind"],
+      ["GET", "/api/notes?kind=checklist", undefined, 400, "invalidKind"],
       ["PATCH", "/api/notes/nope", { body: "x" }, 404, "noteNotFound"],
       ["DELETE", "/api/notes/nope", undefined, 404, "noteNotFound"],
       ["POST", "/api/notes/nope/append", "x", 404, "noteNotFound"],

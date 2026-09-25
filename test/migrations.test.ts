@@ -39,6 +39,28 @@ describe("migrations", () => {
     expect(index).toEqual({ name: "notes_order" });
   });
 
+  test("0004 marks checklist and principles notes as reference, keeping their tags", () => {
+    const db = new Database(":memory:");
+    migrate(
+      db,
+      MIGRATIONS.filter((m) => m.id < "0004"),
+    );
+    const insert = db.query(
+      "INSERT INTO notes (id, title, tags, created_at, updated_at) VALUES (?, ?, ?, 'x', 'x')",
+    );
+    insert.run("c", "SEO checklist", '["seo","checklist"]');
+    insert.run("p", "Working principles", '["principles","agents"]');
+    insert.run("t", "Tasks", '["tasks"]');
+
+    migrate(db);
+    const rows = db.query("SELECT id, kind, tags FROM notes ORDER BY id").all();
+    expect(rows).toEqual([
+      { id: "c", kind: "reference", tags: '["seo","checklist"]' },
+      { id: "p", kind: "reference", tags: '["principles","agents"]' },
+      { id: "t", kind: "note", tags: '["tasks"]' },
+    ]);
+  });
+
   test("a failing migration rolls back the whole batch", () => {
     const db = new Database(":memory:");
     const broken = [

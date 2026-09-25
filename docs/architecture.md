@@ -8,6 +8,8 @@ src/
   db.ts           Store: notes in SQLite + FTS5. Only the server uses it.
   migrations.ts   Named schema changes, recorded in schema_migrations.
   errors.ts       Error codes + messages; shared by server and clients.
+  kinds.ts        Note kinds (note, reference); a use case is a tag, not a kind. Shared.
+  query.ts        The search language (`kind:x #tag words`); run by the server, edited by the PWA.
   openapi.ts      The contract (/openapi.json) and the agent quick-start (/llms.txt).
   config.ts       Every env var and ~/.config/scratchpad/config.json, read in one place.
   client.ts       Typed HTTP client used by the CLI, MCP server and Claude Code hook.

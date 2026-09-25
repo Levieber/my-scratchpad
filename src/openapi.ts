@@ -1,15 +1,23 @@
 import { ERROR_CODES } from "./errors";
+import { KIND_NAMES, KINDS } from "./kinds";
+
+const kind = {
+  type: "string",
+  enum: KIND_NAMES,
+  description: KIND_NAMES.map((k) => `${k}: ${KINDS[k]}`).join(" "),
+};
 
 // The API contract. Every client (PWA, CLI, MCP, curl, other agents) goes through these endpoints.
 const Note = {
   type: "object",
-  required: ["id", "title", "body", "tags", "pinned", "author", "created_at", "updated_at"],
+  required: ["id", "title", "body", "tags", "pinned", "kind", "author", "created_at", "updated_at"],
   properties: {
     id: { type: "string" },
     title: { type: "string" },
     body: { type: "string", description: "Markdown" },
     tags: { type: "array", items: { type: "string" } },
     pinned: { type: "boolean" },
+    kind,
     author: {
       type: "string",
       description: "Who created it: 'human', 'claude-code', ... (from X-Pad-Author)",
@@ -26,6 +34,7 @@ const NoteInput = {
     body: { type: "string" },
     tags: { type: "array", items: { type: "string" } },
     pinned: { type: "boolean" },
+    kind: { ...kind, default: "note" },
   },
 };
 
@@ -64,8 +73,21 @@ export const openapi = {
         operationId: "listNotes",
         summary: "List or full-text search notes (pinned first, then most recently updated)",
         parameters: [
-          { name: "q", in: "query", schema: { type: "string" }, description: "Full-text search" },
-          { name: "tag", in: "query", schema: { type: "string" } },
+          {
+            name: "q",
+            in: "query",
+            schema: { type: "string" },
+            description:
+              "Full-text search. `kind:<kind>` and `#<tag>` narrow it, e.g. `kind:reference #launch seo`",
+          },
+          { name: "kind", in: "query", schema: { type: "string", enum: KIND_NAMES } },
+          {
+            name: "tag",
+            in: "query",
+            schema: { type: "array", items: { type: "string" } },
+            explode: true,
+            description: "Repeat to require several tags",
+          },
           { name: "pinned", in: "query", schema: { type: "boolean" } },
           { name: "limit", in: "query", schema: { type: "integer", default: 50, maximum: 500 } },
           { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
@@ -180,13 +202,17 @@ Auth: if the server has PAD_TOKEN set, send \`Authorization: Bearer <token>\`.
 Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 
 ## Endpoints
-- GET    /api/notes?q=&tag=&pinned=&limit=&offset=   list / full-text search
-- POST   /api/notes            {title?, body, tags?, pinned?}  (or text/plain body)
+- GET    /api/notes?q=&kind=&tag=&pinned=&limit=&offset=   list / full-text search
+- POST   /api/notes            {title?, body, tags?, pinned?, kind?}  (or text/plain body)
 - GET    /api/notes/{id}
-- PATCH  /api/notes/{id}       {title?, body?, tags?, pinned?}
+- PATCH  /api/notes/{id}       {title?, body?, tags?, pinned?, kind?}
 - POST   /api/notes/{id}/append {text}  (or text/plain)
 - DELETE /api/notes/{id}
 - GET    /api/tags
+
+## Kinds and search
+${KIND_NAMES.map((k) => `- ${k}: ${KINDS[k]}`).join("\n")}
+A use case is a tag, not a kind. \`q\` takes operators: \`kind:reference #checklist #launch\` finds launch checklists; repeat \`tag=\` to require several tags.
 
 ## Errors
 Non-2xx responses are \`{ "error": "<code>", "message": "<english>" }\`. Branch on the code:

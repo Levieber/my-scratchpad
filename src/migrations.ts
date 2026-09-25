@@ -47,6 +47,16 @@ export const MIGRATIONS: Migration[] = [
     id: "0003.notes_order_index",
     statements: ["CREATE INDEX notes_order ON notes(pinned DESC, updated_at DESC)"],
   },
+  {
+    // Notes were already classified by hand with tags; those tags stay, the kind is read from them.
+    id: "0004.notes_kind",
+    statements: [
+      "ALTER TABLE notes ADD COLUMN kind TEXT NOT NULL DEFAULT 'note'",
+      `UPDATE notes SET kind = 'reference' WHERE EXISTS (
+         SELECT 1 FROM json_each(notes.tags) WHERE value IN ('checklist', 'principles')
+       )`,
+    ],
+  },
 ];
 
 /** Applies every migration not yet recorded, all in one transaction. Returns the ids it ran. */

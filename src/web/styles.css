@@ -158,10 +158,32 @@ button.more {
   border-style: dashed;
   color: var(--muted);
 }
+.kinds {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.kinds button {
+  font-size: 13px;
+  padding: 3px 12px;
+  color: var(--muted);
+}
+.kinds button[aria-pressed="true"],
 .tags button[aria-pressed="true"] {
   background: var(--accent-soft);
   border-color: var(--accent);
   color: var(--text);
+}
+button.ghost.kindToggle {
+  font-size: 13px;
+  color: var(--muted);
+}
+.badge.kind {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
 }
 
 .list {

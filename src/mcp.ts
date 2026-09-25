@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Client } from "./client";
 import { config } from "./config";
 import type { Note } from "./db";
+import { type Kind, KIND_NAMES, KINDS } from "./kinds";
 
 const client = new Client(config.url, process.env.PAD_AUTHOR ?? "claude-code");
 
@@ -15,7 +16,8 @@ const server = new McpServer(
   {
     instructions: `The user's personal scratchpad, shared between them (via a PWA and the \`pad\` CLI) and you.
 Use it to: look up context the user jotted down (search before asking them to repeat themselves), save notes/findings/TODOs they ask you to remember, and keep a running log on long tasks.
-Pinned notes are the user's most important context. Your writes are attributed as "claude-code". Web UI: ${config.url}`,
+Pinned notes are the user's most important context. Your writes are attributed as "claude-code". Web UI: ${config.url}
+Every note has a kind: ${KIND_NAMES.map((k) => `\`${k}\` (${KINDS[k]})`).join("; ")} A use case is a tag, not a kind: a launch checklist is kind reference + tags checklist, launch.`,
   },
 );
 
@@ -45,12 +47,17 @@ const summary = (n: Note) => ({
   title: n.title,
   tags: n.tags,
   pinned: n.pinned,
+  kind: n.kind,
   author: n.author,
   updated_at: n.updated_at,
   preview: n.body.length > 200 ? n.body.slice(0, 200) + "…" : n.body,
 });
 
 const tags = z.array(z.string()).optional().describe("Lowercase tags, e.g. ['project-x', 'todo']");
+const kind = z
+  .enum(KIND_NAMES as [Kind, ...Kind[]])
+  .optional()
+  .describe("note (default) or reference (reusable rules: practices, principles, checklists)");
 
 server.registerTool(
   "scratchpad_search",
@@ -59,15 +66,21 @@ server.registerTool(
     description:
       "List or full-text search the user's scratchpad notes. Pinned first, then most recently updated. Returns previews; use scratchpad_get for the full body.",
     inputSchema: {
-      query: z.string().optional().describe("Full-text search terms; omit to list recent notes"),
-      tag: z.string().optional(),
+      query: z
+        .string()
+        .optional()
+        .describe(
+          "Full-text search terms; omit to list recent notes. Also takes `kind:reference` and `#tag` operators",
+        ),
+      tags: z.array(z.string()).optional().describe("Notes must carry all of these"),
+      kind,
       pinned: z.boolean().optional().describe("Only pinned notes"),
       limit: z.number().int().min(1).max(100).optional().describe("Default 20"),
     },
     annotations: { readOnlyHint: true },
   },
-  safe(async ({ query, tag, pinned, limit }) =>
-    (await client.list({ q: query, tag, pinned, limit: limit ?? 20 })).map(summary),
+  safe(async ({ query, tags, kind, pinned, limit }) =>
+    (await client.list({ q: query, tag: tags, kind, pinned, limit: limit ?? 20 })).map(summary),
   ),
 );
 
@@ -91,6 +104,7 @@ server.registerTool(
       body: z.string(),
       title: z.string().optional(),
       tags,
+      kind,
       pinned: z.boolean().optional(),
     },
   },
@@ -118,6 +132,7 @@ server.registerTool(
       title: z.string().optional(),
       body: z.string().optional(),
       tags,
+      kind,
       pinned: z.boolean().optional(),
     },
     annotations: { idempotentHint: true },

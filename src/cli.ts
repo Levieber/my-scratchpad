@@ -7,16 +7,17 @@ import { parseArgs } from "node:util";
 import { ApiError, Client } from "./client";
 import { clientConfigPath, config } from "./config";
 import type { Note } from "./db";
+import { isKind, KIND_NAMES, type Kind } from "./kinds";
 
 const HELP = `pad — scratchpad CLI (talks to ${config.url})
 
 Usage:
-  pad add [text...] [-t title] [--tag x]... [--pin]   create a note (text or stdin)
-  pad ls [query...] [--tag x] [--pinned] [-n limit]    list / full-text search
+  pad add [text...] [-t title] [--tag x]... [--kind k] [--pin]   create a note (text or stdin)
+  pad ls [query...] [--tag x]... [--kind k] [--pinned] [-n limit] list / full-text search
   pad show <id>                                        print a note
   pad append <id> [text...]                            append a line (text or stdin)
   pad edit <id>                                        edit body in $EDITOR
-  pad set <id> [-t title] [--tag x]... [--pin|--unpin] update metadata
+  pad set <id> [-t title] [--tag x]... [--kind k] [--pin|--unpin] update metadata
   pad rm <id>                                          delete a note
   pad tags                                             list tags
   pad status                                           show which server is in use
@@ -25,6 +26,7 @@ Usage:
   pad serve                                            run the API + PWA server
   pad open                                             open the PWA in a browser
 
+Kinds: ${KIND_NAMES.join(", ")}. Search operators: pad ls kind:reference '#launch' seo
 Global: --json for machine-readable output.
 Env (overrides \`pad login\`): PAD_URL, PAD_TOKEN, PAD_AUTHOR.`;
 
@@ -33,6 +35,7 @@ const { values: opts, positionals } = parseArgs({
   options: {
     title: { type: "string", short: "t" },
     tag: { type: "string", multiple: true },
+    kind: { type: "string" },
     pin: { type: "boolean" },
     unpin: { type: "boolean" },
     pinned: { type: "boolean" },
@@ -58,7 +61,7 @@ const ago = (iso: string) => {
 };
 
 const line = (n: Note) =>
-  `${n.pinned ? "★" : " "} ${n.id}  ${n.title}${n.tags.length ? "  #" + n.tags.join(" #") : ""}  (${ago(n.updated_at)}, ${n.author})`;
+  `${n.pinned ? "★" : " "} ${n.id}  ${n.title}${n.kind === "note" ? "" : ` [${n.kind}]`}${n.tags.length ? "  #" + n.tags.join(" #") : ""}  (${ago(n.updated_at)}, ${n.author})`;
 
 const full = (n: Note) =>
   `${n.pinned ? "★ " : ""}${n.title}\nid: ${n.id} · by ${n.author} · updated ${n.updated_at}${
@@ -69,6 +72,12 @@ async function textArg(rest: string[]): Promise<string> {
   if (rest.length) return rest.join(" ");
   if (!process.stdin.isTTY) return (await Bun.stdin.text()).replace(/\n$/, "");
   return "";
+}
+
+// Checked before sending so a typo fails with the flag's name rather than the API's field name.
+function kindOpt(): Kind | undefined {
+  if (opts.kind === undefined || isKind(opts.kind)) return opts.kind;
+  throw new ApiError(400, `--kind must be one of: ${KIND_NAMES.join(", ")}`);
 }
 
 function need(id: string | undefined): string {
@@ -84,7 +93,13 @@ async function main() {
     case "new": {
       const body = await textArg(args);
       if (!body && !opts.title) throw new ApiError(400, "Nothing to add: pass text or pipe stdin.");
-      const n = await client.create({ title: opts.title, body, tags: opts.tag, pinned: opts.pin });
+      const n = await client.create({
+        title: opts.title,
+        body,
+        tags: opts.tag,
+        pinned: opts.pin,
+        kind: kindOpt(),
+      });
       return out(n, () => n.id);
     }
     case "ls":
@@ -92,7 +107,8 @@ async function main() {
     case "search": {
       const notes = await client.list({
         q: args.join(" ") || undefined,
-        tag: opts.tag?.[0],
+        tag: opts.tag,
+        kind: kindOpt(),
         pinned: opts.pinned || undefined,
         limit: opts.limit ? Number(opts.limit) : undefined,
       });
@@ -129,6 +145,7 @@ async function main() {
       const n = await client.update(need(args[0]), {
         title: opts.title,
         tags: opts.tag,
+        kind: kindOpt(),
         pinned: opts.pin ? true : opts.unpin ? false : undefined,
       });
       return out(n, () => line(n));

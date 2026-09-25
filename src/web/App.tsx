@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { Kind } from "../kinds";
+import { hasToken, parseQuery, toggleToken } from "../query";
 import { api, token, Unauthorized, type Note, type Tag } from "./api";
 import { groupNotes, preview, visibleTags } from "./listing";
 
@@ -20,14 +22,15 @@ const storedWidth = () => {
   }
 };
 
-type Draft = { title: string; body: string; tags: string; pinned: boolean };
+type Draft = { title: string; body: string; tags: string; pinned: boolean; kind: Kind };
 
-const emptyDraft: Draft = { title: "", body: "", tags: "", pinned: false };
+const emptyDraft: Draft = { title: "", body: "", tags: "", pinned: false, kind: "note" };
 const toDraft = (n: Note): Draft => ({
   title: n.title,
   body: n.body,
   tags: n.tags.join(", "),
   pinned: n.pinned,
+  kind: n.kind,
 });
 const fromDraft = (d: Draft) => ({
   title: d.title,
@@ -37,6 +40,7 @@ const fromDraft = (d: Draft) => ({
     .map((t) => t.trim())
     .filter(Boolean),
   pinned: d.pinned,
+  kind: d.kind,
 });
 
 const ago = (iso: string) => {
@@ -53,7 +57,7 @@ export function App() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [q, setQ] = useState("");
-  const [tag, setTag] = useState("");
+  const [kind, setKind] = useState<Kind | "">("");
   const [limit, setLimit] = useState(PAGE);
   const [allTags, setAllTags] = useState(false);
   const [width, setWidth] = useState(storedWidth);
@@ -79,7 +83,7 @@ export function App() {
 
   const refreshList = useCallback(async () => {
     try {
-      const [n, t] = await Promise.all([api.list({ q, tag, limit }), api.tags()]);
+      const [n, t] = await Promise.all([api.list({ q, kind, limit }), api.tags()]);
       setNotes(n);
       setTags(t);
       setOnline(true);
@@ -87,7 +91,7 @@ export function App() {
     } catch (e) {
       handle(e);
     }
-  }, [q, tag, limit, handle]);
+  }, [q, kind, limit, handle]);
 
   const save = useCallback(async () => {
     const l = latest.current;
@@ -235,13 +239,15 @@ export function App() {
     } catch {}
   }, [width]);
 
-  const filter = (next: { q?: string; tag?: string }) => {
+  const filter = (next: { q?: string; kind?: Kind | "" }) => {
     if (next.q !== undefined) setQ(next.q);
-    if (next.tag !== undefined) setTag(next.tag);
+    if (next.kind !== undefined) setKind(next.kind);
     setLimit(PAGE);
   };
 
-  const shownTags = allTags ? tags : visibleTags(tags, tag, TAG_LIMIT);
+  // Tag chips edit the search box, so several tags combine and the query stays visible.
+  const selectedTags = parseQuery(q).tags;
+  const shownTags = allTags ? tags : visibleTags(tags, selectedTags, TAG_LIMIT);
 
   const saveLabel = {
     "": "",
@@ -276,13 +282,25 @@ export function App() {
           value={q}
           onChange={(e) => filter({ q: e.target.value })}
         />
+        <fieldset className="kinds" aria-label="Kind">
+          {(
+            [
+              ["", "All"],
+              ["reference", "Reference"],
+            ] as const
+          ).map(([k, label]) => (
+            <button key={k} aria-pressed={kind === k} onClick={() => filter({ kind: k })}>
+              {label}
+            </button>
+          ))}
+        </fieldset>
         {tags.length > 0 && (
           <div className="tags">
             {shownTags.map((t) => (
               <button
                 key={t.tag}
-                aria-pressed={tag === t.tag}
-                onClick={() => filter({ tag: tag === t.tag ? "" : t.tag })}
+                aria-pressed={hasToken(q, `#${t.tag}`)}
+                onClick={() => filter({ q: toggleToken(q, `#${t.tag}`) })}
               >
                 #{t.tag} {t.count}
               </button>
@@ -313,6 +331,9 @@ export function App() {
                         {p && <span className="p">{p}</span>}
                         <span className="m">
                           {ago(n.updated_at)}
+                          {n.kind === "reference" && !kind && (
+                            <span className="badge kind">reference</span>
+                          )}
                           {n.author !== "human" && <span className="badge">{n.author}</span>}
                           {n.tags.length > 0 && <span> · #{n.tags.join(" #")}</span>}
                         </span>
@@ -323,7 +344,7 @@ export function App() {
               </ul>
             </section>
           ))}
-          {notes.length === 0 && <p className="m">{q || tag ? "No matches." : "No notes yet."}</p>}
+          {notes.length === 0 && <p className="m">{q || kind ? "No matches." : "No notes yet."}</p>}
           {notes.length >= limit && (
             <button className="more" onClick={() => setLimit((l) => l + PAGE)}>
               Load more
@@ -364,6 +385,14 @@ export function App() {
               value={draft.title}
               onChange={(e) => edit({ title: e.target.value })}
             />
+            <button
+              className="ghost kindToggle"
+              aria-pressed={draft.kind === "reference"}
+              title="Reference: reusable rules to check work against (practices, checklists)"
+              onClick={() => edit({ kind: draft.kind === "reference" ? "note" : "reference" })}
+            >
+              Reference
+            </button>
             <button
               className="ghost"
               aria-pressed={draft.pinned}
