@@ -2,6 +2,8 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
+import { openItems, type Progress, progress } from "./checklist";
+import { DAILY_TAG, dailyBody, dailyTitle } from "./daily";
 import type { Kind } from "./kinds";
 import { migrate } from "./migrations";
 
@@ -15,6 +17,8 @@ export type Note = {
   author: string;
   created_at: string;
   updated_at: string;
+  /** Derived from the body's checkboxes on every read, never stored. */
+  progress: Progress;
 };
 
 export type NoteInput = {
@@ -36,9 +40,16 @@ export type ListQuery = {
   offset?: number;
 };
 
-type Row = Omit<Note, "tags" | "pinned"> & { tags: string; pinned: number };
+type Row = Omit<Note, "tags" | "pinned" | "progress"> & { tags: string; pinned: number };
 
-const toNote = (r: Row): Note => ({ ...r, tags: JSON.parse(r.tags), pinned: !!r.pinned });
+const toNote = (r: Row): Note => ({
+  ...r,
+  tags: JSON.parse(r.tags),
+  pinned: !!r.pinned,
+  progress: progress(r.body),
+});
+
+const hasTag = "EXISTS (SELECT 1 FROM json_each(notes.tags) WHERE value = ?)";
 
 // Sortable, URL-safe id: base36 timestamp + random suffix.
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -116,14 +127,39 @@ export class Store {
       author,
       created_at: now,
       updated_at: now,
+      progress: progress(body),
     };
+    const { progress: _, ...row } = note;
     this.db
       .query(
         `INSERT INTO notes (id, title, body, tags, pinned, kind, author, created_at, updated_at)
          VALUES ($id, $title, $body, $tags, $pinned, $kind, $author, $created_at, $updated_at)`,
       )
-      .run({ ...note, tags: JSON.stringify(note.tags), pinned: note.pinned ? 1 : 0 });
+      .run({ ...row, tags: JSON.stringify(note.tags), pinned: note.pinned ? 1 : 0 });
     return note;
+  }
+
+  /**
+   * The daily review for `date` (a checked YYYY-MM-DD), created on first request with the open
+   * items of the latest earlier review. One transaction, so two clients can't create it twice.
+   */
+  daily(date: string, author = "human"): { note: Note; created: boolean } {
+    return this.db.transaction(() => {
+      const title = dailyTitle(date);
+      const existing = this.db
+        .query(`SELECT * FROM notes WHERE title = ? AND ${hasTag}`)
+        .get(title, DAILY_TAG) as Row | null;
+      if (existing) return { note: toNote(existing), created: false };
+      // ISO dates sort as text, so the latest earlier review is the greatest smaller title.
+      const previous = this.db
+        .query(
+          `SELECT body FROM notes WHERE title LIKE ? AND title < ? AND ${hasTag}
+           ORDER BY title DESC LIMIT 1`,
+        )
+        .get(`${dailyTitle("")}%`, title, DAILY_TAG) as { body: string } | null;
+      const body = dailyBody(previous ? openItems(previous.body) : []);
+      return { note: this.create({ title, body, tags: [DAILY_TAG] }, author), created: true };
+    })();
   }
 
   update(id: string, patch: NoteInput): Note | null {
@@ -140,6 +176,7 @@ export class Store {
       pinned: patch.pinned ?? cur.pinned,
       kind: patch.kind ?? cur.kind,
       updated_at: new Date().toISOString(),
+      progress: progress(patch.body ?? cur.body),
     };
     this.db
       .query(

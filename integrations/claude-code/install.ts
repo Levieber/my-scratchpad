@@ -47,7 +47,9 @@ const link = (target: string, path: string) => {
 };
 
 const ALLOW = [
-  ...["search", "get", "create", "append", "update"].map((t) => `mcp__scratchpad__scratchpad_${t}`),
+  ...["search", "get", "create", "append", "update", "daily"].map(
+    (t) => `mcp__scratchpad__scratchpad_${t}`,
+  ),
   ...["pad ls:*", "pad show:*", "pad tags", "pad status"].map((c) => `Bash(${c})`),
 ];
 

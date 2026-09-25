@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { Client } from "./client";
 import { config } from "./config";
+import { localDate } from "./daily";
 import type { Note } from "./db";
 import { type Kind, KIND_NAMES, KINDS } from "./kinds";
 
@@ -48,6 +49,7 @@ const summary = (n: Note) => ({
   tags: n.tags,
   pinned: n.pinned,
   kind: n.kind,
+  ...(n.progress.total > 0 && { progress: n.progress }),
   author: n.author,
   updated_at: n.updated_at,
   preview: n.body.length > 200 ? n.body.slice(0, 200) + "…" : n.body,
@@ -109,6 +111,20 @@ server.registerTool(
     },
   },
   safe((args) => client.create(args)),
+);
+
+server.registerTool(
+  "scratchpad_daily",
+  {
+    title: "Daily review",
+    description:
+      "Get the user's daily review note for a date, creating it (with open items carried over from the previous one) if it doesn't exist. Use when the user asks about today's plan, what's left, or a daily review.",
+    inputSchema: {
+      date: z.string().optional().describe("YYYY-MM-DD; defaults to today in the user's time zone"),
+    },
+    annotations: { idempotentHint: true },
+  },
+  safe(({ date }) => client.daily(date ?? localDate())),
 );
 
 server.registerTool(

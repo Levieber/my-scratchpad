@@ -56,5 +56,6 @@ export const api = {
   create: (input: NoteInput) => req<Note>("POST", "/api/notes", input),
   update: (id: string, patch: NoteInput) => req<Note>("PATCH", `/api/notes/${id}`, patch),
   delete: (id: string) => req<void>("DELETE", `/api/notes/${id}`),
+  daily: (date: string) => req<Note>("PUT", `/api/daily/${date}`),
   tags: () => req<Tag[]>("GET", "/api/tags"),
 };

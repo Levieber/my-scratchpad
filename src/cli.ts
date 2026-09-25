@@ -6,6 +6,7 @@ import { parseArgs } from "node:util";
 
 import { ApiError, Client } from "./client";
 import { clientConfigPath, config } from "./config";
+import { localDate } from "./daily";
 import type { Note } from "./db";
 import { isKind, KIND_NAMES, type Kind } from "./kinds";
 
@@ -19,7 +20,8 @@ Usage:
   pad edit <id>                                        edit body in $EDITOR
   pad set <id> [-t title] [--tag x]... [--kind k] [--pin|--unpin] update metadata
   pad rm <id>                                          delete a note
-  pad tags                                             list tags
+  pad today [YYYY-MM-DD]                               print (or create) the daily review
+  pad tags                                            list tags
   pad status                                           show which server is in use
   pad login <url> [token]                              point CLI/MCP at a server (e.g. Railway)
   pad logout                                           back to the local server
@@ -60,8 +62,12 @@ const ago = (iso: string) => {
   return `${Math.floor(s / 86400)}d`;
 };
 
+// Progress means something on a to-do list; on a reference checklist it's just the item count.
+const done = (n: Note) =>
+  n.kind === "note" && n.progress.total ? ` ${n.progress.done}/${n.progress.total}` : "";
+
 const line = (n: Note) =>
-  `${n.pinned ? "★" : " "} ${n.id}  ${n.title}${n.kind === "note" ? "" : ` [${n.kind}]`}${n.tags.length ? "  #" + n.tags.join(" #") : ""}  (${ago(n.updated_at)}, ${n.author})`;
+  `${n.pinned ? "★" : " "} ${n.id}  ${n.title}${done(n)}${n.kind === "note" ? "" : ` [${n.kind}]`}${n.tags.length ? "  #" + n.tags.join(" #") : ""}  (${ago(n.updated_at)}, ${n.author})`;
 
 const full = (n: Note) =>
   `${n.pinned ? "★ " : ""}${n.title}\nid: ${n.id} · by ${n.author} · updated ${n.updated_at}${
@@ -160,6 +166,11 @@ async function main() {
       const id = need(args[0]);
       await client.delete(id);
       return out({ deleted: id }, () => `deleted ${id}`);
+    }
+    case "today":
+    case "daily": {
+      const n = await client.daily(args[0] ?? localDate());
+      return out(n, () => full(n));
     }
     case "tags": {
       const tags = await client.tags();

@@ -180,6 +180,13 @@ button.ghost.kindToggle {
   font-size: 13px;
   color: var(--muted);
 }
+.done progress {
+  width: 48px;
+  height: 6px;
+  margin-right: 6px;
+  vertical-align: middle;
+  accent-color: var(--accent);
+}
 .badge.kind {
   background: none;
   border: 1px solid var(--line);

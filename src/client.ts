@@ -73,6 +73,8 @@ export class Client {
   append = (id: string, text: string) =>
     this.req<Note>("POST", `/api/notes/${encodeURIComponent(id)}/append`, { text });
   delete = (id: string) => this.req<void>("DELETE", `/api/notes/${encodeURIComponent(id)}`);
+  /** The daily review for a local YYYY-MM-DD date, created on first request. */
+  daily = (date: string) => this.req<Note>("PUT", `/api/daily/${encodeURIComponent(date)}`);
   tags = () => this.req<{ tag: string; count: number }[]>("GET", "/api/tags");
   health = () => this.req<{ ok: boolean }>("GET", "/api/health");
 }

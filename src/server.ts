@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { BunRequest } from "bun";
 
 import { config } from "./config";
+import { isDate } from "./daily";
 import { type ListQuery, type NoteInput, Store } from "./db";
 import { ERROR_MESSAGES, type ErrorBody, type ErrorCode } from "./errors";
 import { isKind, KIND_NAMES } from "./kinds";
@@ -57,6 +58,8 @@ async function readInput(req: Request): Promise<NoteInput> {
   if (kind !== undefined && !isKind(kind)) throw kindError();
   return { title, body: text, tags, pinned, kind };
 }
+
+const authorOf = (req: Request) => req.headers.get("x-pad-author")?.trim().slice(0, 64) || "human";
 
 const kindError = () =>
   new HttpError("invalidKind", 400, `kind must be one of: ${KIND_NAMES.join(", ")}`);
@@ -145,8 +148,7 @@ export function createRoutes(store: Store, { token }: { token?: string } = {}) {
       POST: async (req) => {
         const input = await readInput(req);
         if (!input.body?.trim() && !input.title?.trim()) throw new HttpError("emptyNote", 400);
-        const author = req.headers.get("x-pad-author")?.trim().slice(0, 64) || "human";
-        return json(store.create(input, author), 201);
+        return json(store.create(input, authorOf(req)), 201);
       },
     }),
 
@@ -164,6 +166,16 @@ export function createRoutes(store: Store, { token }: { token?: string } = {}) {
         const text = await readAppendText(req);
         if (!text) throw new HttpError("emptyAppend", 400);
         return json(noteOr404(store.append(id(req), text)));
+      },
+    }),
+
+    // PUT because it is idempotent: asking for the same day twice returns the same note.
+    "/api/daily/:date": resource({
+      PUT: (req) => {
+        const date = req.params.date ?? "";
+        if (!isDate(date)) throw new HttpError("invalidDate", 400);
+        const { note, created } = store.daily(date, authorOf(req));
+        return json(note, created ? 201 : 200);
       },
     }),
 

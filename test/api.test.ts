@@ -82,6 +82,39 @@ describe("notes API", () => {
     expect((await call("GET", "/api/notes")).data[0].body).toBe("pinned one");
   });
 
+  test("notes report checkbox progress, kept current on every write", async () => {
+    const { data: n } = await call("POST", "/api/notes", { body: "- [x] a\n- [ ] b" });
+    expect(n.progress).toEqual({ done: 1, total: 2 });
+    const patched = (await call("PATCH", `/api/notes/${n.id}`, { body: "- [x] a\n- [x] b" })).data;
+    expect(patched.progress).toEqual({ done: 2, total: 2 });
+    const appended = (await call("POST", `/api/notes/${n.id}/append`, "- [ ] c")).data;
+    expect(appended.progress).toEqual({ done: 2, total: 3 });
+    expect((await call("GET", "/api/notes")).data[0].progress).toEqual({ done: 2, total: 3 });
+  });
+
+  test("daily review: created once per date, carrying over open items", async () => {
+    const first = await call("PUT", "/api/daily/2026-09-24");
+    expect(first.status).toBe(201);
+    expect(first.data).toMatchObject({
+      title: "Daily review 2026-09-24",
+      tags: ["daily"],
+      kind: "note",
+    });
+    const again = await call("PUT", "/api/daily/2026-09-24");
+    expect([again.status, again.data.id]).toEqual([200, first.data.id]);
+
+    await call("PATCH", `/api/notes/${first.data.id}`, {
+      body: "## Tomorrow\n- [ ] ship the list\n- [x] write tests",
+    });
+    const next = await call("PUT", "/api/daily/2026-09-25", undefined, {
+      "x-pad-author": "claude-code",
+    });
+    expect(next.status).toBe(201);
+    expect(next.data.author).toBe("claude-code");
+    expect(next.data.body).toContain("- [ ] ship the list");
+    expect(next.data.body).not.toContain("write tests");
+  });
+
   test("kind defaults to note and can be set on create and patch", async () => {
     const { data: n } = await call("POST", "/api/notes", { body: "a note" });
     expect(n.kind).toBe("note");
@@ -143,6 +176,8 @@ describe("notes API", () => {
       ["POST", "/api/notes", { tags: [1] }, 400, "invalidBody"],
       ["POST", "/api/notes", { body: "x", kind: "checklist" }, 400, "invalidKind"],
       ["GET", "/api/notes?kind=checklist", undefined, 400, "invalidKind"],
+      ["PUT", "/api/daily/2026-02-30", undefined, 400, "invalidDate"],
+      ["PUT", "/api/daily/today", undefined, 400, "invalidDate"],
       ["PATCH", "/api/notes/nope", { body: "x" }, 404, "noteNotFound"],
       ["DELETE", "/api/notes/nope", undefined, 404, "noteNotFound"],
       ["POST", "/api/notes/nope/append", "x", 404, "noteNotFound"],

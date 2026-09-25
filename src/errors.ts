@@ -9,6 +9,7 @@ export const ERROR_MESSAGES = {
   emptyNote: "Provide a body or a title",
   emptyAppend: "Provide text to append",
   invalidKind: "Unknown kind",
+  invalidDate: "Expected a date as YYYY-MM-DD",
   unauthorized: "Missing or invalid bearer token",
   noteNotFound: "Note not found",
   notFound: "No such endpoint",

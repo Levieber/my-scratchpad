@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { localDate } from "../daily";
 import type { Kind } from "../kinds";
 import { hasToken, parseQuery, toggleToken } from "../query";
 import { api, token, Unauthorized, type Note, type Tag } from "./api";
@@ -134,10 +135,10 @@ export function App() {
     if (latest.current.dirty) await save();
   };
 
-  const openNote = async (id: string) => {
+  const show = async (load: () => Promise<Note>) => {
     await flush();
     try {
-      const n = await api.get(id);
+      const n = await load();
       setCurrent(n);
       setDraft(toDraft(n));
       setSaveState("");
@@ -146,6 +147,9 @@ export function App() {
       handle(e);
     }
   };
+  const openNote = (id: string) => show(() => api.get(id));
+  // The first open of the day creates the note, so refresh the list to show it.
+  const openToday = () => show(() => api.daily(localDate())).then(refreshList);
 
   const newNote = async (body = "") => {
     await flush();
@@ -267,6 +271,9 @@ export function App() {
       <aside className="sidebar">
         <header className="bar">
           <h1>Scratchpad</h1>
+          <button title="Today's daily review" onClick={() => void openToday()}>
+            Today
+          </button>
           <button
             className="primary"
             title="New note (Ctrl+Alt+N)"
@@ -330,6 +337,16 @@ export function App() {
                         <span className="t">{n.title}</span>
                         {p && <span className="p">{p}</span>}
                         <span className="m">
+                          {n.kind === "note" && n.progress.total > 0 && (
+                            <span className="done">
+                              <progress
+                                value={n.progress.done}
+                                max={n.progress.total}
+                                aria-hidden="true"
+                              />
+                              {n.progress.done}/{n.progress.total} ·{" "}
+                            </span>
+                          )}
                           {ago(n.updated_at)}
                           {n.kind === "reference" && !kind && (
                             <span className="badge kind">reference</span>

@@ -10,7 +10,18 @@ const kind = {
 // The API contract. Every client (PWA, CLI, MCP, curl, other agents) goes through these endpoints.
 const Note = {
   type: "object",
-  required: ["id", "title", "body", "tags", "pinned", "kind", "author", "created_at", "updated_at"],
+  required: [
+    "id",
+    "title",
+    "body",
+    "tags",
+    "pinned",
+    "kind",
+    "author",
+    "created_at",
+    "updated_at",
+    "progress",
+  ],
   properties: {
     id: { type: "string" },
     title: { type: "string" },
@@ -24,6 +35,13 @@ const Note = {
     },
     created_at: { type: "string", format: "date-time" },
     updated_at: { type: "string", format: "date-time" },
+    progress: {
+      type: "object",
+      description: "Markdown checkboxes (`- [ ]`, `- [x]`) in the body, outside code fences",
+      required: ["done", "total"],
+      properties: { done: { type: "integer" }, total: { type: "integer" } },
+      readOnly: true,
+    },
   },
 };
 
@@ -163,6 +181,27 @@ export const openapi = {
         },
       },
     },
+    "/api/daily/{date}": {
+      parameters: [
+        {
+          name: "date",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "date" },
+          description: "The user's local date; the server can't know their time zone",
+        },
+      ],
+      put: {
+        operationId: "dailyReview",
+        summary:
+          "Get the daily review for a date, creating it (tag `daily`, open items carried over from the previous review) on first request",
+        responses: {
+          200: { description: "Existing review", ...json({ $ref: "#/components/schemas/Note" }) },
+          201: { description: "Created", ...json({ $ref: "#/components/schemas/Note" }) },
+          400: { description: "Bad date", ...json({ $ref: "#/components/schemas/Error" }) },
+        },
+      },
+    },
     "/api/tags": {
       get: {
         operationId: "listTags",
@@ -208,7 +247,10 @@ Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 - PATCH  /api/notes/{id}       {title?, body?, tags?, pinned?, kind?}
 - POST   /api/notes/{id}/append {text}  (or text/plain)
 - DELETE /api/notes/{id}
+- PUT    /api/daily/{YYYY-MM-DD}  the daily review for the user's local date (created on first request)
 - GET    /api/tags
+
+Every note carries \`progress: {done, total}\`, counted from its markdown checkboxes.
 
 ## Kinds and search
 ${KIND_NAMES.map((k) => `- ${k}: ${KINDS[k]}`).join("\n")}

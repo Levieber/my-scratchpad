@@ -23,6 +23,7 @@ bun run typecheck
 ```sh
 pad add "idea: …" --tag ideas        # or: echo … | pad add
 pad ls [query] [--tag x]... [--kind reference] [--json]   # query: words, kind:reference, '#tag'
+pad today                            # the daily review, open items carried over
 pad show <id> · pad append <id> "…" · pad edit <id> · pad set <id> --pin · pad rm <id>
 pad status · pad login <url> <token> · pad logout
 ```

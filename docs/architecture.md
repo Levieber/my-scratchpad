@@ -10,6 +10,8 @@ src/
   errors.ts       Error codes + messages; shared by server and clients.
   kinds.ts        Note kinds (note, reference); a use case is a tag, not a kind. Shared.
   query.ts        The search language (`kind:x #tag words`); run by the server, edited by the PWA.
+  checklist.ts    Markdown checkboxes → `progress` on every note, open items for carry-over.
+  daily.ts        The daily review's title, template and date helpers (the date is the client's).
   openapi.ts      The contract (/openapi.json) and the agent quick-start (/llms.txt).
   config.ts       Every env var and ~/.config/scratchpad/config.json, read in one place.
   client.ts       Typed HTTP client used by the CLI, MCP server and Claude Code hook.
