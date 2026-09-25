@@ -1,6 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, token, Unauthorized, type Note, type Tag } from "./api";
+import { groupNotes, preview, visibleTags } from "./listing";
+
+const PAGE = 50;
+const TAG_LIMIT = 8;
+const WIDTH_KEY = "pad-sidebar-width";
+const MIN_WIDTH = 260;
+const MAX_WIDTH = 560;
+const clampWidth = (w: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(w)));
+
+// The width is a per-device convenience, so storage failing (private mode) just means the default.
+const storedWidth = () => {
+  try {
+    const w = Number(localStorage.getItem(WIDTH_KEY));
+    return w ? clampWidth(w) : 360;
+  } catch {
+    return 360;
+  }
+};
 
 type Draft = { title: string; body: string; tags: string; pinned: boolean };
 
@@ -36,6 +54,10 @@ export function App() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [q, setQ] = useState("");
   const [tag, setTag] = useState("");
+  const [limit, setLimit] = useState(PAGE);
+  const [allTags, setAllTags] = useState(false);
+  const [width, setWidth] = useState(storedWidth);
+  const [listHidden, setListHidden] = useState(false);
   const [online, setOnline] = useState(true);
   const [needsToken, setNeedsToken] = useState(false);
 
@@ -57,7 +79,7 @@ export function App() {
 
   const refreshList = useCallback(async () => {
     try {
-      const [n, t] = await Promise.all([api.list({ q, tag }), api.tags()]);
+      const [n, t] = await Promise.all([api.list({ q, tag, limit }), api.tags()]);
       setNotes(n);
       setTags(t);
       setOnline(true);
@@ -65,7 +87,7 @@ export function App() {
     } catch (e) {
       handle(e);
     }
-  }, [q, tag, handle]);
+  }, [q, tag, limit, handle]);
 
   const save = useCallback(async () => {
     const l = latest.current;
@@ -207,6 +229,20 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(WIDTH_KEY, String(width));
+    } catch {}
+  }, [width]);
+
+  const filter = (next: { q?: string; tag?: string }) => {
+    if (next.q !== undefined) setQ(next.q);
+    if (next.tag !== undefined) setTag(next.tag);
+    setLimit(PAGE);
+  };
+
+  const shownTags = allTags ? tags : visibleTags(tags, tag, TAG_LIMIT);
+
   const saveLabel = {
     "": "",
     pending: "…",
@@ -216,7 +252,12 @@ export function App() {
   }[saveState];
 
   return (
-    <div className="app" data-view={open ? "editor" : "list"}>
+    <div
+      className="app"
+      data-view={open ? "editor" : "list"}
+      data-list={open && listHidden ? "hidden" : undefined}
+      style={{ "--sidebar": `${width}px` } as React.CSSProperties}
+    >
       <aside className="sidebar">
         <header className="bar">
           <h1>Scratchpad</h1>
@@ -233,47 +274,62 @@ export function App() {
           type="search"
           placeholder="Search…  (/)"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => filter({ q: e.target.value })}
         />
         {tags.length > 0 && (
           <div className="tags">
-            {tags.map((t) => (
+            {shownTags.map((t) => (
               <button
                 key={t.tag}
                 aria-pressed={tag === t.tag}
-                onClick={() => setTag(tag === t.tag ? "" : t.tag)}
+                onClick={() => filter({ tag: tag === t.tag ? "" : t.tag })}
               >
                 #{t.tag} {t.count}
               </button>
             ))}
+            {tags.length > TAG_LIMIT && (
+              <button className="more" aria-expanded={allTags} onClick={() => setAllTags(!allTags)}>
+                {allTags ? "Fewer tags" : `+${tags.length - shownTags.length} more`}
+              </button>
+            )}
           </div>
         )}
-        <ul className="list" aria-label="Notes">
-          {notes.map((n) => (
-            <li key={n.id}>
-              {/* A real button, so the list works from the keyboard and screen readers. */}
-              <button
-                className="item"
-                aria-current={current?.id === n.id}
-                onClick={() => void openNote(n.id)}
-              >
-                <span className="t">
-                  {n.pinned && "★ "}
-                  {n.title}
-                  {n.author !== "human" && <span className="badge">{n.author}</span>}
-                </span>
-                <span className="p">{n.body.slice(0, 160)}</span>
-                <span className="m">
-                  {ago(n.updated_at)}
-                  {n.tags.length > 0 && " · #" + n.tags.join(" #")}
-                </span>
-              </button>
-            </li>
+        <nav className="list" aria-label="Notes">
+          {groupNotes(notes).map((g) => (
+            <section key={g.label} aria-label={g.label}>
+              <h2 className="group">{g.label}</h2>
+              <ul>
+                {g.notes.map((n) => {
+                  const p = preview(n);
+                  return (
+                    <li key={n.id}>
+                      {/* A real button, so the list works from the keyboard and screen readers. */}
+                      <button
+                        className="item"
+                        aria-current={current?.id === n.id}
+                        onClick={() => void openNote(n.id)}
+                      >
+                        <span className="t">{n.title}</span>
+                        {p && <span className="p">{p}</span>}
+                        <span className="m">
+                          {ago(n.updated_at)}
+                          {n.author !== "human" && <span className="badge">{n.author}</span>}
+                          {n.tags.length > 0 && <span> · #{n.tags.join(" #")}</span>}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           ))}
-          {notes.length === 0 && (
-            <li className="m">{q || tag ? "No matches." : "No notes yet."}</li>
+          {notes.length === 0 && <p className="m">{q || tag ? "No matches." : "No notes yet."}</p>}
+          {notes.length >= limit && (
+            <button className="more" onClick={() => setLimit((l) => l + PAGE)}>
+              Load more
+            </button>
           )}
-        </ul>
+        </nav>
         <footer className="foot">
           <span className={online ? "status" : "status off"}>{online ? "online" : "offline"}</span>
           <a href="/openapi.json" target="_blank">
@@ -282,7 +338,9 @@ export function App() {
         </footer>
       </aside>
 
-      {open ? (
+      {open && !listHidden && <Splitter width={width} onChange={setWidth} />}
+
+      {open && (
         <main className="editor">
           <header className="bar">
             <button
@@ -291,6 +349,14 @@ export function App() {
               onClick={() => flush().then(() => setOpen(false))}
             >
               ←
+            </button>
+            <button
+              className="ghost toggleList"
+              aria-label={listHidden ? "Show note list" : "Hide note list"}
+              aria-expanded={!listHidden}
+              onClick={() => setListHidden(!listHidden)}
+            >
+              {listHidden ? "»" : "«"}
             </button>
             <input
               className="title"
@@ -329,10 +395,6 @@ export function App() {
             <span>{saveLabel}</span>
           </footer>
         </main>
-      ) : (
-        <section className="empty">
-          <p>Select a note or create a new one.</p>
-        </section>
       )}
 
       {needsToken && (
@@ -376,3 +438,42 @@ function TokenDialog({ onSave }: { onSave: (token: string) => void }) {
     </div>
   );
 }
+
+// WAI-ARIA's window splitter is a focusable separator carrying a value, so keyboard and screen
+// reader users can resize the list too; jsx-a11y treats every separator as non-interactive.
+/* oxlint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */
+function Splitter({ width, onChange }: { width: number; onChange: (width: number) => void }) {
+  // The sidebar starts at the left edge, so the pointer's x is the new width.
+  const drag = (e: React.PointerEvent<HTMLHRElement>) => {
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => onChange(clampWidth(ev.clientX));
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+  };
+  const key = (e: React.KeyboardEvent) => {
+    const step = { ArrowLeft: -20, ArrowRight: 20 }[e.key];
+    if (step) {
+      e.preventDefault();
+      onChange(clampWidth(width + step));
+    }
+  };
+  return (
+    <hr
+      className="resize"
+      aria-orientation="vertical"
+      aria-label="Resize note list"
+      aria-valuemin={MIN_WIDTH}
+      aria-valuemax={MAX_WIDTH}
+      aria-valuenow={width}
+      tabIndex={0}
+      onPointerDown={drag}
+      onKeyDown={key}
+    />
+  );
+}
+/* oxlint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */
