@@ -12,7 +12,10 @@
     "strict": true,
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
-    "types": ["bun"]
+    "types": ["bun"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
-  "include": ["src", "test"]
+  "include": ["src", "integrations", "test"]
 }

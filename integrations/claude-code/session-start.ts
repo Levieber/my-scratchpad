@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 // Claude Code SessionStart hook: tells Claude the scratchpad exists and injects pinned notes
 // plus recent titles as context. Stays silent and fast if the server is unreachable.
-import { Client } from "../../src/client";
-import { config } from "../../src/config";
-import type { Note } from "../../src/db";
+import { Client } from "@/client";
+import { config } from "@/config";
+import type { Note } from "@/db";
 import { withTimeout } from "./timeout";
 
 const MAX_PINNED_CHARS = 3000;

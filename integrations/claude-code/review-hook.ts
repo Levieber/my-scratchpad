@@ -5,8 +5,8 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { basename } from "node:path";
 
-import { Client } from "../../src/client";
-import { config } from "../../src/config";
+import { Client } from "@/client";
+import { config } from "@/config";
 import { editsPath, reviewReason } from "./review";
 import { withTimeout } from "./timeout";
 
