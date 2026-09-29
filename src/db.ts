@@ -4,8 +4,11 @@ import { dirname } from "node:path";
 
 import { openItems, type Progress, progress } from "./checklist";
 import { DAILY_TAG, dailyBody, dailyTitle } from "./daily";
+import { diffStats } from "./diff";
+import { newId } from "./ids";
 import type { Kind } from "./kinds";
 import { migrate } from "./migrations";
+import { deriveTitle } from "./title";
 
 export type Note = {
   id: string;
@@ -22,6 +25,8 @@ export type Note = {
 };
 
 export type NoteInput = {
+  /** Create only: a client-chosen id (see src/ids.ts), so a note made offline keeps it. */
+  id?: string;
   title?: string;
   body?: string;
   tags?: string[];
@@ -40,7 +45,28 @@ export type ListQuery = {
   offset?: number;
 };
 
+/**
+ * A note's content as of `updated_at`. Saves by one author close together are one revision, so an
+ * autosaving editor records an editing session rather than every pause in typing.
+ */
+export type Revision = {
+  id: number;
+  note_id: string;
+  title: string;
+  tags: string[];
+  kind: Kind;
+  /** Who made the change (X-Pad-Author), unlike the note's author, who created it. */
+  author: string;
+  updated_at: string;
+  /** Lines added and removed since the previous revision. */
+  added: number;
+  removed: number;
+};
+
+export type FullRevision = Revision & { body: string };
+
 type Row = Omit<Note, "tags" | "pinned" | "progress"> & { tags: string; pinned: number };
+type RevisionRow = Omit<FullRevision, "tags"> & { tags: string };
 
 const toNote = (r: Row): Note => ({
   ...r,
@@ -49,27 +75,37 @@ const toNote = (r: Row): Note => ({
   progress: progress(r.body),
 });
 
+const toFullRevision = (r: RevisionRow): FullRevision => ({ ...r, tags: JSON.parse(r.tags) });
+const toRevision = (r: RevisionRow): Revision => {
+  const { body: _, ...rest } = toFullRevision(r);
+  return rest;
+};
+
 const hasTag = "EXISTS (SELECT 1 FROM json_each(notes.tags) WHERE value = ?)";
 
-// Sortable, URL-safe id: base36 timestamp + random suffix.
-const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+/** How long after a revision further saves by the same author still belong to it. */
+export const REVISION_WINDOW_MS = 5 * 60_000;
+
+type Content = Pick<Note, "title" | "body" | "tags" | "kind">;
+
+// What a revision records; pinning is a view setting, not an edit.
+const sameContent = (a: Content, b: Content) =>
+  a.title === b.title &&
+  a.body === b.body &&
+  a.kind === b.kind &&
+  JSON.stringify(a.tags) === JSON.stringify(b.tags);
 
 const normTags = (tags: unknown): string[] =>
   Array.isArray(tags)
     ? [...new Set(tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean))]
     : [];
 
-// Derive a title from the first non-empty line when none is given.
-const deriveTitle = (body: string) =>
-  (body.split("\n").find((l) => l.trim()) ?? "")
-    .replace(/^#+\s*/, "")
-    .trim()
-    .slice(0, 80) || "Untitled";
-
 export class Store {
   db: Database;
+  private now: () => Date;
 
-  constructor(path: string) {
+  constructor(path: string, { now = () => new Date() }: { now?: () => Date } = {}) {
+    this.now = now;
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path, { create: true, strict: true });
     this.db.run("PRAGMA journal_mode = WAL");
@@ -115,10 +151,10 @@ export class Store {
   }
 
   create(input: NoteInput, author = "human"): Note {
-    const now = new Date().toISOString();
+    const now = this.now().toISOString();
     const body = input.body ?? "";
     const note: Note = {
-      id: newId(),
+      id: input.id ?? newId(),
       title: input.title?.trim() || deriveTitle(body),
       body,
       tags: normTags(input.tags),
@@ -130,12 +166,15 @@ export class Store {
       progress: progress(body),
     };
     const { progress: _, ...row } = note;
-    this.db
-      .query(
-        `INSERT INTO notes (id, title, body, tags, pinned, kind, author, created_at, updated_at)
-         VALUES ($id, $title, $body, $tags, $pinned, $kind, $author, $created_at, $updated_at)`,
-      )
-      .run({ ...row, tags: JSON.stringify(note.tags), pinned: note.pinned ? 1 : 0 });
+    this.db.transaction(() => {
+      this.db
+        .query(
+          `INSERT INTO notes (id, title, body, tags, pinned, kind, author, created_at, updated_at)
+           VALUES ($id, $title, $body, $tags, $pinned, $kind, $author, $created_at, $updated_at)`,
+        )
+        .run({ ...row, tags: JSON.stringify(note.tags), pinned: note.pinned ? 1 : 0 });
+      this.record(note, author);
+    })();
     return note;
   }
 
@@ -162,7 +201,7 @@ export class Store {
     })();
   }
 
-  update(id: string, patch: NoteInput): Note | null {
+  update(id: string, patch: NoteInput, author = "human"): Note | null {
     const cur = this.get(id);
     if (!cur) return null;
     const next: Note = {
@@ -175,30 +214,114 @@ export class Store {
       tags: patch.tags !== undefined ? normTags(patch.tags) : cur.tags,
       pinned: patch.pinned ?? cur.pinned,
       kind: patch.kind ?? cur.kind,
-      updated_at: new Date().toISOString(),
+      // Always later than the last write, even within one millisecond: updated_at is the version
+      // clients send back in If-Match, so two writes must never share one.
+      updated_at: new Date(
+        Math.max(this.now().getTime(), Date.parse(cur.updated_at) + 1),
+      ).toISOString(),
       progress: progress(patch.body ?? cur.body),
     };
-    this.db
-      .query(
-        `UPDATE notes SET title=$title, body=$body, tags=$tags, pinned=$pinned, kind=$kind, updated_at=$updated_at WHERE id=$id`,
-      )
-      .run({
-        id,
-        title: next.title,
-        body: next.body,
-        tags: JSON.stringify(next.tags),
-        pinned: next.pinned ? 1 : 0,
-        kind: next.kind,
-        updated_at: next.updated_at,
-      });
+    this.db.transaction(() => {
+      this.db
+        .query(
+          `UPDATE notes SET title=$title, body=$body, tags=$tags, pinned=$pinned, kind=$kind, updated_at=$updated_at WHERE id=$id`,
+        )
+        .run({
+          id,
+          title: next.title,
+          body: next.body,
+          tags: JSON.stringify(next.tags),
+          pinned: next.pinned ? 1 : 0,
+          kind: next.kind,
+          updated_at: next.updated_at,
+        });
+      if (!sameContent(cur, next)) this.record(next, author);
+    })();
     return next;
   }
 
-  append(id: string, text: string): Note | null {
+  append(id: string, text: string, author = "human"): Note | null {
     const cur = this.get(id);
     if (!cur) return null;
     const sep = cur.body && !cur.body.endsWith("\n") ? "\n" : "";
-    return this.update(id, { body: cur.body + sep + text });
+    return this.update(id, { body: cur.body + sep + text }, author);
+  }
+
+  /**
+   * Adds `note`'s content to its history, or folds it into the latest revision when the same
+   * author saved within the window. A folded revision that ends up equal to the one before it
+   * (an edit typed and then undone) is dropped.
+   */
+  private record(note: Note, author: string) {
+    const [last, before] = this.db
+      .query("SELECT * FROM note_revisions WHERE note_id = ? ORDER BY id DESC LIMIT 2")
+      .all(note.id) as RevisionRow[];
+    const fold =
+      last?.author === author &&
+      Date.parse(note.updated_at) - Date.parse(last.updated_at) < REVISION_WINDOW_MS;
+    const previous = fold ? before : last;
+    if (fold && previous && sameContent(toFullRevision(previous), note)) {
+      this.db.query("DELETE FROM note_revisions WHERE id = ?").run(last.id);
+      return;
+    }
+    const row = {
+      title: note.title,
+      body: note.body,
+      tags: JSON.stringify(note.tags),
+      kind: note.kind,
+      updated_at: note.updated_at,
+      ...diffStats(previous?.body ?? "", note.body),
+    };
+    if (fold) {
+      this.db
+        .query(
+          `UPDATE note_revisions SET title=$title, body=$body, tags=$tags, kind=$kind,
+             updated_at=$updated_at, added=$added, removed=$removed WHERE id=$id`,
+        )
+        .run({ ...row, id: last.id });
+    } else {
+      this.db
+        .query(
+          `INSERT INTO note_revisions (note_id, title, body, tags, kind, author, updated_at, added, removed)
+           VALUES ($note_id, $title, $body, $tags, $kind, $author, $updated_at, $added, $removed)`,
+        )
+        .run({ ...row, note_id: note.id, author });
+    }
+  }
+
+  /** A note's history, newest first, without bodies. */
+  revisions(noteId: string, { limit = 50, offset = 0 } = {}): Revision[] {
+    return (
+      this.db
+        .query("SELECT * FROM note_revisions WHERE note_id = ? ORDER BY id DESC LIMIT ? OFFSET ?")
+        .all(noteId, Math.min(limit, 500), offset) as RevisionRow[]
+    ).map(toRevision);
+  }
+
+  revision(noteId: string, id: number): FullRevision | null {
+    const r = this.db
+      .query("SELECT * FROM note_revisions WHERE note_id = ? AND id = ?")
+      .get(noteId, id) as RevisionRow | null;
+    return r ? toFullRevision(r) : null;
+  }
+
+  /** The revision just before `id`, or null when `id` is the first. */
+  previousRevision(noteId: string, id: number): FullRevision | null {
+    const r = this.db
+      .query("SELECT * FROM note_revisions WHERE note_id = ? AND id < ? ORDER BY id DESC LIMIT 1")
+      .get(noteId, id) as RevisionRow | null;
+    return r ? toFullRevision(r) : null;
+  }
+
+  /** The latest revision, or the latest saved at or before `until` (an ISO timestamp). */
+  latestRevision(noteId: string, until?: string): FullRevision | null {
+    const r = this.db
+      .query(
+        `SELECT * FROM note_revisions WHERE note_id = $id AND ($until IS NULL OR updated_at <= $until)
+         ORDER BY id DESC LIMIT 1`,
+      )
+      .get({ id: noteId, until: until ?? null }) as RevisionRow | null;
+    return r ? toFullRevision(r) : null;
   }
 
   delete(id: string): boolean {

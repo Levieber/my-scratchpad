@@ -157,6 +157,38 @@ server.registerTool(
 );
 
 server.registerTool(
+  "scratchpad_history",
+  {
+    title: "Note history",
+    description:
+      "List a note's revisions, newest first: who changed it, when, and how many lines were added/removed. Use scratchpad_diff to see a change.",
+    inputSchema: {
+      id: z.string(),
+      limit: z.number().int().min(1).max(100).optional().describe("Default 20"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  safe(({ id, limit }) => client.revisions(id, { limit: limit ?? 20 })),
+);
+
+server.registerTool(
+  "scratchpad_diff",
+  {
+    title: "Diff note",
+    description:
+      "Show what changed in a note as a unified diff (plus title/tags/kind changes). Defaults to the latest change. Pass `since` (e.g. the updated_at you last read) to see everything the user changed after that.",
+    inputSchema: {
+      id: z.string(),
+      since: z.string().optional().describe("ISO date-time; compare with the note as it was then"),
+      from: z.number().int().optional().describe("Revision id (from scratchpad_history)"),
+      to: z.number().int().optional().describe("Revision id; default the latest"),
+    },
+    annotations: { readOnlyHint: true },
+  },
+  safe(({ id, ...q }) => client.diff(id, q)),
+);
+
+server.registerTool(
   "scratchpad_delete",
   {
     title: "Delete note",

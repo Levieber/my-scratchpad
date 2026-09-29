@@ -61,6 +61,37 @@ describe("migrations", () => {
     ]);
   });
 
+  test("0005 starts every note's history with its current state", () => {
+    const db = new Database(":memory:");
+    migrate(
+      db,
+      MIGRATIONS.filter((m) => m.id < "0005"),
+    );
+    const insert = db.query(
+      "INSERT INTO notes (id, title, body, author, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    );
+    insert.run("a", "Log", "one\ntwo\nthree", "claude-code", "2026-01-01", "2026-01-02");
+    insert.run("b", "Empty", "", "human", "2026-01-03", "2026-01-03");
+
+    migrate(db);
+    const rows = db
+      .query(
+        "SELECT note_id, body, author, updated_at, added, removed FROM note_revisions ORDER BY id",
+      )
+      .all();
+    expect(rows).toEqual([
+      {
+        note_id: "a",
+        body: "one\ntwo\nthree",
+        author: "claude-code",
+        updated_at: "2026-01-02",
+        added: 3,
+        removed: 0,
+      },
+      { note_id: "b", body: "", author: "human", updated_at: "2026-01-03", added: 0, removed: 0 },
+    ]);
+  });
+
   test("a failing migration rolls back the whole batch", () => {
     const db = new Database(":memory:");
     const broken = [

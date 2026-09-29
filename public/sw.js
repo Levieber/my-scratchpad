@@ -1,7 +1,8 @@
 // Runtime caching (bundle filenames are content-hashed, so there is no fixed shell list):
 // - pages & API GETs: network-first, cached fallback -> notes stay readable offline
 // - other assets: cache-first (hashed names never change)
-const CACHE = "scratchpad-v2";
+// Writes are never intercepted: offline, they fail, and the PWA's outbox keeps them (src/web/sync.ts).
+const CACHE = "scratchpad-v3";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
@@ -22,6 +23,14 @@ const put = (req, res) => {
   return res;
 };
 
+// Answers from the cache carry this header, so the page knows it is offline even though the
+// request succeeded (src/web/api.ts).
+const fromCache = (res) => {
+  const headers = new Headers(res.headers);
+  headers.set("x-pad-offline", "1");
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+};
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   const url = new URL(req.url);
@@ -38,7 +47,13 @@ self.addEventListener("fetch", (e) => {
       fetch(req)
         .then((res) => put(req, res))
         .catch(() =>
-          caches.match(req).then((r) => r ?? Response.json({ error: "offline" }, { status: 503 })),
+          caches
+            .match(req)
+            .then((r) =>
+              fromCache(
+                r ?? Response.json({ error: "offline", message: "Offline" }, { status: 503 }),
+              ),
+            ),
         ),
     );
   } else {

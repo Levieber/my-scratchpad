@@ -4,10 +4,12 @@ import { type Note, Store } from "../src/db";
 import { createServer } from "../src/server";
 
 let server: ReturnType<typeof createServer> | undefined;
+let store: Store;
 
 // A real server on a random port: the route table only exists inside Bun.serve.
 function boot(token?: string) {
-  server = createServer({ store: new Store(":memory:"), token });
+  store = new Store(":memory:");
+  server = createServer({ store, token });
   return server;
 }
 
@@ -215,6 +217,98 @@ describe("notes API", () => {
     expect(
       (await call("GET", "/api/notes", undefined, { authorization: "Bearer s3cret" })).status,
     ).toBe(200);
+  });
+
+  test("history: revisions per author, diffs between them", async () => {
+    const { data: n } = await call("POST", "/api/notes", { body: "# Plan\n- one" });
+    // The same author saving again soon is the same editing session.
+    await call("PATCH", `/api/notes/${n.id}`, { body: "# Plan\n- one\n- two" });
+    await call("POST", `/api/notes/${n.id}/append`, "- three", { "x-pad-author": "claude-code" });
+    // Pinning isn't an edit.
+    await call("PATCH", `/api/notes/${n.id}`, { pinned: true }, { "x-pad-author": "claude-code" });
+
+    const { data: revs } = await call("GET", `/api/notes/${n.id}/revisions`);
+    expect(revs.map((r: any) => [r.author, r.added, r.removed])).toEqual([
+      ["claude-code", 1, 0],
+      ["human", 3, 0],
+    ]);
+    expect(revs[0].body).toBeUndefined();
+
+    const latest = await call("GET", `/api/notes/${n.id}/diff`);
+    expect(latest.data.from.id).toBe(revs[1].id);
+    expect(latest.data.to.id).toBe(revs[0].id);
+    expect(latest.data.changes).toEqual({});
+    expect(latest.data.diff).toContain("\n+- three\n");
+
+    const first = await call("GET", `/api/notes/${n.id}/diff?to=${revs[1].id}`);
+    expect(first.data.from).toBeNull();
+    expect(first.data.changes.title).toEqual({ from: null, to: "Plan" });
+    expect(first.data.diff).toContain("@@ -0,0 +1,3 @@");
+
+    const full = await call("GET", `/api/notes/${n.id}/revisions/${revs[1].id}`);
+    expect(full.data.body).toBe("# Plan\n- one\n- two");
+
+    // Since a time before the note existed, everything is new; since now, nothing is.
+    const before = await call("GET", `/api/notes/${n.id}/diff?since=2000-01-01T00:00:00Z`);
+    expect(before.data.from).toBeNull();
+    const now = await call("GET", `/api/notes/${n.id}/diff?since=${new Date().toISOString()}`);
+    expect(now.data.diff).toBe("");
+  });
+
+  test("history errors", async () => {
+    const { data: n } = await call("POST", "/api/notes", { body: "x" });
+    const cases: [string, number, string][] = [
+      ["/api/notes/nope/revisions", 404, "noteNotFound"],
+      ["/api/notes/nope/diff", 404, "noteNotFound"],
+      [`/api/notes/${n.id}/revisions/999`, 404, "revisionNotFound"],
+      [`/api/notes/${n.id}/diff?from=999`, 404, "revisionNotFound"],
+      [`/api/notes/${n.id}/diff?to=abc`, 400, "invalidParam"],
+      [`/api/notes/${n.id}/diff?since=yesterday`, 400, "invalidParam"],
+      [`/api/notes/${n.id}/diff?from=1&since=2026-01-01`, 400, "invalidParam"],
+    ];
+    for (const [path, status, code] of cases) {
+      const res = await call("GET", path);
+      expect([path, res.status, res.data.error]).toEqual([path, status, code]);
+    }
+  });
+
+  test("deleting a note deletes its history", async () => {
+    const { data: n } = await call("POST", "/api/notes", { body: "x" });
+    await call("DELETE", `/api/notes/${n.id}`);
+    expect(store.db.query("SELECT COUNT(*) AS n FROM note_revisions").get()).toEqual({ n: 0 });
+  });
+
+  test("If-Match: a write based on an old version is refused", async () => {
+    const { data: n, headers } = await call("POST", "/api/notes", { body: "v1" });
+    expect(headers.get("etag")).toBe(`"${n.updated_at}"`);
+
+    const ok = await call(
+      "PATCH",
+      `/api/notes/${n.id}`,
+      { body: "v2" },
+      { "if-match": `"${n.updated_at}"` },
+    );
+    expect(ok.status).toBe(200);
+    const stale = await call(
+      "PATCH",
+      `/api/notes/${n.id}`,
+      { body: "v3" },
+      { "if-match": n.updated_at },
+    );
+    expect([stale.status, stale.data.error]).toEqual([412, "noteChanged"]);
+    expect((await call("GET", `/api/notes/${n.id}`)).data.body).toBe("v2");
+    expect(
+      (await call("PATCH", `/api/notes/${n.id}`, { body: "v4" }, { "if-match": "*" })).status,
+    ).toBe(200);
+  });
+
+  test("a client-chosen id makes a create safe to retry", async () => {
+    const first = await call("POST", "/api/notes", { id: "offline-note-1", body: "made offline" });
+    expect([first.status, first.data.id]).toEqual([201, "offline-note-1"]);
+    const again = await call("POST", "/api/notes", { id: "offline-note-1", body: "made offline" });
+    expect([again.status, again.data.error]).toEqual([409, "noteExists"]);
+    const bad = await call("POST", "/api/notes", { id: "a/b", body: "x" });
+    expect([bad.status, bad.data.error]).toEqual([400, "invalidBody"]);
   });
 
   test("discovery endpoints and PWA files", async () => {

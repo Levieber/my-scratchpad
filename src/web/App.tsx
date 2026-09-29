@@ -1,10 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { localDate } from "../daily";
+import { newId } from "../ids";
 import type { Kind } from "../kinds";
 import { hasToken, parseQuery, toggleToken } from "../query";
-import { api, token, Unauthorized, type Note, type Tag } from "./api";
-import { groupNotes, preview, visibleTags } from "./listing";
+import {
+  api,
+  type FullRevision,
+  Offline,
+  onConnectivity,
+  token,
+  Unauthorized,
+  type Note,
+  type Tag,
+} from "./api";
+import { History } from "./History";
+import { ago, groupNotes, preview, visibleTags } from "./listing";
+import {
+  baseOf,
+  type Fields,
+  fieldsOf,
+  localNote,
+  mergeFields,
+  Outbox,
+  Syncer,
+  withPending,
+} from "./sync";
 
 const PAGE = 50;
 const TAG_LIMIT = 8;
@@ -23,17 +44,29 @@ const storedWidth = () => {
   }
 };
 
+// Private mode can refuse storage; the outbox then lasts as long as the tab.
+const browserStorage = () => {
+  try {
+    return localStorage;
+  } catch {
+    return null;
+  }
+};
+
+const outbox = new Outbox(browserStorage());
+const syncer = new Syncer(outbox, api);
+
 type Draft = { title: string; body: string; tags: string; pinned: boolean; kind: Kind };
 
 const emptyDraft: Draft = { title: "", body: "", tags: "", pinned: false, kind: "note" };
-const toDraft = (n: Note): Draft => ({
+const toDraft = (n: Fields): Draft => ({
   title: n.title,
   body: n.body,
   tags: n.tags.join(", "),
   pinned: n.pinned,
   kind: n.kind,
 });
-const fromDraft = (d: Draft) => ({
+const fromDraft = (d: Draft): Fields => ({
   title: d.title,
   body: d.body,
   tags: d.tags
@@ -44,15 +77,7 @@ const fromDraft = (d: Draft) => ({
   kind: d.kind,
 });
 
-const ago = (iso: string) => {
-  const s = (Date.now() - Date.parse(iso)) / 1000;
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return new Date(iso).toLocaleDateString();
-};
-
-type SaveState = "" | "pending" | "saving" | "saved" | "error";
+type SaveState = "" | "pending" | "saving" | "saved" | "local" | "merged" | "conflict" | "error";
 
 export function App() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -71,58 +96,100 @@ export function App() {
   const [current, setCurrent] = useState<Note | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [saveState, setSaveState] = useState<SaveState>("");
+  const [saveError, setSaveError] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  // Edits and deletes the server doesn't have yet (src/web/sync.ts).
+  const [pending, setPending] = useState(outbox.all);
 
   // Refs so timers/intervals see the latest values without re-subscribing.
-  const latest = useRef({ current, draft, dirty: false, saving: null as Promise<void> | null });
+  const latest = useRef({ current, draft, dirty: false });
   latest.current.current = current;
   latest.current.draft = draft;
 
   const handle = useCallback((e: unknown) => {
     if (e instanceof Unauthorized) setNeedsToken(true);
-    else setOnline(false);
+    else if (!(e instanceof Offline)) console.error(e);
   }, []);
+
+  useEffect(() => onConnectivity(setOnline), []);
+  useEffect(() => outbox.subscribe(() => setPending(outbox.all())), []);
 
   const refreshList = useCallback(async () => {
     try {
       const [n, t] = await Promise.all([api.list({ q, kind, limit }), api.tags()]);
       setNotes(n);
       setTags(t);
-      setOnline(true);
       return n;
     } catch (e) {
       handle(e);
     }
   }, [q, kind, limit, handle]);
 
-  const save = useCallback(async () => {
-    const l = latest.current;
-    if (l.saving) await l.saving;
-    const { current, draft } = latest.current;
-    if (!current && !draft.body.trim() && !draft.title.trim()) return;
-    l.dirty = false;
-    setSaveState("saving");
-    l.saving = (async () => {
-      try {
-        const note = current
-          ? await api.update(current.id, fromDraft(draft))
-          : await api.create(fromDraft(draft));
-        setCurrent(note);
-        latest.current.current = note;
-        setSaveState(latest.current.dirty ? "pending" : "saved");
-        setOnline(true);
-        void refreshList();
-      } catch (e) {
-        l.dirty = true;
+  // Sends the outbox. What the server answers for the open note arrives through onSettled below.
+  const sync = useCallback(async () => {
+    const open = latest.current.current;
+    if (open && outbox.get(open.id)) setSaveState("saving");
+    const result = await syncer.run();
+    if (result.status === "unauthorized") setNeedsToken(true);
+    const cur = latest.current.current;
+    if (cur && outbox.get(cur.id) && !latest.current.dirty) {
+      if (result.status === "offline") setSaveState("local");
+      if (result.status === "error") {
+        setSaveError(result.message);
         setSaveState("error");
-        handle(e);
       }
-    })();
-    await l.saving;
-    l.saving = null;
-  }, [refreshList, handle]);
+    }
+    if (result.status === "done") void refreshList();
+  }, [refreshList]);
+
+  useEffect(() => {
+    syncer.onSettled = ({ sent, note, merged, conflict }) => {
+      const l = latest.current;
+      if (!note || sent.op !== "save" || l.current?.id !== note.id) return;
+      const waiting = outbox.get(note.id);
+      // A newer edit still waiting was typed on top of this one; it carries the merge onward.
+      if (!waiting && merged) {
+        // Typing since the save started from what was sent, so it merges into the result too.
+        const next = l.dirty
+          ? mergeFields(sent.fields, fromDraft(l.draft), note).fields
+          : fieldsOf(note);
+        l.draft = toDraft(next);
+        setDraft(l.draft);
+      }
+      l.current = note;
+      setCurrent(note);
+      if (!waiting)
+        setSaveState(conflict ? "conflict" : merged ? "merged" : l.dirty ? "pending" : "saved");
+    };
+  }, []);
+
+  // Queues what the editor shows. Synchronous, so a tab being closed still keeps the edit.
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const commit = useCallback(() => {
+    const l = latest.current;
+    clearTimeout(timer.current);
+    if (!l.dirty) return;
+    l.dirty = false;
+    const { current, draft } = l;
+    if (!current && !draft.body.trim() && !draft.title.trim()) return;
+    const fields = fromDraft(draft);
+    if (current) {
+      outbox.save(current.id, fields, baseOf(current));
+    } else {
+      // A new note gets its id here, so it can be edited, listed and deleted before it syncs.
+      const note = localNote(newId(), fields);
+      l.current = note;
+      setCurrent(note);
+      outbox.save(note.id, fields, null);
+    }
+  }, []);
+
+  const save = useCallback(async () => {
+    commit();
+    await sync();
+  }, [commit, sync]);
 
   // Debounced autosave.
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const edit = (patch: Partial<Draft>) => {
     setDraft((d) => ({ ...d, ...patch }));
     latest.current.dirty = true;
@@ -130,43 +197,79 @@ export function App() {
     clearTimeout(timer.current);
     timer.current = setTimeout(save, 600);
   };
-  const flush = async () => {
-    clearTimeout(timer.current);
-    if (latest.current.dirty) await save();
+  // Leaving a note never waits for the network: the edit is safe in the outbox either way.
+  const flush = () => {
+    if (!latest.current.dirty) return;
+    commit();
+    void sync();
+  };
+
+  const showDraft = (note: Note | null, d: Draft) => {
+    latest.current.current = note;
+    latest.current.draft = d;
+    setCurrent(note);
+    setDraft(d);
+    setShowHistory(false);
+    setOpen(true);
   };
 
   const show = async (load: () => Promise<Note>) => {
-    await flush();
+    flush();
     try {
       const n = await load();
-      setCurrent(n);
-      setDraft(toDraft(n));
-      setSaveState("");
-      setOpen(true);
+      const waiting = outbox.get(n.id);
+      showDraft(n, toDraft(waiting?.op === "save" ? waiting.fields : n));
+      setSaveState(waiting ? "local" : "");
     } catch (e) {
       handle(e);
     }
   };
-  const openNote = (id: string) => show(() => api.get(id));
+  const openNote = (id: string) =>
+    show(async () => {
+      try {
+        return await api.get(id);
+      } catch (e) {
+        // Offline, or made here and not synced yet: the list has the whole note, or the outbox does.
+        const p = outbox.get(id);
+        const known =
+          notes.find((n) => n.id === id) ??
+          (p?.op === "save" ? localNote(id, p.fields) : undefined);
+        if (known && !(e instanceof Unauthorized)) return known;
+        throw e;
+      }
+    });
   // The first open of the day creates the note, so refresh the list to show it.
   const openToday = () => show(() => api.daily(localDate())).then(refreshList);
 
   const newNote = async (body = "") => {
-    await flush();
-    setCurrent(null);
-    setDraft({ ...emptyDraft, body });
+    flush();
+    showDraft(null, { ...emptyDraft, body });
     setSaveState("");
-    setOpen(true);
   };
 
-  const remove = async () => {
+  const remove = () => {
     if (current && !confirm(`Delete "${current.title}"?`)) return;
     clearTimeout(timer.current);
     latest.current.dirty = false;
-    if (current) await api.delete(current.id).catch(handle);
+    if (current) {
+      outbox.delete(current.id);
+      void sync();
+    }
     setCurrent(null);
     setOpen(false);
-    void refreshList();
+  };
+
+  const toggleHistory = async () => {
+    if (showHistory) return setShowHistory(false);
+    // So the latest revision is what's on screen.
+    commit();
+    await sync();
+    setShowHistory(true);
+  };
+
+  const restore = (r: FullRevision) => {
+    setShowHistory(false);
+    edit({ title: r.title, body: r.body, tags: r.tags.join(", "), kind: r.kind });
   };
 
   // Search / tag filter.
@@ -175,14 +278,22 @@ export function App() {
     return () => clearTimeout(t);
   }, [refreshList]);
 
-  // Poll so notes written by agents or the CLI show up live; reload the open note if it changed remotely.
+  // Poll so notes written by agents or the CLI show up live; reload the open note if it changed
+  // remotely. Each tick also retries whatever the outbox still holds.
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const tick = async () => {
       if (document.hidden) return;
+      if (outbox.all().length) await sync();
       const list = await refreshList();
-      const { current, dirty, saving } = latest.current;
-      if (!list || !current || dirty || saving || document.activeElement === bodyRef.current)
+      const { current, dirty } = latest.current;
+      if (
+        !list ||
+        !current ||
+        dirty ||
+        outbox.get(current.id) ||
+        document.activeElement === bodyRef.current
+      )
         return;
       const fresh = list.find((n) => n.id === current.id);
       if (fresh && fresh.updated_at !== current.updated_at) {
@@ -196,7 +307,17 @@ export function App() {
       clearInterval(id);
       document.removeEventListener("visibilitychange", tick);
     };
-  }, [refreshList]);
+  }, [refreshList, sync]);
+
+  // Send what was left from last time, and send again the moment the connection returns.
+  const syncRef = useRef(sync);
+  syncRef.current = sync;
+  useEffect(() => {
+    const retry = () => void syncRef.current();
+    retry();
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, []);
 
   // Keyboard shortcuts + share-target (/?text=...).
   const searchRef = useRef<HTMLInputElement>(null);
@@ -213,11 +334,11 @@ export function App() {
         void newNote().then(() => bodyRef.current?.focus());
       } else if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        clearTimeout(timer.current);
         void save();
       }
     };
-    const onUnload = () => latest.current.dirty && save();
+    // Only the outbox write: a request started now may never finish, and the next visit sends it.
+    const onUnload = () => commit();
     document.addEventListener("keydown", onKey);
     window.addEventListener("beforeunload", onUnload);
 
@@ -258,8 +379,15 @@ export function App() {
     pending: "…",
     saving: "saving…",
     saved: "saved",
-    error: "not saved — offline?",
+    local: "saved on this device · syncs when online",
+    merged: "merged with changes made elsewhere",
+    conflict: "edited elsewhere too: both versions kept between <<<<<<< and >>>>>>>",
+    error: `not saved: ${saveError}`,
   }[saveState];
+
+  const shown = withPending(notes, pending, !q && !kind);
+  // History lives on the server, so a note it hasn't seen yet has none.
+  const unsynced = pending.some((p) => p.id === current?.id && p.op === "save" && !p.base);
 
   return (
     <div
@@ -320,7 +448,7 @@ export function App() {
           </div>
         )}
         <nav className="list" aria-label="Notes">
-          {groupNotes(notes).map((g) => (
+          {groupNotes(shown).map((g) => (
             <section key={g.label} aria-label={g.label}>
               <h2 className="group">{g.label}</h2>
               <ul>
@@ -361,7 +489,7 @@ export function App() {
               </ul>
             </section>
           ))}
-          {notes.length === 0 && <p className="m">{q || kind ? "No matches." : "No notes yet."}</p>}
+          {shown.length === 0 && <p className="m">{q || kind ? "No matches." : "No notes yet."}</p>}
           {notes.length >= limit && (
             <button className="more" onClick={() => setLimit((l) => l + PAGE)}>
               Load more
@@ -369,7 +497,11 @@ export function App() {
           )}
         </nav>
         <footer className="foot">
-          <span className={online ? "status" : "status off"}>{online ? "online" : "offline"}</span>
+          <span className={online ? "status" : "status off"}>
+            {online ? "online" : "offline"}
+            {pending.length > 0 &&
+              ` · ${pending.length} ${pending.length === 1 ? "change" : "changes"} to sync`}
+          </span>
           <a href="/openapi.json" target="_blank">
             API
           </a>
@@ -384,7 +516,10 @@ export function App() {
             <button
               className="ghost back"
               aria-label="Back to list"
-              onClick={() => flush().then(() => setOpen(false))}
+              onClick={() => {
+                flush();
+                setOpen(false);
+              }}
             >
               ←
             </button>
@@ -418,22 +553,39 @@ export function App() {
             >
               {draft.pinned ? "★" : "☆"}
             </button>
+            <button
+              className="ghost kindToggle"
+              aria-pressed={showHistory}
+              disabled={!current || unsynced}
+              title={
+                unsynced ? "History starts once the note has synced" : "What changed, and when"
+              }
+              onClick={() => void toggleHistory()}
+            >
+              History
+            </button>
             <button className="ghost danger" title="Delete" onClick={remove}>
               🗑
             </button>
           </header>
-          <input
-            className="tagsInput"
-            placeholder="tags, comma separated"
-            value={draft.tags}
-            onChange={(e) => edit({ tags: e.target.value })}
-          />
-          <textarea
-            ref={bodyRef}
-            placeholder="Write anything. Markdown welcome."
-            value={draft.body}
-            onChange={(e) => edit({ body: e.target.value })}
-          />
+          {showHistory && current ? (
+            <History key={current.id} noteId={current.id} onRestore={restore} />
+          ) : (
+            <>
+              <input
+                className="tagsInput"
+                placeholder="tags, comma separated"
+                value={draft.tags}
+                onChange={(e) => edit({ tags: e.target.value })}
+              />
+              <textarea
+                ref={bodyRef}
+                placeholder="Write anything. Markdown welcome."
+                value={draft.body}
+                onChange={(e) => edit({ body: e.target.value })}
+              />
+            </>
+          )}
           <footer className="foot">
             <span>
               {current ? `by ${current.author} · created ${ago(current.created_at)}` : "new note"}
@@ -449,6 +601,7 @@ export function App() {
             token.set(t);
             setNeedsToken(false);
             void refreshList();
+            void sync();
           }}
         />
       )}

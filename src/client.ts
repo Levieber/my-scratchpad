@@ -1,7 +1,8 @@
 // Thin typed client over the HTTP API. The CLI and MCP server both use this — never the DB directly.
 import { config } from "./config";
-import type { Note, NoteInput } from "./db";
+import type { FullRevision, Note, NoteInput, Revision } from "./db";
 import { readError } from "./errors";
+import type { NoteDiff } from "./server";
 
 /** `GET /api/notes` parameters. `q` may carry `kind:x` and `#tag` operators (src/query.ts). */
 export type ListParams = {
@@ -58,14 +59,7 @@ export class Client {
     return data as T;
   }
 
-  list(q: ListParams = {}) {
-    const params = new URLSearchParams();
-    for (const [k, v] of Object.entries(q))
-      for (const one of [v].flat())
-        if (one !== undefined && one !== "") params.append(k, String(one));
-    const qs = params.toString();
-    return this.req<Note[]>("GET", `/api/notes${qs ? "?" + qs : ""}`);
-  }
+  list = (q: ListParams = {}) => this.req<Note[]>("GET", `/api/notes${query(q)}`);
   get = (id: string) => this.req<Note>("GET", `/api/notes/${encodeURIComponent(id)}`);
   create = (input: NoteInput) => this.req<Note>("POST", "/api/notes", input);
   update = (id: string, patch: NoteInput) =>
@@ -77,4 +71,21 @@ export class Client {
   daily = (date: string) => this.req<Note>("PUT", `/api/daily/${encodeURIComponent(date)}`);
   tags = () => this.req<{ tag: string; count: number }[]>("GET", "/api/tags");
   health = () => this.req<{ ok: boolean }>("GET", "/api/health");
+  /** A note's history, newest first. */
+  revisions = (id: string, q: { limit?: number; offset?: number } = {}) =>
+    this.req<Revision[]>("GET", `/api/notes/${encodeURIComponent(id)}/revisions${query(q)}`);
+  revision = (id: string, rev: number) =>
+    this.req<FullRevision>("GET", `/api/notes/${encodeURIComponent(id)}/revisions/${rev}`);
+  /** The latest change by default; `since` (ISO time) for everything changed after it. */
+  diff = (id: string, q: { from?: number; to?: number; since?: string } = {}) =>
+    this.req<NoteDiff>("GET", `/api/notes/${encodeURIComponent(id)}/diff${query(q)}`);
+}
+
+function query(q: Record<string, string | number | boolean | string[] | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(q))
+    for (const one of [v].flat())
+      if (one !== undefined && one !== "") params.append(k, String(one));
+  const qs = params.toString();
+  return qs ? "?" + qs : "";
 }

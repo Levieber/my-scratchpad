@@ -21,10 +21,12 @@ export const HOOKS = {
 } as const;
 
 export const ALLOW = [
-  ...["search", "get", "create", "append", "update", "daily"].map(
+  ...["search", "get", "create", "append", "update", "daily", "history", "diff"].map(
     (t) => `mcp__scratchpad__scratchpad_${t}`,
   ),
-  ...["pad ls:*", "pad show:*", "pad tags", "pad status"].map((c) => `Bash(${c})`),
+  ...["pad ls:*", "pad show:*", "pad history:*", "pad diff:*", "pad tags", "pad status"].map(
+    (c) => `Bash(${c})`,
+  ),
 ];
 
 export const hookScript = (repo: string, script: string) =>

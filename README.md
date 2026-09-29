@@ -1,6 +1,6 @@
 # Scratchpad
 
-An API-first scratchpad shared by you and your AI agents. One HTTP API is the source of truth; the React PWA, the `pad` CLI and the Claude Code MCP server are thin clients of it, so people and agents read and write the same notes with the same ease.
+An API-first scratchpad shared by you and your AI agents. One HTTP API is the source of truth; the React PWA, the `pad` CLI and the Claude Code MCP server are thin clients of it, so people and agents read and write the same notes with the same ease. Every change is kept with its author and can be diffed or restored, and the PWA keeps working offline, merging its edits when it reconnects.
 
 ```
                 ┌──────────── Bun server (src/server.ts) ────────────┐
@@ -24,6 +24,7 @@ bun run typecheck
 pad add "idea: …" --tag ideas        # or: echo … | pad add
 pad ls [query] [--tag x]... [--kind reference] [--json]   # query: words, kind:reference, '#tag'
 pad today                            # the daily review, open items carried over
+pad history <id> · pad diff <id> [--since <time>]   # who changed a note, and what
 pad show <id> · pad append <id> "…" · pad edit <id> · pad set <id> --pin · pad rm <id>
 pad status · pad login <url> <token> · pad logout
 ```

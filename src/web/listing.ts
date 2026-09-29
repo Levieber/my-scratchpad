@@ -12,6 +12,15 @@ const stripLine = (line: string) =>
     .replace(/(^|\W)[*_]([^*_]+)[*_](?=\W|$)/g, "$1$2")
     .trim();
 
+/** How long ago `iso` was, briefly; a date once it's more than a day. */
+export const ago = (iso: string) => {
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return new Date(iso).toLocaleDateString();
+};
+
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /**

@@ -20,6 +20,8 @@ Usage:
   pad edit <id>                                        edit body in $EDITOR
   pad set <id> [-t title] [--tag x]... [--kind k] [--pin|--unpin] update metadata
   pad rm <id>                                          delete a note
+  pad history <id> [-n limit]                          list a note's revisions
+  pad diff <id> [--from rev] [--to rev] [--since time] what changed (default: the latest change)
   pad today [YYYY-MM-DD]                               print (or create) the daily review
   pad tags                                            list tags
   pad status                                           show which server is in use
@@ -42,6 +44,9 @@ const { values: opts, positionals } = parseArgs({
     unpin: { type: "boolean" },
     pinned: { type: "boolean" },
     limit: { type: "string", short: "n" },
+    from: { type: "string" },
+    to: { type: "string" },
+    since: { type: "string" },
     json: { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
@@ -166,6 +171,35 @@ async function main() {
       const id = need(args[0]);
       await client.delete(id);
       return out({ deleted: id }, () => `deleted ${id}`);
+    }
+    case "history":
+    case "log": {
+      const revs = await client.revisions(need(args[0]), {
+        limit: opts.limit ? Number(opts.limit) : undefined,
+      });
+      return out(revs, () =>
+        revs
+          .map(
+            (r) =>
+              `${String(r.id).padStart(6)}  ${r.updated_at}  +${r.added} -${r.removed}  ${r.author}  ${r.title}`,
+          )
+          .join("\n"),
+      );
+    }
+    case "diff": {
+      const rev = (v: string | undefined) => (v === undefined ? undefined : Number(v));
+      const d = await client.diff(need(args[0]), {
+        from: rev(opts.from),
+        to: rev(opts.to),
+        since: opts.since,
+      });
+      const fields = Object.entries(d.changes).map(
+        ([field, c]) => `${field}: ${JSON.stringify(c.from)} → ${JSON.stringify(c.to)}`,
+      );
+      return out(
+        d,
+        () => [...fields, d.diff.trimEnd()].filter(Boolean).join("\n") || "(no changes)",
+      );
     }
     case "today":
     case "daily": {

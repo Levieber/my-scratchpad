@@ -6,7 +6,7 @@ bun run setup:claude                  # --no-service: skip the local server · -
 
 Run it from the main checkout: it records the paths of the folder it runs in. It is idempotent and backs up `~/.claude/settings.json` to `settings.json.bak-scratchpad`. It installs, at user scope:
 
-- **MCP server** `scratchpad` (`src/mcp.ts`) → tools `scratchpad_search|get|create|append|update|daily|delete`, attributed as `claude-code`.
+- **MCP server** `scratchpad` (`src/mcp.ts`) → tools `scratchpad_search|get|create|append|update|daily|history|diff|delete`, attributed as `claude-code`.
 - **Skill** `~/.claude/skills/scratchpad` → symlink to `integrations/claude-code/skill/`: when to use the scratchpad, kinds, tagging and logging conventions.
 - **Skill** `~/.claude/skills/pad-review` → symlink to `integrations/claude-code/review-skill/`: how to check edits against reference notes (also `/pad-review` by hand).
 - **SessionStart hook** (`integrations/claude-code/session-start.ts`) → injects pinned notes and recent titles into every session; silent and ~20 ms when the server is unreachable.

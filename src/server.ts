@@ -4,8 +4,17 @@ import type { BunRequest } from "bun";
 
 import { config } from "./config";
 import { isDate } from "./daily";
-import { type ListQuery, type NoteInput, Store } from "./db";
+import {
+  type FullRevision,
+  type ListQuery,
+  type Note,
+  type NoteInput,
+  type Revision,
+  Store,
+} from "./db";
+import { unifiedDiff } from "./diff";
 import { ERROR_MESSAGES, type ErrorBody, type ErrorCode } from "./errors";
+import { isNoteId } from "./ids";
 import { isKind, KIND_NAMES } from "./kinds";
 import { llmsTxt, openapi } from "./openapi";
 import { parseQuery } from "./query";
@@ -28,6 +37,9 @@ class HttpError extends Error {
 }
 
 const json = (data: unknown, status = 200) => Response.json(data, { status });
+// The note's updated_at is its version: what If-Match compares against.
+const noteJson = (note: Note, status = 200) =>
+  Response.json(note, { status, headers: { etag: `"${note.updated_at}"` } });
 const fail = (
   code: ErrorCode,
   status: number,
@@ -45,7 +57,9 @@ async function readInput(req: Request): Promise<NoteInput> {
   });
   if (!body || typeof body !== "object" || Array.isArray(body))
     throw new HttpError("invalidBody", 400, "Expected a JSON object");
-  const { title, body: text, tags, pinned, kind } = body as Record<string, unknown>;
+  const { id, title, body: text, tags, pinned, kind } = body as Record<string, unknown>;
+  if (id !== undefined && !isNoteId(id))
+    throw new HttpError("invalidBody", 400, "id must be 8-64 letters, digits, '-' or '_'");
   if (title !== undefined && typeof title !== "string")
     throw new HttpError("invalidBody", 400, "title must be a string");
   if (text !== undefined && typeof text !== "string")
@@ -56,8 +70,57 @@ async function readInput(req: Request): Promise<NoteInput> {
   if (pinned !== undefined && typeof pinned !== "boolean")
     throw new HttpError("invalidBody", 400, "pinned must be a boolean");
   if (kind !== undefined && !isKind(kind)) throw kindError();
-  return { title, body: text, tags, pinned, kind };
+  return { id, title, body: text, tags, pinned, kind };
 }
+
+/** If-Match against a note: its updated_at, quoted as in the ETag or bare, or `*` for any. */
+function matches(header: string | null, note: Note): boolean {
+  if (header === null) return true;
+  const tags = header.split(",").map((t) =>
+    t
+      .trim()
+      .replace(/^W\//, "")
+      .replace(/^"(.*)"$/, "$1"),
+  );
+  return tags.includes("*") || tags.includes(note.updated_at);
+}
+
+const positiveInt = (p: URLSearchParams, name: string): number | undefined => {
+  const value = p.get(name);
+  if (value === null) return undefined;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n <= 0)
+    throw new HttpError("invalidParam", 400, `${name} must be a revision id`);
+  return n;
+};
+
+/** `GET /api/notes/:id/diff`: `from` null means compared with an empty note. */
+export type NoteDiff = {
+  note_id: string;
+  from: Revision | null;
+  to: Revision;
+  changes: Partial<Record<"title" | "tags" | "kind", { from: unknown; to: unknown }>>;
+  diff: string;
+};
+
+const withoutBody = (full: FullRevision): Revision => {
+  const { body: _, ...revision } = full;
+  return revision;
+};
+
+/** Which of the fields besides the body differ between two revisions (`from` null: none yet). */
+function fieldChanges(from: FullRevision | null, to: FullRevision) {
+  const changes: NoteDiff["changes"] = {};
+  for (const field of ["title", "tags", "kind"] as const) {
+    const before = from ? from[field] : null;
+    if (JSON.stringify(before) !== JSON.stringify(to[field]))
+      changes[field] = { from: before, to: to[field] };
+  }
+  return changes;
+}
+
+const revisionLabel = (r: FullRevision | null) =>
+  r ? `revision ${r.id} (${r.updated_at}, ${r.author})` : "empty";
 
 const authorOf = (req: Request) => req.headers.get("x-pad-author")?.trim().slice(0, 64) || "human";
 
@@ -138,7 +201,45 @@ export function createRoutes(store: Store, { token }: { token?: string } = {}) {
     if (value === null) throw new HttpError("noteNotFound", 404);
     return value;
   };
+  const revisionOr404 = <T>(value: T | null): T => {
+    if (value === null) throw new HttpError("revisionNotFound", 404);
+    return value;
+  };
   const id = (req: BunRequest) => req.params.id ?? "";
+
+  /**
+   * Two revisions of a note: `to` (default the latest) against `from` (default the one before
+   * `to`), or against the note as it was at `since`, to see what changed after a given time.
+   */
+  const diff = (noteId: string, p: URLSearchParams): NoteDiff => {
+    noteOr404(store.get(noteId));
+    const fromId = positiveInt(p, "from");
+    const toId = positiveInt(p, "to");
+    const sinceParam = p.get("since");
+    if (sinceParam !== null && fromId !== undefined)
+      throw new HttpError("invalidParam", 400, "Pass either from or since, not both");
+    const sinceTime = sinceParam === null ? undefined : Date.parse(sinceParam);
+    if (sinceTime !== undefined && Number.isNaN(sinceTime))
+      throw new HttpError("invalidParam", 400, "since must be an ISO date-time");
+
+    const to = revisionOr404(
+      toId === undefined ? store.latestRevision(noteId) : store.revision(noteId, toId),
+    );
+    const from =
+      fromId !== undefined
+        ? revisionOr404(store.revision(noteId, fromId))
+        : sinceTime !== undefined
+          ? store.latestRevision(noteId, new Date(sinceTime).toISOString())
+          : store.previousRevision(noteId, to.id);
+    const body = unifiedDiff(from?.body ?? "", to.body, [revisionLabel(from), revisionLabel(to)]);
+    return {
+      note_id: noteId,
+      from: from && withoutBody(from),
+      to: withoutBody(to),
+      changes: fieldChanges(from, to),
+      diff: body,
+    };
+  };
 
   return {
     "/api/health": resource({ GET: () => json({ ok: true }) }, { auth: false }),
@@ -148,13 +249,21 @@ export function createRoutes(store: Store, { token }: { token?: string } = {}) {
       POST: async (req) => {
         const input = await readInput(req);
         if (!input.body?.trim() && !input.title?.trim()) throw new HttpError("emptyNote", 400);
-        return json(store.create(input, authorOf(req)), 201);
+        // A client retrying a create whose response it never got learns it already succeeded.
+        if (input.id !== undefined && store.get(input.id)) throw new HttpError("noteExists", 409);
+        return noteJson(store.create(input, authorOf(req)), 201);
       },
     }),
 
     "/api/notes/:id": resource({
-      GET: (req) => json(noteOr404(store.get(id(req)))),
-      PATCH: async (req) => json(noteOr404(store.update(id(req), await readInput(req)))),
+      GET: (req) => noteJson(noteOr404(store.get(id(req)))),
+      PATCH: async (req) => {
+        const { id: _, ...patch } = await readInput(req);
+        // Checked and written with no await in between, so no other write can slip past the check.
+        const cur = noteOr404(store.get(id(req)));
+        if (!matches(req.headers.get("if-match"), cur)) throw new HttpError("noteChanged", 412);
+        return noteJson(noteOr404(store.update(cur.id, patch, authorOf(req))));
+      },
       DELETE: (req) => {
         if (!store.delete(id(req))) throw new HttpError("noteNotFound", 404);
         return new Response(null, { status: 204 });
@@ -165,8 +274,32 @@ export function createRoutes(store: Store, { token }: { token?: string } = {}) {
       POST: async (req) => {
         const text = await readAppendText(req);
         if (!text) throw new HttpError("emptyAppend", 400);
-        return json(noteOr404(store.append(id(req), text)));
+        return noteJson(noteOr404(store.append(id(req), text, authorOf(req))));
       },
+    }),
+
+    "/api/notes/:id/revisions": resource({
+      GET: (req) => {
+        noteOr404(store.get(id(req)));
+        const p = new URL(req.url).searchParams;
+        return json(
+          store.revisions(id(req), {
+            limit: Number(p.get("limit") ?? 50) || 50,
+            offset: Number(p.get("offset") ?? 0) || 0,
+          }),
+        );
+      },
+    }),
+
+    "/api/notes/:id/revisions/:rev": resource({
+      GET: (req) => {
+        noteOr404(store.get(id(req)));
+        return json(revisionOr404(store.revision(id(req), Number(req.params.rev))));
+      },
+    }),
+
+    "/api/notes/:id/diff": resource({
+      GET: (req) => json(diff(id(req), new URL(req.url).searchParams)),
     }),
 
     // PUT because it is idempotent: asking for the same day twice returns the same note.
@@ -175,7 +308,7 @@ export function createRoutes(store: Store, { token }: { token?: string } = {}) {
         const date = req.params.date ?? "";
         if (!isDate(date)) throw new HttpError("invalidDate", 400);
         const { note, created } = store.daily(date, authorOf(req));
-        return json(note, created ? 201 : 200);
+        return noteJson(note, created ? 201 : 200);
       },
     }),
 

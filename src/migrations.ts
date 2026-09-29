@@ -57,6 +57,30 @@ export const MIGRATIONS: Migration[] = [
        )`,
     ],
   },
+  {
+    // Each existing note starts its history with its current state, so the first edit after this
+    // has something to be diffed against. Its lines count as added, like a newly created note's.
+    id: "0005.note_revisions",
+    statements: [
+      `CREATE TABLE note_revisions (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+         title TEXT NOT NULL,
+         body TEXT NOT NULL,
+         tags TEXT NOT NULL,
+         kind TEXT NOT NULL,
+         author TEXT NOT NULL,
+         updated_at TEXT NOT NULL,
+         added INTEGER NOT NULL DEFAULT 0,
+         removed INTEGER NOT NULL DEFAULT 0
+       )`,
+      "CREATE INDEX note_revisions_note ON note_revisions(note_id, id)",
+      `INSERT INTO note_revisions (note_id, title, body, tags, kind, author, updated_at, added)
+       SELECT id, title, body, tags, kind, author, updated_at,
+              CASE WHEN body = '' THEN 0 ELSE length(body) - length(replace(body, char(10), '')) + 1 END
+       FROM notes ORDER BY created_at`,
+    ],
+  },
 ];
 
 /** Applies every migration not yet recorded, all in one transaction. Returns the ids it ran. */

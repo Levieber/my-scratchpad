@@ -358,3 +358,103 @@ button[aria-pressed="true"].ghost {
     display: none;
   }
 }
+
+/* History: revisions on the left, the selected change on the right; stacked on narrow screens. */
+.history {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr;
+  gap: 12px;
+  min-height: 0;
+  margin: 0;
+}
+.revisions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+.revisions .item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+}
+.revisions .item:hover,
+.revisions .item[aria-current="true"] {
+  background: var(--panel);
+  border-color: var(--line);
+}
+.revisions .t {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+}
+.revisions .m,
+.change .m {
+  color: var(--muted);
+  font-size: 12px;
+}
+.add {
+  color: var(--ok);
+}
+.del {
+  color: var(--danger);
+}
+.change {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  min-width: 0;
+}
+.change .bar {
+  justify-content: space-between;
+}
+.change .field {
+  margin: 0;
+}
+.change ins {
+  text-decoration: none;
+  color: var(--ok);
+}
+.diff {
+  flex: 1;
+  overflow: auto;
+  font: 13px/1.5 var(--mono);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 0;
+  margin: 0;
+}
+.diff > div {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 0 12px;
+}
+.diff .add {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: inherit;
+}
+.diff .del {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: inherit;
+}
+.diff .hunk {
+  color: var(--muted);
+  margin-top: 6px;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (max-width: 720px) {
+  .history {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 30%) 1fr;
+  }
+}
