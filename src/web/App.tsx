@@ -497,11 +497,11 @@ export function App() {
           )}
         </nav>
         <footer className="foot">
-          <span className={online ? "status" : "status off"}>
+          <output className={online ? "status" : "status off"}>
             {online ? "online" : "offline"}
             {pending.length > 0 &&
               ` · ${pending.length} ${pending.length === 1 ? "change" : "changes"} to sync`}
-          </span>
+          </output>
           <a href="/openapi.json" target="_blank">
             API
           </a>
@@ -590,7 +590,8 @@ export function App() {
             <span>
               {current ? `by ${current.author} · created ${ago(current.created_at)}` : "new note"}
             </span>
-            <span>{saveLabel}</span>
+            {/* Announced, since it can say an edit is only on this device or conflicted. */}
+            <output>{saveLabel}</output>
           </footer>
         </main>
       )}
