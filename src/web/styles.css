@@ -505,3 +505,22 @@ fieldset.views {
   padding: 0;
   border: 0;
 }
+/* WCAG 2.2 target size: the new view controls are at least 24 x 24 px. */
+.views .view button,
+.views button.more,
+.views input {
+  min-height: 24px;
+}
+.views .view button.remove {
+  min-width: 24px;
+  padding: 2px 4px;
+}
+.views form {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.views .error {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--danger);
+}

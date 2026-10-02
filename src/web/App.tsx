@@ -83,6 +83,14 @@ export function App() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [views, setViews] = useState<View[]>([]);
   const [naming, setNaming] = useState<string | null>(null);
+  const [nameTaken, setNameTaken] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  // Focus moves to the field once, when the person opens the form: not on every re-render, which
+  // the 5 s poll would otherwise turn into stealing focus from the Save button.
+  const formOpen = naming !== null;
+  useEffect(() => {
+    if (formOpen) nameRef.current?.focus();
+  }, [formOpen]);
   // Everything that narrows the list (kind, author, tags, words) is one query string, so a view
   // is just that string saved under a name.
   const [q, setQ] = useState("");
@@ -378,13 +386,14 @@ export function App() {
   const activeView = views.find((v) => sameQuery(v.query, q));
 
   const saveView = async (name: string) => {
-    setNaming(null);
     try {
       await api.createView(name, q.trim());
+      setNaming(null);
       await refreshList();
     } catch (e) {
-      // A name already taken is the only failure the person can fix, and the field says so.
-      if (isApiError(e, "viewExists")) setNaming(name);
+      // A name already taken is the only failure the person can fix, so the form stays open and
+      // says so (announced, and linked to the field).
+      if (isApiError(e, "viewExists")) setNameTaken(true);
       else handle(e);
     }
   };
@@ -496,7 +505,13 @@ export function App() {
               </span>
             ))}
             {q.trim() && !activeView && naming === null && (
-              <button className="more" onClick={() => setNaming("")}>
+              <button
+                className="more"
+                onClick={() => {
+                  setNameTaken(false);
+                  setNaming("");
+                }}
+              >
                 Save this search
               </button>
             )}
@@ -508,15 +523,24 @@ export function App() {
                 }}
               >
                 <input
-                  // Opened by the person pressing "Save this search", so focus belongs here.
-                  ref={(el) => el?.focus()}
+                  ref={nameRef}
                   aria-label="View name"
+                  aria-invalid={nameTaken}
+                  aria-describedby={nameTaken ? "view-name-error" : undefined}
                   placeholder="Name this view"
                   value={naming}
-                  onChange={(e) => setNaming(e.target.value)}
+                  onChange={(e) => {
+                    setNameTaken(false);
+                    setNaming(e.target.value);
+                  }}
                   onKeyDown={(e) => e.key === "Escape" && setNaming(null)}
                 />
                 <button className="more">Save</button>
+                {nameTaken && (
+                  <span id="view-name-error" role="alert" className="error">
+                    A view with this name already exists
+                  </span>
+                )}
               </form>
             )}
           </fieldset>
