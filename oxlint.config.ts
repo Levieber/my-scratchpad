@@ -1,6 +1,8 @@
 import { defineConfig } from "oxlint";
 
 export default defineConfig({
+  // Vendored upstream source (read-only reference), linted by its own project.
+  ignorePatterns: ["repos/**"],
   plugins: ["typescript", "node", "eslint", "unicorn", "oxc", "react", "jsx-a11y"],
   categories: {
     correctness: "error",

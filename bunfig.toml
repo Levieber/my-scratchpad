@@ -3,3 +3,7 @@
 exact = true
 # Refuse packages published less than a day ago: most malicious releases are pulled within hours.
 minimumReleaseAge = 86400
+
+[test]
+# Only our tests: repos/ vendors upstream projects whose suites run under their own tooling.
+root = "test"
