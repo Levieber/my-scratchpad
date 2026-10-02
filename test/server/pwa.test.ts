@@ -56,6 +56,22 @@ describe("PWA icons", () => {
     expect((await get("/icon.svg")).headers.get("content-type")).toBe("image/svg+xml");
   });
 
+  test("icons are cacheable for a day: they have no hash in their name to cache them for good", async () => {
+    for (const path of [
+      "/icon.svg",
+      "/icon-192.png",
+      "/icon-512.png",
+      "/icon-maskable-512.png",
+      "/apple-touch-icon.png",
+    ])
+      expect([path, (await get(path)).headers.get("cache-control")]).toEqual([
+        path,
+        "public, max-age=86400",
+      ]);
+    // The service worker and manifest must be re-checked on every load, or an update never lands.
+    expect((await get("/sw.js")).headers.get("cache-control")).toBe("no-cache");
+  });
+
   test("an icon is either `any` or `maskable`, never both: one image can't suit both", async () => {
     const manifest = (await (await get("/manifest.webmanifest")).json()) as {
       icons: { purpose: string }[];
