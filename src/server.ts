@@ -4,4 +4,14 @@ import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 
 import { main } from "@/server/serve";
 
-BunRuntime.runMain(main);
+BunRuntime.runMain(main, {
+  teardown: function customTeardown(exit, onExit) {
+    if (exit._tag === "Failure") {
+      console.error("Program ended with an error.");
+      onExit(1);
+    } else {
+      console.log("Program finished successfully.");
+      onExit(0);
+    }
+  },
+});
