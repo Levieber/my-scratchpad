@@ -24,7 +24,7 @@ src/
     resource.ts   How a path becomes a route: one handler per method, bearer check, error mapping (`guard`), 405 + Allow.
     http.ts       Reading a request (body, If-Match, query, paging) and writing a response or a refusal.
     note-diff.ts  What `GET /api/notes/:id/diff` computes.
-    pwa.ts        The PWA files that live at the site root (service worker, manifest, icon).
+    pwa.ts        The PWA files that live at the site root (service worker, manifest, the icons).
     observability.ts  A request id on every request and response, one log line per request, the JSON logger.
     docs/         openapi.ts (the contract at /openapi.json), llms.ts (the agent quick-start at /llms.txt).
     storage/      SQLite + FTS5 through effect/sql; knows nothing about HTTP.
@@ -121,6 +121,19 @@ The PWA builds offline editing on those two rules (`src/web/lib/sync.ts`):
 - The **syncer** sends the outbox in order whenever it can (after a save, on each poll, on the `online` event, at startup). A `412` fetches the note, merges three-way (`merge3` in `src/shared/diff/merge.ts`, field by field for the rest) and retries. Where both sides changed the same lines, both are kept between git-style markers; both sides appending at one spot keeps both without markers.
 - A note deleted elsewhere while edited here is recreated rather than losing the edit.
 - The service worker serves cached GETs when the network is down and marks them with `x-pad-offline`, so the app can show that it is offline while still reading notes.
+
+## The PWA on a phone
+
+**Icons.** `public/icon.svg` is the source; `icon-maskable.svg` is the same artwork full-bleed. `bun run build:icons` (`scripts/build-icons.ts`, needs a Chrome) renders the committed PNGs from them: 192 and 512 px with the rounded corners (`any`), a 512 px maskable one (the OS crops it, so no corners of its own), and the 180 px `apple-touch-icon`. iOS ignores SVG icons and paints transparency black, so its icon is opaque and full-bleed (iOS rounds it). The manifest lists each icon for one purpose only: `any maskable` on one image suits neither. `index.html` links the apple-touch-icon statically, as a relative path the bundler turns into an asset; the manifest and the SVG icon are added by `main.tsx` (see there), and `server/pwa.ts` also serves every icon from the root, where iOS looks for `/apple-touch-icon.png` by itself. `test/server/pwa.test.ts` checks each icon's size and opacity.
+
+**Responsiveness.** The rules, so a phone and its owner's settings work (`test/web/styles.test.ts` holds the checkable ones):
+
+- Text sizes are `rem`, so the reader's text-size setting applies; nothing disables zoom in the viewport meta.
+- Form fields are at least `1rem`: iOS Safari zooms into any smaller field when it is focused, and doesn't zoom back.
+- Grid columns are `minmax(0, 1fr)`, never a bare `1fr`, which can't shrink below its content and pushes the page wider than the screen. Rows of controls wrap.
+- Tap targets are at least 24×24 CSS px (WCAG 2.2). `env(safe-area-inset-*)` keeps the app out of a notch and the home indicator.
+
+Measured in a browser at 320, 360 and 390 px, and at 150 % and 200 % text size on 320 px, in the list, the editor and the history: no horizontal scroll, no target under 24 px, no field under 16 px. Bun's dev server gives assets stable URLs, which the service worker's cache-first rule then serves stale: unregister it, or test against `NODE_ENV=production`, which hashes asset names.
 
 ## Tooling
 

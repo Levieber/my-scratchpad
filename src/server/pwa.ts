@@ -3,6 +3,10 @@
 //
 // Imported as files rather than read from public/ at run time, so `pad` compiled into one
 // executable carries them too.
+import appleTouchIcon from "@public/apple-touch-icon.png" with { type: "file" };
+import icon192 from "@public/icon-192.png" with { type: "file" };
+import icon512 from "@public/icon-512.png" with { type: "file" };
+import iconMaskable from "@public/icon-maskable-512.png" with { type: "file" };
 import icon from "@public/icon.svg" with { type: "file" };
 import manifest from "@public/manifest.webmanifest" with { type: "file" };
 import serviceWorker from "@public/sw.js" with { type: "file" };
@@ -22,4 +26,9 @@ export const pwaRoutes = [
     staticFile(manifest, "application/manifest+json"),
   ),
   HttpRouter.route("GET", "/icon.svg", staticFile(icon, "image/svg+xml")),
+  HttpRouter.route("GET", "/icon-192.png", staticFile(icon192, "image/png")),
+  HttpRouter.route("GET", "/icon-512.png", staticFile(icon512, "image/png")),
+  HttpRouter.route("GET", "/icon-maskable-512.png", staticFile(iconMaskable, "image/png")),
+  // iOS asks for this path by itself when a page has no apple-touch-icon link it can use.
+  HttpRouter.route("GET", "/apple-touch-icon.png", staticFile(appleTouchIcon, "image/png")),
 ];

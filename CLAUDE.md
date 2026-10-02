@@ -11,6 +11,7 @@ bun run lint         # oxlint + oxfmt + knip   (bun run lint:fix to fix)
 bun run typecheck
 bun run setup:claude # user-scope Claude Code wiring (integrations/claude-code/)
 bun run build:pad    # recompile dist/pad (= ~/.local/bin/pad and the hooks) after changing code
+bun run build:icons  # re-render the PWA icons (public/*.png) from the SVGs; needs Chrome
 ```
 
 Use Bun for everything: `bun`, `bun test`, `bun install`, `bunx`. No Node, npm, Jest, Vite, dotenv, express or better-sqlite3.

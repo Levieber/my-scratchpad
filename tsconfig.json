@@ -20,5 +20,5 @@
       "@public/*": ["./public/*"]
     }
   },
-  "include": ["src", "integrations", "test"]
+  "include": ["src", "integrations", "test", "scripts"]
 }

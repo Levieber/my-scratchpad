@@ -35,16 +35,27 @@ body {
   margin: 0;
   height: 100%;
 }
+html {
+  /* iOS enlarges text on its own when the phone turns to landscape; the layout sets the sizes. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 body {
   background: var(--bg);
   color: var(--text);
-  font: 15px/1.5 var(--font);
+  font: 0.9375rem/1.5 var(--font);
 }
 button,
 input,
 textarea {
   font: inherit;
   color: inherit;
+}
+/* iOS Safari zooms the page into any field under 16px when it gets focus, and doesn't zoom back.
+   Fields are at least 1rem, in rem so the reader's text size still applies. */
+input,
+textarea {
+  font-size: max(1rem, 1em);
 }
 button {
   cursor: pointer;
@@ -62,7 +73,7 @@ button.primary {
 button.ghost {
   background: none;
   border-color: transparent;
-  font-size: 18px;
+  font-size: 1.125rem;
   padding: 4px 8px;
 }
 button.ghost:hover {
@@ -91,14 +102,16 @@ a {
 /* No note open: the list is the whole page. A note open: list | resize handle | editor. */
 .app {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
 }
 .app[data-view="editor"] {
-  grid-template-columns: var(--sidebar, 360px) auto 1fr;
+  grid-template-columns: var(--sidebar, 360px) auto minmax(0, 1fr);
 }
 .app[data-list="hidden"] {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 .app[data-list="hidden"] .sidebar {
   display: none;
@@ -136,7 +149,7 @@ a {
   gap: 8px;
 }
 .bar h1 {
-  font-size: 17px;
+  font-size: 1.0625rem;
   margin: 0;
   flex: 1;
   letter-spacing: -0.01em;
@@ -147,26 +160,28 @@ a {
   gap: 6px;
 }
 .tags button {
-  font-size: 12px;
+  font-size: 0.75rem;
   padding: 2px 8px;
   border-radius: 999px;
   color: var(--muted);
 }
 button.more {
-  font-size: 12px;
+  font-size: 0.75rem;
   padding: 2px 8px;
   border-style: dashed;
   color: var(--muted);
 }
 .kinds {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: 4px;
   margin: 0;
   padding: 0;
   border: 0;
 }
 .kinds button {
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 3px 12px;
   color: var(--muted);
 }
@@ -177,7 +192,7 @@ button.more {
   color: var(--text);
 }
 button.ghost.kindToggle {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .done progress {
@@ -211,7 +226,7 @@ button.ghost.kindToggle {
 }
 .group {
   margin: 12px 10px 4px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -253,7 +268,7 @@ button.ghost.kindToggle {
 }
 .list .p {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .app[data-view="list"] .list .p {
   -webkit-line-clamp: 3;
@@ -261,11 +276,11 @@ button.ghost.kindToggle {
 .list .m {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 2px;
 }
 .badge {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
   padding: 0 6px;
   border-radius: 999px;
@@ -279,7 +294,14 @@ button.ghost.kindToggle {
   justify-content: space-between;
   gap: 8px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
+}
+.foot a {
+  display: inline-flex;
+  align-items: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0 4px;
 }
 .status::before {
   content: "●";
@@ -297,9 +319,13 @@ button.ghost.kindToggle {
   padding: 14px 20px;
   min-height: 0;
 }
+.editor .bar {
+  flex-wrap: wrap;
+}
 .editor .title {
-  flex: 1;
-  font-size: 20px;
+  flex: 1 1 8rem;
+  min-width: 0;
+  font-size: 1.25rem;
   font-weight: 700;
   border-color: transparent;
   background: none;
@@ -308,12 +334,9 @@ button.ghost.kindToggle {
 .editor textarea {
   flex: 1;
   resize: none;
-  font: 15px/1.6 var(--mono);
+  font: 1rem/1.6 var(--mono);
   padding: 14px;
   min-height: 0;
-}
-.tagsInput {
-  font-size: 13px;
 }
 button[aria-pressed="true"].ghost {
   color: var(--accent);
@@ -343,7 +366,7 @@ button[aria-pressed="true"].ghost {
 @media (max-width: 720px) {
   .app,
   .app[data-view="editor"] {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .sidebar,
   .app[data-view="list"] .sidebar {
@@ -363,7 +386,7 @@ button[aria-pressed="true"].ghost {
 .history {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(160px, 220px) 1fr;
+  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
   gap: 12px;
   min-height: 0;
   margin: 0;
@@ -391,12 +414,12 @@ button[aria-pressed="true"].ghost {
 .revisions .t {
   display: block;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .revisions .m,
 .change .m {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .add {
   color: var(--ok);
@@ -424,7 +447,7 @@ button[aria-pressed="true"].ghost {
 .diff {
   flex: 1;
   overflow: auto;
-  font: 13px/1.5 var(--mono);
+  font: 0.8125rem/1.5 var(--mono);
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -454,7 +477,7 @@ button:disabled {
 }
 @media (max-width: 720px) {
   .history {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 30%) 1fr;
   }
 }
@@ -481,7 +504,7 @@ button:disabled {
 .views .view button {
   border: 0;
   background: none;
-  font-size: 12px;
+  font-size: 0.75rem;
   padding: 2px 8px;
   color: var(--muted);
 }
@@ -496,9 +519,8 @@ button:disabled {
   gap: 4px;
 }
 .views input {
-  font-size: 12px;
   padding: 2px 8px;
-  width: 120px;
+  width: 8rem;
 }
 fieldset.views {
   margin: 0;
@@ -521,6 +543,6 @@ fieldset.views {
 }
 .views .error {
   flex-basis: 100%;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--danger);
 }

@@ -2,7 +2,7 @@
 // - pages & API GETs: network-first, cached fallback -> notes stay readable offline
 // - other assets: cache-first (hashed names never change)
 // Writes are never intercepted: offline, they fail, and the PWA's outbox keeps them (src/web/sync.ts).
-const CACHE = "scratchpad-v3";
+const CACHE = "scratchpad-v4";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
