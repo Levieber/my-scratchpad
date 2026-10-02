@@ -286,12 +286,12 @@ export function App() {
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const typing = ["INPUT", "TEXTAREA"].includes(
-        (document.activeElement as HTMLElement)?.tagName,
-      );
-      if (e.key === "/" && !typing) {
+      // Ctrl+K types nothing, so unlike "/" it works from inside a field too, the note being
+      // written included. Taken from the browser, whose own Ctrl+K searches the web.
+      if (e.key.toLowerCase() === "k" && (e.ctrlKey || e.metaKey) && !e.altKey) {
         e.preventDefault();
         searchRef.current?.focus();
+        searchRef.current?.select();
       } else if (e.key.toLowerCase() === "n" && e.ctrlKey && e.altKey) {
         e.preventDefault();
         void newNote().then(() => bodyRef.current?.focus());
