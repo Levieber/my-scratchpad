@@ -2,28 +2,32 @@
 
 One rule shapes everything: **the HTTP API is the only way in.** People (PWA, CLI) and agents (MCP, curl, anything reading `/llms.txt`) use the same endpoints, so neither gets a capability the other lacks.
 
+Everything but the PWA is written with Effect 4; why, and what it cost, is in [effect.md](effect.md).
+
 ```
 src/
-  server.ts       Bun.serve route table: auth, validation, error codes. The only HTTP entry point.
-  db.ts           Store: notes and saved views in SQLite + FTS5. Only the server uses it.
+  server.ts       HttpRouter routes on BunHttpServer: auth, validation, error codes. The only HTTP entry point.
+  db.ts           Store service: notes and saved views in SQLite + FTS5 (effect/sql). Only the server uses it.
   migrations.ts   Named schema changes, recorded in schema_migrations.
+  domain.ts       The API's shapes as Schemas (Note, NoteInput, Revision, View); every client shares the types.
   errors.ts       Error codes + messages; shared by server and clients.
   kinds.ts        Note kinds (note, reference); a use case is a tag, not a kind. Shared.
   query.ts        The search language (`kind:x author:x #tag words`); run by the server, edited by the PWA.
   checklist.ts    Markdown checkboxes → `progress` on every note.
   diff.ts         Line diffs (Myers), unified diff text, three-way merge. Server and PWA share it.
-  ids.ts          Note ids; the PWA mints them too, for notes written offline.
+  ids.ts          Note ids; the PWA mints them too, for notes written offline (accepted ones: NoteId in domain.ts).
   title.ts        The title derived from a body's first line.
   openapi.ts      The contract (/openapi.json) and the agent quick-start (/llms.txt).
-  config.ts       Every env var and ~/.config/scratchpad/config.json, read in one place.
-  client.ts       Typed HTTP client used by the CLI, MCP server and Claude Code hook.
+  config.ts       Every env var and ~/.config/scratchpad/config.json, read in one place (Effect Config).
+  client.ts       Client service over the HTTP API, used by the CLI, MCP server and Claude Code hooks.
   transfer.ts     `pad export` / `pad import`: notes as a JSON array (the shape of `pad ls --json`), built on the public API. Import keeps ids, so it is safe to repeat; author and timestamps are not carried over.
-  cli.ts          `pad` — human-friendly and `--json` output.
-  mcp.ts          MCP stdio server — native tools for Claude Code.
+  cli.ts          `pad` (effect/cli) — human-friendly and `--json` output.
+  mcp.ts          MCP stdio server (effect/ai McpServer) — native tools for Claude Code.
   web/            React PWA (bundled by Bun from the web/index.html import); talks to the API via web/api.ts,
                   writes through the outbox in web/sync.ts.
 public/           Files that must live at the site root: service worker, manifest, icon.
 integrations/     Claude Code wiring (installer, SessionStart hook, skill).
+test/support.ts   Fixtures: the production layers on an in-memory database, in a ManagedRuntime.
 ```
 
 ## Boundaries, enforced
@@ -32,28 +36,38 @@ integrations/     Claude Code wiring (installer, SessionStart hook, skill).
 
 - Clients (`src/web/**`, `cli.ts`, `mcp.ts`, `client.ts`, `integrations/**`) never import `db.ts`, `migrations.ts`, `bun:sqlite` or `server.ts` at runtime — they go through HTTP. (`pad serve` may import the server: it launches it, it doesn't call it.)
 - `src/web/**` imports no `bun`/`node:` modules and not `config.ts`/`client.ts`: it runs in a browser.
-- Storage (`db.ts`, `migrations.ts`) knows nothing about HTTP.
+- Storage (`db.ts`, `migrations.ts`) knows nothing about HTTP (`server.ts`, `client.ts`, `errors.ts`, `effect/http`).
+- `src/web/**` imports no Effect: it stays out of the browser bundle.
+- Effect modules are imported by path (`effect/Effect`), never through a barrel (`effect`, `effect/http`, `@effect/platform-bun`): Bun loads a whole barrel at runtime, ~30 ms on every `pad` and hook run.
+- No `../`, tests included: `@/` is `src/`, `@integrations/` is `integrations/`, `./` is for a sibling.
 
-Type-only imports are always fine: sharing `Note` couples nothing at runtime.
+A boundary holds however the module is written (`./db`, `../db`, `@/db`). Type-only imports are always fine: sharing `Note` couples nothing at runtime.
 
 ## Adding a capability
 
-1. API first: a route in `createRoutes` (`src/server.ts`), its schema in `src/openapi.ts` (and `/llms.txt` if agents should know), a test in `test/api.test.ts`.
-2. Then the clients that need it: `src/client.ts` (+ `cli.ts`, `mcp.ts` tool), `src/web/api.ts`.
+1. API first: a route in `routes` (`src/server.ts`), its schema in `src/openapi.ts` (and `/llms.txt` if agents should know), a test in `test/api.test.ts`. A new shape goes in `src/domain.ts`; a new storage outcome is a tagged error in `src/db.ts`, mapped in `guard`.
+2. Then the clients that need it: `src/client.ts` (+ a `cli.ts` command, a `mcp.ts` tool), `src/web/api.ts`.
 
 ## Routes
 
-`createRoutes` returns Bun's route table: one entry per path, one handler per method. `resource()` wraps each handler with the bearer check and error mapping, and answers methods a path doesn't define with `405` and an `Allow` header (Bun would otherwise fall through to 404). Path params arrive decoded in `req.params`.
+`routes(token)` is a layer adding an `HttpRouter` route per path: `resource(path, { GET, POST, … })` dispatches on the method, wraps each handler in `guard` (the bearer check and error mapping) and answers the methods a path doesn't define with `405` and an `Allow` header. Handlers are Effects that read the request (`HttpServerRequest`) and path params (`HttpRouter.params`); the store is yielded once, when the routes are built. `serverLayer` serves them on `BunHttpServer`, with Bun itself serving the HTML import at `/` (HMR in development). `main` reads `ServerConfig`, refuses a non-loopback address without `PAD_TOKEN`, and launches it all with `BunRuntime.runMain`.
 
 ## Errors
 
-Every non-2xx body is `{ "error": "<code>", "message": "<english>" }`. The code (from `src/errors.ts`, also an enum in `/openapi.json`) is the contract; the message is for people and agents reading raw responses. Throw `new HttpError(code, status, detail?)` inside a handler; `resource()` turns it into the response.
+Every non-2xx body is `{ "error": "<code>", "message": "<english>" }`. The code (from `src/errors.ts`, also an enum in `/openapi.json`) is the contract; the message is for people and agents reading raw responses.
+
+- A handler refuses a request with `yield* refuse(code, status, detail?)`, an `HttpError`.
+- The store fails with tagged errors (`NoteNotFound`, `NoteExists`, `NoteChanged`, `RevisionNotFound`, `ViewNotFound`, `ViewExists`); `guard` maps each to its code and status, and the `Failure` type lists everything a handler may fail with.
+- A defect (a bug, a broken database) is logged and answered with `500 internal`.
+
+Clients get `ApiError` (`src/client.ts`) carrying the status and code.
 
 ## Storage and migrations
 
-Notes live in one SQLite table with an FTS5 index kept in sync by triggers. Schema changes are named migrations in `src/migrations.ts`, applied in one transaction on startup and recorded in `schema_migrations`:
+Notes live in one SQLite table with an FTS5 index kept in sync by triggers. `Store` is a service on `SqlClient` (`@effect/sql-sqlite-bun`, one connection); `Store.layer(path)` opens the file, turns on foreign keys and migrates before the store is handed out. Rows are decoded with Schemas; SQL failures are defects, so store signatures list only domain outcomes. Schema changes are named migrations in `src/migrations.ts`, applied in one transaction on startup and recorded in `schema_migrations`:
 
 - Append to the end of `MIGRATIONS`; never edit, rename or reorder one that has shipped.
+- The runner is ours, not effect/sql's `Migrator`, which keeps numeric ids in its own table.
 - Only `0001` and `0002` use `IF NOT EXISTS` — that is how databases created before named migrations (including the live Railway one) adopt them. New migrations must not need it.
 
 ## History
@@ -63,6 +77,8 @@ Every create and every content change (title, body, tags, kind; not pinning) is 
 ## Concurrent and offline writes
 
 A note's `updated_at` is its version: note responses carry it as `ETag`, and `PATCH` with `If-Match` answers `412 noteChanged` when the note moved on. `Store.update` always advances `updated_at` by at least a millisecond, so two writes never share a version. `POST` accepts a client-chosen `id` (`409 noteExists` if taken), which makes a create safe to retry.
+
+Requests run concurrently, so every check-then-write (If-Match, append, create with an id) runs in one `sql.withTransaction`. `test/api.test.ts` races writes to hold that.
 
 The PWA builds offline editing on those two rules (`src/web/sync.ts`):
 
@@ -76,3 +92,5 @@ The PWA builds offline editing on those two rules (`src/web/sync.ts`):
 - `bun run lint` — oxlint (type-aware, incl. `no-deprecated` and jsx-a11y), oxfmt (formatting, sorted imports), knip (unused files/exports/deps), in parallel. `bun run lint:fix` fixes what it can.
 - Change a lint rule with a scoped override and a comment giving the reason.
 - `bunfig.toml`: dependencies are added with exact versions, and packages published less than a day ago are refused (`minimumReleaseAge`).
+- `repos/` vendors upstream source for reference (Effect): `bun test` runs only `test/`, and every linter ignores it (oxlint also with `--disable-nested-config`, as `repos/effect` brings its own config).
+- Tests build the production layers with `test/support.ts` (`testServer`, `testStore` with a `TestClock`) and run effects through the fixture's `run`.

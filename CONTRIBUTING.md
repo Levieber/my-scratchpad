@@ -22,6 +22,7 @@ bun test && bun run lint && bun run typecheck
 ## Rules that apply to every change
 
 - **API first.** Clients (PWA, CLI, MCP, hooks) talk to the HTTP API and never import `db.ts`, `migrations.ts` or `server.ts` at runtime. A new capability lands as a route, an `openapi.ts` entry and a test, and only then in the clients. `test/architecture.test.ts` enforces the boundaries.
+- **Imports by alias.** Never `../`: `@/` is `src/`, `@integrations/` is `integrations/`, `./` is for a sibling. Effect modules by path (`effect/Effect`), never a barrel. See [docs/effect.md](docs/effect.md) for how Effect is used here.
 - **Errors are codes.** Responses are `{ error: <code from src/errors.ts>, message }`; add a code rather than inventing a string.
 - **Migrations are append-only.** A schema change adds a migration to `src/migrations.ts`; never edit one that has shipped.
 - **Comments explain a decision.** Don't narrate the code.

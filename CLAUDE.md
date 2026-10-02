@@ -27,10 +27,10 @@ Use Bun for everything: `bun`, `bun test`, `bun install`, `bunx`. No Node, npm, 
 
 Area-specific guidance lives in project skills (`.claude/skills/`). Each condenses a document in `docs/`; when a change alters what a skill says, update both.
 
-| Skill          | Use it when                                                                 | Source document        |
-| -------------- | --------------------------------------------------------------------------- | ---------------------- |
-| `architecture` | adding endpoints/commands/tools, errors, migrations, lint, a boundary fails | `docs/architecture.md` |
-| `deployment`   | env vars, config, start/build scripts, Railway                              | `docs/deployment.md`   |
+| Skill          | Use it when                                                                                      | Source document                          |
+| -------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| `architecture` | adding endpoints/commands/tools, errors, migrations, writing Effect code, lint, a boundary fails | `docs/architecture.md`, `docs/effect.md` |
+| `deployment`   | env vars, config, start/build scripts, Railway                                                   | `docs/deployment.md`                     |
 
 The Claude Code integration itself is described in `docs/claude-code.md`. `README.md` is a short index for people; put detail in `docs/`.
 

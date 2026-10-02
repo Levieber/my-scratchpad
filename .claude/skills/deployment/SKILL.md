@@ -7,7 +7,7 @@ description: Configuration, environment variables and Railway for my-scratchpad.
 
 The detail is in `docs/deployment.md`. Update it in the same change when something here moves.
 
-- Every env var is read in `src/config.ts` (`PAD_PORT`/`PORT`, `PAD_HOST`, `PAD_DB`, `PAD_TOKEN`, `PAD_URL`, `PAD_AUTHOR`, `NODE_ENV`). Add new ones there and to the table in the doc and `.env.example`.
+- Every env var is read in `src/config.ts` (`PAD_PORT`/`PORT`, `PAD_HOST`, `PAD_DB`, `PAD_TOKEN`, `PAD_URL`, `PAD_AUTHOR`, `NODE_ENV`). Add new ones there (as Effect `Config`; wrap optional ones in `Config.option`, so a malformed value fails rather than falling through to a default) and to the table in the doc and `.env.example`.
 - Production runs `bun run start` = `NODE_ENV=production bun src/server.ts`. No server build; Bun bundles the PWA from the HTML import at startup. `bun run build` only produces an inspectable PWA bundle in `dist/`.
 
 ## Railway

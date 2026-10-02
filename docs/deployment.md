@@ -2,7 +2,7 @@
 
 ## Configuration
 
-Every variable is read in `src/config.ts`.
+Every variable is read in `src/config.ts`, as Effect `Config`: a value that is set but malformed (`PAD_PORT=abc`) stops startup with the reason instead of being used, an empty one counts as unset, and tokens are `Redacted`, so they never show in a log.
 
 | Var                 | Default                            |                                                                   |
 | ------------------- | ---------------------------------- | ----------------------------------------------------------------- |
@@ -19,7 +19,7 @@ Clients (CLI, MCP server, SessionStart hook) prefer `pad login <url> <token>`, w
 ## Running
 
 - `bun run dev` — HMR, and browser console output streamed to the terminal.
-- `bun run start` — `NODE_ENV=production bun src/server.ts`. There is no server build: Bun bundles the PWA from the HTML import at startup (well under a second).
+- `bun run start` — `NODE_ENV=production bun src/server.ts`. There is no server build: Bun bundles the PWA from the HTML import at startup (well under a second). SIGINT/SIGTERM (a Railway redeploy) shut it down gracefully: requests are interrupted and the database is closed.
 - `bun run build` — optional: bundle the PWA into `dist/` to inspect its output and size. Nothing serves `dist/`.
 
 ## Railway

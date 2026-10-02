@@ -10,7 +10,7 @@ An API-first scratchpad shared by you and your AI agents. One HTTP API is the so
  curl / agents ▶└────────────────────────────────────────────────────┘
 ```
 
-**Stack:** Bun (runtime, bundler, tests, `bun:sqlite`), React 19, MCP TypeScript SDK; oxlint, oxfmt and knip.
+**Stack:** Bun (runtime, bundler, tests, SQLite), Effect 4 (HTTP server and client, SQL, config, CLI, MCP server), React 19 for the PWA; oxlint, oxfmt and knip.
 
 ```sh
 bun install
@@ -36,6 +36,7 @@ API summary for agents: `GET /llms.txt`; full contract: `GET /openapi.json`.
 - [docs/self-hosting.md](docs/self-hosting.md) — run it on your machine, a server or Railway, and connect clients.
 - [docs/architecture.md](docs/architecture.md) — the API-first rule and how it's enforced, routes, error codes, migrations, tooling.
 - [docs/deployment.md](docs/deployment.md) — configuration, running, Railway (IaC + Railpack).
+- [docs/effect.md](docs/effect.md) — why everything but the PWA is written with Effect, the decisions behind it, and what it cost.
 - [docs/claude-code.md](docs/claude-code.md) — `bun run setup:claude` and what it installs.
 
 ## Contributing and license
