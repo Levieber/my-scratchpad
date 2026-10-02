@@ -66,22 +66,15 @@ describe("notes API", () => {
     expect(data.author).toBe("claude-code");
   });
 
-  test("full-text search with prefix match, tag and pinned filters", async () => {
+  test("full-text search with prefix match and tag filters", async () => {
     await call("POST", "/api/notes", { body: "rotate the database credentials", tags: ["ops"] });
-    await call("POST", "/api/notes", { body: "buy coffee", pinned: true });
+    await call("POST", "/api/notes", { body: "buy coffee" });
     expect((await call("GET", "/api/notes?q=datab")).data).toHaveLength(1);
     expect((await call("GET", `/api/notes?q=${encodeURIComponent('"weird (syntax')}`)).status).toBe(
       200,
     );
     expect((await call("GET", "/api/notes?tag=ops")).data[0].body).toContain("database");
-    expect((await call("GET", "/api/notes?pinned=true")).data[0].body).toBe("buy coffee");
     expect((await call("GET", "/api/tags")).data).toEqual([{ tag: "ops", count: 1 }]);
-  });
-
-  test("pinned notes sort first", async () => {
-    await call("POST", "/api/notes", { body: "pinned one", pinned: true });
-    await call("POST", "/api/notes", { body: "newer" });
-    expect((await call("GET", "/api/notes")).data[0].body).toBe("pinned one");
   });
 
   test("notes report checkbox progress, kept current on every write", async () => {
@@ -92,29 +85,6 @@ describe("notes API", () => {
     const appended = (await call("POST", `/api/notes/${n.id}/append`, "- [ ] c")).data;
     expect(appended.progress).toEqual({ done: 2, total: 3 });
     expect((await call("GET", "/api/notes")).data[0].progress).toEqual({ done: 2, total: 3 });
-  });
-
-  test("daily review: created once per date, carrying over open items", async () => {
-    const first = await call("PUT", "/api/daily/2026-09-24");
-    expect(first.status).toBe(201);
-    expect(first.data).toMatchObject({
-      title: "Daily review 2026-09-24",
-      tags: ["daily"],
-      kind: "note",
-    });
-    const again = await call("PUT", "/api/daily/2026-09-24");
-    expect([again.status, again.data.id]).toEqual([200, first.data.id]);
-
-    await call("PATCH", `/api/notes/${first.data.id}`, {
-      body: "## Tomorrow\n- [ ] ship the list\n- [x] write tests",
-    });
-    const next = await call("PUT", "/api/daily/2026-09-25", undefined, {
-      "x-pad-author": "claude-code",
-    });
-    expect(next.status).toBe(201);
-    expect(next.data.author).toBe("claude-code");
-    expect(next.data.body).toContain("- [ ] ship the list");
-    expect(next.data.body).not.toContain("write tests");
   });
 
   test("kind defaults to note and can be set on create and patch", async () => {
@@ -203,9 +173,9 @@ describe("notes API", () => {
   test("patch, append, delete", async () => {
     const { data: n } = await call("POST", "/api/notes", { body: "log" });
     const patched = (
-      await call("PATCH", `/api/notes/${n.id}`, { title: "Build log", pinned: true })
+      await call("PATCH", `/api/notes/${n.id}`, { title: "Build log", tags: ["log"] })
     ).data;
-    expect(patched).toMatchObject({ title: "Build log", pinned: true, body: "log" });
+    expect(patched).toMatchObject({ title: "Build log", tags: ["log"], body: "log" });
 
     await call("POST", `/api/notes/${n.id}/append`, { text: "step 1 ok" });
     const appended = (await call("POST", `/api/notes/${n.id}/append`, "step 2 ok")).data;
@@ -225,8 +195,6 @@ describe("notes API", () => {
       ["POST", "/api/notes", { tags: [1] }, 400, "invalidBody"],
       ["POST", "/api/notes", { body: "x", kind: "checklist" }, 400, "invalidKind"],
       ["GET", "/api/notes?kind=checklist", undefined, 400, "invalidKind"],
-      ["PUT", "/api/daily/2026-02-30", undefined, 400, "invalidDate"],
-      ["PUT", "/api/daily/today", undefined, 400, "invalidDate"],
       ["PATCH", "/api/notes/nope", { body: "x" }, 404, "noteNotFound"],
       ["DELETE", "/api/notes/nope", undefined, 404, "noteNotFound"],
       ["POST", "/api/notes/nope/append", "x", 404, "noteNotFound"],
@@ -271,8 +239,8 @@ describe("notes API", () => {
     // The same author saving again soon is the same editing session.
     await call("PATCH", `/api/notes/${n.id}`, { body: "# Plan\n- one\n- two" });
     await call("POST", `/api/notes/${n.id}/append`, "- three", { "x-pad-author": "claude-code" });
-    // Pinning isn't an edit.
-    await call("PATCH", `/api/notes/${n.id}`, { pinned: true }, { "x-pad-author": "claude-code" });
+    // A save that changes nothing isn't an edit.
+    await call("PATCH", `/api/notes/${n.id}`, { title: "Plan" }, { "x-pad-author": "claude-code" });
 
     const { data: revs } = await call("GET", `/api/notes/${n.id}/revisions`);
     expect(revs.map((r: any) => [r.author, r.added, r.removed])).toEqual([

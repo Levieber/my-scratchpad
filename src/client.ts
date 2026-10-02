@@ -12,7 +12,6 @@ export type ListParams = {
   author?: string;
   /** Notes must carry every one of these. */
   tag?: string[];
-  pinned?: boolean;
   limit?: number;
   offset?: number;
 };
@@ -69,8 +68,6 @@ export class Client {
   append = (id: string, text: string) =>
     this.req<Note>("POST", `/api/notes/${encodeURIComponent(id)}/append`, { text });
   delete = (id: string) => this.req<void>("DELETE", `/api/notes/${encodeURIComponent(id)}`);
-  /** The daily review for a local YYYY-MM-DD date, created on first request. */
-  daily = (date: string) => this.req<Note>("PUT", `/api/daily/${encodeURIComponent(date)}`);
   tags = () => this.req<{ tag: string; count: number }[]>("GET", "/api/tags");
   views = () => this.req<View[]>("GET", "/api/views");
   createView = (name: string, query: string) =>

@@ -3,7 +3,6 @@ import { join } from "node:path";
 import type { BunRequest } from "bun";
 
 import { config } from "./config";
-import { isDate } from "./daily";
 import {
   type FullRevision,
   type ListQuery,
@@ -57,7 +56,7 @@ async function readInput(req: Request): Promise<NoteInput> {
   });
   if (!body || typeof body !== "object" || Array.isArray(body))
     throw new HttpError("invalidBody", 400, "Expected a JSON object");
-  const { id, title, body: text, tags, pinned, kind } = body as Record<string, unknown>;
+  const { id, title, body: text, tags, kind } = body as Record<string, unknown>;
   if (id !== undefined && !isNoteId(id))
     throw new HttpError("invalidBody", 400, "id must be 8-64 letters, digits, '-' or '_'");
   if (title !== undefined && typeof title !== "string")
@@ -67,10 +66,8 @@ async function readInput(req: Request): Promise<NoteInput> {
   if (tags !== undefined && (!Array.isArray(tags) || !tags.every((t) => typeof t === "string"))) {
     throw new HttpError("invalidBody", 400, "tags must be an array of strings");
   }
-  if (pinned !== undefined && typeof pinned !== "boolean")
-    throw new HttpError("invalidBody", 400, "pinned must be a boolean");
   if (kind !== undefined && !isKind(kind)) throw kindError();
-  return { id, title, body: text, tags, pinned, kind };
+  return { id, title, body: text, tags, kind };
 }
 
 /** If-Match against a note: its updated_at, quoted as in the ETag or bare, or `*` for any. */
@@ -135,13 +132,11 @@ function readListQuery(p: URLSearchParams): ListQuery {
   const kind = p.get("kind");
   if (kind !== null && !isKind(kind)) throw kindError();
   const parsed = parseQuery(p.get("q") ?? "");
-  const pinned = p.get("pinned");
   return {
     q: parsed.text || undefined,
     kind: kind ?? parsed.kind,
     author: p.get("author") ?? parsed.author,
     tags: [...p.getAll("tag"), ...parsed.tags],
-    pinned: pinned === null ? undefined : pinned === "true",
     limit: Number(p.get("limit") ?? 50) || 50,
     offset: Number(p.get("offset") ?? 0) || 0,
   };
@@ -301,16 +296,6 @@ export function createRoutes(store: Store, { token }: { token?: string } = {}) {
 
     "/api/notes/:id/diff": resource({
       GET: (req) => json(diff(id(req), new URL(req.url).searchParams)),
-    }),
-
-    // PUT because it is idempotent: asking for the same day twice returns the same note.
-    "/api/daily/:date": resource({
-      PUT: (req) => {
-        const date = req.params.date ?? "";
-        if (!isDate(date)) throw new HttpError("invalidDate", 400);
-        const { note, created } = store.daily(date, authorOf(req));
-        return noteJson(note, created ? 201 : 200);
-      },
     }),
 
     "/api/tags": resource({ GET: () => json(store.tags()) }),

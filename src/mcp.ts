@@ -6,7 +6,6 @@ import { z } from "zod";
 
 import { Client } from "./client";
 import { config } from "./config";
-import { localDate } from "./daily";
 import type { Note } from "./db";
 import { type Kind, KIND_NAMES, KINDS } from "./kinds";
 
@@ -17,7 +16,7 @@ const server = new McpServer(
   {
     instructions: `The user's personal scratchpad, shared between them (via a PWA and the \`pad\` CLI) and you.
 Use it to: look up context the user jotted down (search before asking them to repeat themselves), save notes/findings/TODOs they ask you to remember, and keep a running log on long tasks.
-Pinned notes are the user's most important context. Your writes are attributed as "claude-code". Web UI: ${config.url}
+Your writes are attributed as "claude-code". Web UI: ${config.url}
 Every note has a kind: ${KIND_NAMES.map((k) => `\`${k}\` (${KINDS[k]})`).join("; ")} A use case is a tag, not a kind: a launch checklist is kind reference + tags checklist, launch.`,
   },
 );
@@ -47,7 +46,6 @@ const summary = (n: Note) => ({
   id: n.id,
   title: n.title,
   tags: n.tags,
-  pinned: n.pinned,
   kind: n.kind,
   ...(n.progress.total > 0 && { progress: n.progress }),
   author: n.author,
@@ -66,7 +64,7 @@ server.registerTool(
   {
     title: "Search scratchpad",
     description:
-      "List or full-text search the user's scratchpad notes. Pinned first, then most recently updated. Returns previews; use scratchpad_get for the full body.",
+      "List or full-text search the user's scratchpad notes. Most recently updated first. Returns previews; use scratchpad_get for the full body.",
     inputSchema: {
       query: z
         .string()
@@ -80,15 +78,12 @@ server.registerTool(
         .string()
         .optional()
         .describe("human, agent (anyone who isn't the human), or an author's name"),
-      pinned: z.boolean().optional().describe("Only pinned notes"),
       limit: z.number().int().min(1).max(100).optional().describe("Default 20"),
     },
     annotations: { readOnlyHint: true },
   },
-  safe(async ({ query, tags, kind, author, pinned, limit }) =>
-    (await client.list({ q: query, tag: tags, kind, author, pinned, limit: limit ?? 20 })).map(
-      summary,
-    ),
+  safe(async ({ query, tags, kind, author, limit }) =>
+    (await client.list({ q: query, tag: tags, kind, author, limit: limit ?? 20 })).map(summary),
   ),
 );
 
@@ -113,24 +108,9 @@ server.registerTool(
       title: z.string().optional(),
       tags,
       kind,
-      pinned: z.boolean().optional(),
     },
   },
   safe((args) => client.create(args)),
-);
-
-server.registerTool(
-  "scratchpad_daily",
-  {
-    title: "Daily review",
-    description:
-      "Get the user's daily review note for a date, creating it (with open items carried over from the previous one) if it doesn't exist. Use when the user asks about today's plan, what's left, or a daily review.",
-    inputSchema: {
-      date: z.string().optional().describe("YYYY-MM-DD; defaults to today in the user's time zone"),
-    },
-    annotations: { idempotentHint: true },
-  },
-  safe(({ date }) => client.daily(date ?? localDate())),
 );
 
 server.registerTool(
@@ -148,14 +128,13 @@ server.registerTool(
   "scratchpad_update",
   {
     title: "Update note",
-    description: "Replace a note's title, body, tags or pinned flag. Omitted fields are unchanged.",
+    description: "Replace a note's title, body, tags or kind. Omitted fields are unchanged.",
     inputSchema: {
       id: z.string(),
       title: z.string().optional(),
       body: z.string().optional(),
       tags,
       kind,
-      pinned: z.boolean().optional(),
     },
     annotations: { idempotentHint: true },
   },

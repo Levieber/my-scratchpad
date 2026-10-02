@@ -5,13 +5,12 @@ One rule shapes everything: **the HTTP API is the only way in.** People (PWA, CL
 ```
 src/
   server.ts       Bun.serve route table: auth, validation, error codes. The only HTTP entry point.
-  db.ts           Store: notes in SQLite + FTS5. Only the server uses it.
+  db.ts           Store: notes and saved views in SQLite + FTS5. Only the server uses it.
   migrations.ts   Named schema changes, recorded in schema_migrations.
   errors.ts       Error codes + messages; shared by server and clients.
   kinds.ts        Note kinds (note, reference); a use case is a tag, not a kind. Shared.
   query.ts        The search language (`kind:x author:x #tag words`); run by the server, edited by the PWA.
-  checklist.ts    Markdown checkboxes → `progress` on every note, open items for carry-over.
-  daily.ts        The daily review's title, template and date helpers (the date is the client's).
+  checklist.ts    Markdown checkboxes → `progress` on every note.
   diff.ts         Line diffs (Myers), unified diff text, three-way merge. Server and PWA share it.
   ids.ts          Note ids; the PWA mints them too, for notes written offline.
   title.ts        The title derived from a body's first line.

@@ -2,8 +2,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { openItems, type Progress, progress } from "./checklist";
-import { DAILY_TAG, dailyBody, dailyTitle } from "./daily";
+import { type Progress, progress } from "./checklist";
 import { diffStats } from "./diff";
 import { newId } from "./ids";
 import type { Kind } from "./kinds";
@@ -15,7 +14,6 @@ export type Note = {
   title: string;
   body: string;
   tags: string[];
-  pinned: boolean;
   kind: Kind;
   author: string;
   created_at: string;
@@ -30,7 +28,6 @@ export type NoteInput = {
   title?: string;
   body?: string;
   tags?: string[];
-  pinned?: boolean;
   kind?: Kind;
 };
 
@@ -42,7 +39,6 @@ export type ListQuery = {
   author?: string;
   /** Notes must carry every one of these. */
   tags?: string[];
-  pinned?: boolean;
   limit?: number;
   offset?: number;
 };
@@ -70,13 +66,12 @@ export type FullRevision = Revision & { body: string };
 /** A named search: `query` is what goes in the search box, operators included (src/query.ts). */
 export type View = { id: string; name: string; query: string; created_at: string };
 
-type Row = Omit<Note, "tags" | "pinned" | "progress"> & { tags: string; pinned: number };
+type Row = Omit<Note, "tags" | "progress"> & { tags: string };
 type RevisionRow = Omit<FullRevision, "tags"> & { tags: string };
 
 const toNote = (r: Row): Note => ({
   ...r,
   tags: JSON.parse(r.tags),
-  pinned: !!r.pinned,
   progress: progress(r.body),
 });
 
@@ -85,8 +80,6 @@ const toRevision = (r: RevisionRow): Revision => {
   const { body: _, ...rest } = toFullRevision(r);
   return rest;
 };
-
-const hasTag = "EXISTS (SELECT 1 FROM json_each(notes.tags) WHERE value = ?)";
 
 /** How long after a revision further saves by the same author still belong to it. */
 export const REVISION_WINDOW_MS = 5 * 60_000;
@@ -118,7 +111,7 @@ export class Store {
     migrate(this.db);
   }
 
-  list({ q, kind, author, tags = [], pinned, limit = 50, offset = 0 }: ListQuery = {}): Note[] {
+  list({ q, kind, author, tags = [], limit = 50, offset = 0 }: ListQuery = {}): Note[] {
     const where: string[] = [];
     const params: Record<string, string | number> = { limit: Math.min(limit, 500), offset };
     let from = "notes n";
@@ -148,12 +141,8 @@ export class Store {
       where.push(`EXISTS (SELECT 1 FROM json_each(n.tags) WHERE value = $tag${i})`);
       params[`tag${i}`] = tag.toLowerCase();
     });
-    if (pinned !== undefined) {
-      where.push("n.pinned = $pinned");
-      params.pinned = pinned ? 1 : 0;
-    }
     const sql = `SELECT n.* FROM ${from} ${where.length ? "WHERE " + where.join(" AND ") : ""}
-      ORDER BY n.pinned DESC, n.updated_at DESC LIMIT $limit OFFSET $offset`;
+      ORDER BY n.updated_at DESC LIMIT $limit OFFSET $offset`;
     return (this.db.query(sql).all(params) as Row[]).map(toNote);
   }
 
@@ -170,7 +159,6 @@ export class Store {
       title: input.title?.trim() || deriveTitle(body),
       body,
       tags: normTags(input.tags),
-      pinned: !!input.pinned,
       kind: input.kind ?? "note",
       author,
       created_at: now,
@@ -181,36 +169,13 @@ export class Store {
     this.db.transaction(() => {
       this.db
         .query(
-          `INSERT INTO notes (id, title, body, tags, pinned, kind, author, created_at, updated_at)
-           VALUES ($id, $title, $body, $tags, $pinned, $kind, $author, $created_at, $updated_at)`,
+          `INSERT INTO notes (id, title, body, tags, kind, author, created_at, updated_at)
+           VALUES ($id, $title, $body, $tags, $kind, $author, $created_at, $updated_at)`,
         )
-        .run({ ...row, tags: JSON.stringify(note.tags), pinned: note.pinned ? 1 : 0 });
+        .run({ ...row, tags: JSON.stringify(note.tags) });
       this.record(note, author);
     })();
     return note;
-  }
-
-  /**
-   * The daily review for `date` (a checked YYYY-MM-DD), created on first request with the open
-   * items of the latest earlier review. One transaction, so two clients can't create it twice.
-   */
-  daily(date: string, author = "human"): { note: Note; created: boolean } {
-    return this.db.transaction(() => {
-      const title = dailyTitle(date);
-      const existing = this.db
-        .query(`SELECT * FROM notes WHERE title = ? AND ${hasTag}`)
-        .get(title, DAILY_TAG) as Row | null;
-      if (existing) return { note: toNote(existing), created: false };
-      // ISO dates sort as text, so the latest earlier review is the greatest smaller title.
-      const previous = this.db
-        .query(
-          `SELECT body FROM notes WHERE title LIKE ? AND title < ? AND ${hasTag}
-           ORDER BY title DESC LIMIT 1`,
-        )
-        .get(`${dailyTitle("")}%`, title, DAILY_TAG) as { body: string } | null;
-      const body = dailyBody(previous ? openItems(previous.body) : []);
-      return { note: this.create({ title, body, tags: [DAILY_TAG] }, author), created: true };
-    })();
   }
 
   update(id: string, patch: NoteInput, author = "human"): Note | null {
@@ -224,7 +189,6 @@ export class Store {
           : cur.title,
       body: patch.body ?? cur.body,
       tags: patch.tags !== undefined ? normTags(patch.tags) : cur.tags,
-      pinned: patch.pinned ?? cur.pinned,
       kind: patch.kind ?? cur.kind,
       // Always later than the last write, even within one millisecond: updated_at is the version
       // clients send back in If-Match, so two writes must never share one.
@@ -236,14 +200,13 @@ export class Store {
     this.db.transaction(() => {
       this.db
         .query(
-          `UPDATE notes SET title=$title, body=$body, tags=$tags, pinned=$pinned, kind=$kind, updated_at=$updated_at WHERE id=$id`,
+          `UPDATE notes SET title=$title, body=$body, tags=$tags, kind=$kind, updated_at=$updated_at WHERE id=$id`,
         )
         .run({
           id,
           title: next.title,
           body: next.body,
           tags: JSON.stringify(next.tags),
-          pinned: next.pinned ? 1 : 0,
           kind: next.kind,
           updated_at: next.updated_at,
         });

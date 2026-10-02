@@ -1,32 +1,15 @@
 #!/usr/bin/env bun
-// Claude Code SessionStart hook: tells Claude the scratchpad exists and injects pinned notes
-// plus recent titles as context. Stays silent and fast if the server is unreachable.
+// Claude Code SessionStart hook: tells Claude the scratchpad exists and lists the most recent
+// note titles as context. Stays silent and fast if the server is unreachable.
 import { Client } from "@/client";
 import { config } from "@/config";
-import type { Note } from "@/db";
 
 import { withTimeout } from "./timeout";
-
-const MAX_PINNED_CHARS = 3000;
 
 const client = new Client(config.url, "claude-code");
 
 try {
-  const [pinned, recent] = await withTimeout(
-    Promise.all([
-      client.list({ pinned: true, limit: 10 }),
-      client.list({ pinned: false, limit: 8 }),
-    ]),
-  );
-
-  let budget = MAX_PINNED_CHARS;
-  const pinnedText = pinned
-    .map((n: Note) => {
-      const body = n.body.slice(0, Math.max(0, budget));
-      budget -= body.length;
-      return `### ${n.title} (id: ${n.id})\n${body}${body.length < n.body.length ? "\n…(truncated; scratchpad_get for full)" : ""}`;
-    })
-    .join("\n\n");
+  const recent = await withTimeout(client.list({ limit: 8 }));
 
   const recentText = recent
     .map((n) => `- ${n.title} (id: ${n.id}, ${n.author}, ${n.updated_at.slice(0, 10)})`)
@@ -38,7 +21,6 @@ try {
     "Search it before asking the user to repeat context; save things they ask you to remember; append progress logs on long tasks.",
     // Reference notes stay out of this context on purpose: they load on demand (review-hook.ts).
     "The user's reference notes (practices, principles, checklists) aren't loaded here: after a turn that edits files you'll be asked to check the edits against the ones that apply.",
-    pinned.length ? `\n## Pinned notes\n${pinnedText}` : "",
     recent.length ? `\n## Recent notes\n${recentText}` : "",
   ]
     .filter(Boolean)

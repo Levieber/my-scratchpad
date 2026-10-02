@@ -9,7 +9,7 @@ import { deriveTitle } from "../title";
 import { isApiError, Offline, Unauthorized, type Note, type NoteInput } from "./api";
 
 /** What the editor changes. */
-export type Fields = { title: string; body: string; tags: string[]; pinned: boolean; kind: Kind };
+export type Fields = { title: string; body: string; tags: string[]; kind: Kind };
 
 /** The server's version an edit started from: its content to merge against, its version for If-Match. */
 export type Base = Fields & { updated_at: string };
@@ -23,7 +23,6 @@ export const fieldsOf = (n: Fields): Fields => ({
   title: n.title,
   body: n.body,
   tags: n.tags,
-  pinned: n.pinned,
   kind: n.kind,
 });
 export const baseOf = (n: Note): Base => ({ ...fieldsOf(n), updated_at: n.updated_at });
@@ -118,7 +117,6 @@ export function mergeFields(
       title: pick("title"),
       body: body.text,
       tags: pick("tags"),
-      pinned: pick("pinned"),
       kind: pick("kind"),
     },
     conflict: body.conflict,

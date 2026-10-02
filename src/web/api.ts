@@ -99,7 +99,6 @@ export const api = {
   update: (id: string, patch: NoteInput, ifMatch?: string) =>
     req<Note>("PATCH", `/api/notes/${id}`, patch, ifMatch ? { "if-match": `"${ifMatch}"` } : {}),
   delete: (id: string) => req<void>("DELETE", `/api/notes/${id}`),
-  daily: (date: string) => req<Note>("PUT", `/api/daily/${date}`),
   tags: () => req<Tag[]>("GET", "/api/tags"),
   views: () => req<View[]>("GET", "/api/views"),
   createView: (name: string, query: string) => req<View>("POST", "/api/views", { name, query }),

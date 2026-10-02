@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { localDate } from "../daily";
 import { newId } from "../ids";
 import type { Kind } from "../kinds";
 import { hasToken, operatorValue, parseQuery, setOperator, toggleToken } from "../query";
@@ -58,14 +57,13 @@ const browserStorage = () => {
 const outbox = new Outbox(browserStorage());
 const syncer = new Syncer(outbox, api);
 
-type Draft = { title: string; body: string; tags: string; pinned: boolean; kind: Kind };
+type Draft = { title: string; body: string; tags: string; kind: Kind };
 
-const emptyDraft: Draft = { title: "", body: "", tags: "", pinned: false, kind: "note" };
+const emptyDraft: Draft = { title: "", body: "", tags: "", kind: "note" };
 const toDraft = (n: Fields): Draft => ({
   title: n.title,
   body: n.body,
   tags: n.tags.join(", "),
-  pinned: n.pinned,
   kind: n.kind,
 });
 const fromDraft = (d: Draft): Fields => ({
@@ -75,7 +73,6 @@ const fromDraft = (d: Draft): Fields => ({
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean),
-  pinned: d.pinned,
   kind: d.kind,
 });
 
@@ -244,8 +241,6 @@ export function App() {
         throw e;
       }
     });
-  // The first open of the day creates the note, so refresh the list to show it.
-  const openToday = () => show(() => api.daily(localDate())).then(refreshList);
 
   const newNote = async (body = "") => {
     flush();
@@ -428,9 +423,6 @@ export function App() {
       <aside className="sidebar">
         <header className="bar">
           <h1>Scratchpad</h1>
-          <button title="Today's daily review" onClick={() => void openToday()}>
-            Today
-          </button>
           <button
             className="primary"
             title="New note (Ctrl+Alt+N)"
@@ -644,14 +636,6 @@ export function App() {
               onClick={() => edit({ kind: draft.kind === "reference" ? "note" : "reference" })}
             >
               Reference
-            </button>
-            <button
-              className="ghost"
-              aria-pressed={draft.pinned}
-              title="Pin"
-              onClick={() => edit({ pinned: !draft.pinned })}
-            >
-              {draft.pinned ? "★" : "☆"}
             </button>
             <button
               className="ghost kindToggle"

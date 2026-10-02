@@ -8,7 +8,6 @@ const note = (patch: Partial<Note>): Note => ({
   title: "Title",
   body: "",
   tags: [],
-  pinned: false,
   kind: "note",
   author: "human",
   created_at: "2026-09-25T12:00:00.000Z",
@@ -51,10 +50,9 @@ describe("groupNotes", () => {
   const now = new Date(2026, 8, 25, 12);
   const daysAgo = (d: number) => new Date(2026, 8, 25 - d, 9).toISOString();
 
-  test("puts pinned first, then Today, Previous 7 days and Earlier, dropping empty groups", () => {
+  test("groups into Today, Previous 7 days and Earlier, dropping empty groups", () => {
     const groups = groupNotes(
       [
-        note({ id: "p", pinned: true, updated_at: daysAgo(30) }),
         note({ id: "t", updated_at: daysAgo(0) }),
         note({ id: "w", updated_at: daysAgo(6) }),
         note({ id: "e", updated_at: daysAgo(7) }),
@@ -62,7 +60,6 @@ describe("groupNotes", () => {
       now,
     );
     expect(groups.map((g) => [g.label, g.notes.map((n) => n.id)])).toEqual([
-      ["Pinned", ["p"]],
       ["Today", ["t"]],
       ["Previous 7 days", ["w"]],
       ["Earlier", ["e"]],

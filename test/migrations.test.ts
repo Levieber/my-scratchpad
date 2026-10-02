@@ -92,6 +92,31 @@ describe("migrations", () => {
     ]);
   });
 
+  test("0007 drops the pinned column and keeps the notes, newest first", () => {
+    const db = new Database(":memory:");
+    migrate(
+      db,
+      MIGRATIONS.filter((m) => m.id < "0007"),
+    );
+    db.query(
+      "INSERT INTO notes (id, title, body, pinned, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ).run("a", "Pinned old", "x", 1, "2026-01-01", "2026-01-01");
+    db.query(
+      "INSERT INTO notes (id, title, body, pinned, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    ).run("b", "Newer", "y", 0, "2026-01-02", "2026-01-02");
+
+    migrate(db);
+    const columns = db.query("PRAGMA table_info(notes)").all() as { name: string }[];
+    expect(columns.map((c) => c.name)).not.toContain("pinned");
+    const ids = db.query("SELECT id FROM notes ORDER BY updated_at DESC").all();
+    expect(ids).toEqual([{ id: "b" }, { id: "a" }]);
+    // The search index still follows writes after the table was altered.
+    db.query("UPDATE notes SET body = 'findme' WHERE id = 'a'").run();
+    expect(
+      db.query("SELECT rowid FROM notes_fts WHERE notes_fts MATCH 'findme'").all(),
+    ).toHaveLength(1);
+  });
+
   test("a failing migration rolls back the whole batch", () => {
     const db = new Database(":memory:");
     const broken = [

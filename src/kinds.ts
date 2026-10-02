@@ -1,9 +1,9 @@
 /**
  * What a note is for, which decides how people and agents use it. Deliberately few: a use case
- * (launch checklist, daily review) is a tag, not a kind.
+ * (launch checklist, weekly review) is a tag, not a kind.
  */
 export const KINDS = {
-  note: "Anything used once or finished: to-dos, learnings, logs, daily reviews. The default.",
+  note: "Anything used once or finished: to-dos, learnings, logs, reviews. The default.",
   reference:
     "Reusable rules to check work against, never done: best practices, principles, checklists.",
 } as const;

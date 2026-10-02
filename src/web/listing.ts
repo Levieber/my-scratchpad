@@ -40,19 +40,18 @@ export function preview(note: Note, max = 240): string {
 
 export type Group = { label: string; notes: Note[] };
 
-/** Splits the API's order (pinned, then most recently updated) into labelled sections. */
+/** Splits the API's order (most recently updated first) into labelled sections. */
 export function groupNotes(notes: Note[], now = new Date()): Group[] {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const week = today - 6 * 86_400_000;
   const groups: Group[] = [
-    { label: "Pinned", notes: [] },
     { label: "Today", notes: [] },
     { label: "Previous 7 days", notes: [] },
     { label: "Earlier", notes: [] },
   ];
   for (const n of notes) {
     const t = Date.parse(n.updated_at);
-    const i = n.pinned ? 0 : t >= today ? 1 : t >= week ? 2 : 3;
+    const i = t >= today ? 0 : t >= week ? 1 : 2;
     groups[i]!.notes.push(n);
   }
   return groups.filter((g) => g.notes.length);

@@ -93,6 +93,16 @@ export const MIGRATIONS: Migration[] = [
        )`,
     ],
   },
+  {
+    // Pinning was never used. The column goes, and the list order keeps only its recency half.
+    // The index has to go first: SQLite refuses to drop a column an index still uses.
+    id: "0007.drop_pinned",
+    statements: [
+      "DROP INDEX notes_order",
+      "ALTER TABLE notes DROP COLUMN pinned",
+      "CREATE INDEX notes_order ON notes(updated_at DESC)",
+    ],
+  },
 ];
 
 /** Applies every migration not yet recorded, all in one transaction. Returns the ids it ran. */

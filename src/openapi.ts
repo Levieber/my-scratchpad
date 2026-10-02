@@ -15,7 +15,6 @@ const Note = {
     "title",
     "body",
     "tags",
-    "pinned",
     "kind",
     "author",
     "created_at",
@@ -27,7 +26,6 @@ const Note = {
     title: { type: "string" },
     body: { type: "string", description: "Markdown" },
     tags: { type: "array", items: { type: "string" } },
-    pinned: { type: "boolean" },
     kind,
     author: {
       type: "string",
@@ -57,7 +55,6 @@ const NoteInput = {
     title: { type: "string", description: "Defaults to the first line of body" },
     body: { type: "string" },
     tags: { type: "array", items: { type: "string" } },
-    pinned: { type: "boolean" },
     kind: { ...kind, default: "note" },
   },
 };
@@ -170,7 +167,7 @@ export const openapi = {
     "/api/notes": {
       get: {
         operationId: "listNotes",
-        summary: "List or full-text search notes (pinned first, then most recently updated)",
+        summary: "List or full-text search notes (most recently updated first)",
         parameters: [
           {
             name: "q",
@@ -194,7 +191,6 @@ export const openapi = {
             explode: true,
             description: "Repeat to require several tags",
           },
-          { name: "pinned", in: "query", schema: { type: "boolean" } },
           { name: "limit", in: "query", schema: { type: "integer", default: 50, maximum: 500 } },
           { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
         ],
@@ -341,27 +337,6 @@ export const openapi = {
         },
       },
     },
-    "/api/daily/{date}": {
-      parameters: [
-        {
-          name: "date",
-          in: "path",
-          required: true,
-          schema: { type: "string", format: "date" },
-          description: "The user's local date; the server can't know their time zone",
-        },
-      ],
-      put: {
-        operationId: "dailyReview",
-        summary:
-          "Get the daily review for a date, creating it (tag `daily`, open items carried over from the previous review) on first request",
-        responses: {
-          200: noteResponse("Existing review"),
-          201: noteResponse("Created"),
-          400: error("Bad date"),
-        },
-      },
-    },
     "/api/tags": {
       get: {
         operationId: "listTags",
@@ -442,16 +417,15 @@ Auth: if the server has PAD_TOKEN set, send \`Authorization: Bearer <token>\`.
 Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 
 ## Endpoints
-- GET    /api/notes?q=&kind=&author=&tag=&pinned=&limit=&offset=   list / full-text search
-- POST   /api/notes            {title?, body, tags?, pinned?, kind?, id?}  (or text/plain body)
+- GET    /api/notes?q=&kind=&author=&tag=&limit=&offset=   list / full-text search
+- POST   /api/notes            {title?, body, tags?, kind?, id?}  (or text/plain body)
 - GET    /api/notes/{id}
-- PATCH  /api/notes/{id}       {title?, body?, tags?, pinned?, kind?}
+- PATCH  /api/notes/{id}       {title?, body?, tags?, kind?}
 - POST   /api/notes/{id}/append {text}  (or text/plain)
 - DELETE /api/notes/{id}
 - GET    /api/notes/{id}/revisions         history, newest first (who changed it, lines +/-)
 - GET    /api/notes/{id}/revisions/{rev}   one revision with its body
 - GET    /api/notes/{id}/diff?from=&to=&since=   unified diff; default the latest change
-- PUT    /api/daily/{YYYY-MM-DD}  the daily review for the user's local date (created on first request)
 - GET    /api/tags
 - GET    /api/views, POST /api/views {name, query}, DELETE /api/views/{id}   saved searches
 

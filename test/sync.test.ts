@@ -16,7 +16,6 @@ const fields = (patch: Partial<Fields> = {}): Fields => ({
   title: "",
   body: "",
   tags: [],
-  pinned: false,
   kind: "note",
   ...patch,
 });
@@ -251,9 +250,9 @@ describe("mergeFields", () => {
     const { fields: merged } = mergeFields(
       base,
       { ...base, title: "Mine" },
-      { ...base, tags: ["a", "b"], pinned: true },
+      { ...base, tags: ["a", "b"] },
     );
-    expect(merged).toEqual(fields({ title: "Mine", tags: ["a", "b"], pinned: true, body: "x" }));
+    expect(merged).toEqual(fields({ title: "Mine", tags: ["a", "b"], body: "x" }));
   });
 });
 

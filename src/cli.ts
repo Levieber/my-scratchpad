@@ -6,25 +6,23 @@ import { parseArgs } from "node:util";
 
 import { ApiError, Client } from "./client";
 import { clientConfigPath, config } from "./config";
-import { localDate } from "./daily";
 import type { Note } from "./db";
 import { isKind, KIND_NAMES, type Kind } from "./kinds";
 
 const HELP = `pad — scratchpad CLI (talks to ${config.url})
 
 Usage:
-  pad add [text...] [-t title] [--tag x]... [--kind k] [--pin]   create a note (text or stdin)
-  pad ls [query...] [--tag x]... [--kind k] [--author a] [--pinned] [-n limit] list / search
+  pad add [text...] [-t title] [--tag x]... [--kind k]   create a note (text or stdin)
+  pad ls [query...] [--tag x]... [--kind k] [--author a] [-n limit] list / search
   pad views [add <name> <query...> | rm <name>]        list, save or delete saved searches
   pad ls @<view>                                       run a saved search
   pad show <id>                                        print a note
   pad append <id> [text...]                            append a line (text or stdin)
   pad edit <id>                                        edit body in $EDITOR
-  pad set <id> [-t title] [--tag x]... [--kind k] [--pin|--unpin] update metadata
+  pad set <id> [-t title] [--tag x]... [--kind k] update metadata
   pad rm <id>                                          delete a note
   pad history <id> [-n limit]                          list a note's revisions
   pad diff <id> [--from rev] [--to rev] [--since time] what changed (default: the latest change)
-  pad today [YYYY-MM-DD]                               print (or create) the daily review
   pad tags                                            list tags
   pad status                                           show which server is in use
   pad login <url> [token]                              point CLI/MCP at a server (e.g. Railway)
@@ -43,9 +41,6 @@ const { values: opts, positionals } = parseArgs({
     tag: { type: "string", multiple: true },
     kind: { type: "string" },
     author: { type: "string" },
-    pin: { type: "boolean" },
-    unpin: { type: "boolean" },
-    pinned: { type: "boolean" },
     limit: { type: "string", short: "n" },
     from: { type: "string" },
     to: { type: "string" },
@@ -75,10 +70,10 @@ const done = (n: Note) =>
   n.kind === "note" && n.progress.total ? ` ${n.progress.done}/${n.progress.total}` : "";
 
 const line = (n: Note) =>
-  `${n.pinned ? "★" : " "} ${n.id}  ${n.title}${done(n)}${n.kind === "note" ? "" : ` [${n.kind}]`}${n.tags.length ? "  #" + n.tags.join(" #") : ""}  (${ago(n.updated_at)}, ${n.author})`;
+  `${n.id}  ${n.title}${done(n)}${n.kind === "note" ? "" : ` [${n.kind}]`}${n.tags.length ? "  #" + n.tags.join(" #") : ""}  (${ago(n.updated_at)}, ${n.author})`;
 
 const full = (n: Note) =>
-  `${n.pinned ? "★ " : ""}${n.title}\nid: ${n.id} · by ${n.author} · updated ${n.updated_at}${
+  `${n.title}\nid: ${n.id} · by ${n.author} · updated ${n.updated_at}${
     n.tags.length ? " · #" + n.tags.join(" #") : ""
   }\n\n${n.body}`;
 
@@ -111,7 +106,6 @@ async function main() {
         title: opts.title,
         body,
         tags: opts.tag,
-        pinned: opts.pin,
         kind: kindOpt(),
       });
       return out(n, () => n.id);
@@ -135,7 +129,6 @@ async function main() {
         tag: opts.tag,
         kind: kindOpt(),
         author: opts.author,
-        pinned: opts.pinned || undefined,
         limit: opts.limit ? Number(opts.limit) : undefined,
       });
       return out(notes, () => notes.map(line).join("\n") || "(no notes)");
@@ -172,13 +165,7 @@ async function main() {
         title: opts.title,
         tags: opts.tag,
         kind: kindOpt(),
-        pinned: opts.pin ? true : opts.unpin ? false : undefined,
       });
-      return out(n, () => line(n));
-    }
-    case "pin":
-    case "unpin": {
-      const n = await client.update(need(args[0]), { pinned: cmd === "pin" });
       return out(n, () => line(n));
     }
     case "rm":
@@ -215,11 +202,6 @@ async function main() {
         d,
         () => [...fields, d.diff.trimEnd()].filter(Boolean).join("\n") || "(no changes)",
       );
-    }
-    case "today":
-    case "daily": {
-      const n = await client.daily(args[0] ?? localDate());
-      return out(n, () => full(n));
     }
     case "tags": {
       const tags = await client.tags();
