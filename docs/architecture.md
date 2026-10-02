@@ -28,8 +28,8 @@ src/
     observability.ts  A request id on every request and response, one log line per request, the JSON logger.
     docs/         openapi.ts (the contract at /openapi.json), llms.ts (the agent quick-start at /llms.txt).
     storage/      SQLite + FTS5 through effect/sql; knows nothing about HTTP.
-      store.ts      The `Store` service and its layers: composes the three below, plus the health `ping`.
-      notes.ts, revisions.ts, views.ts   The queries, one file per area.
+      store.ts      The `Store` service and its layers: composes the four below, plus the health `ping`.
+      notes.ts, revisions.ts, views.ts, pins.ts   The queries, one file per area.
       errors.ts     What the store fails with besides a defect (NoteNotFound, NoteChanged, …).
       rows.ts       A row of SQLite → the API's shapes.
       sql.ts        What every query shares: SQL failures as defects, the clock.
@@ -44,7 +44,7 @@ src/
   cli/          `pad` (effect/cli); cli.ts wires it.
     root.ts       The root command, `out`, `reported` (API errors → one line, exit 1), the author.
     flags.ts, format.ts   Shared flags; how a note is printed for a person.
-    commands/     notes.ts, find.ts (search, tags, saved views), history.ts, transfer.ts, connection.ts (status, login, serve…), hooks.ts.
+    commands/     notes.ts, find.ts (search, tags, saved views), pins.ts (pin, unpin, pins), history.ts, transfer.ts, connection.ts (status, login, serve…), hooks.ts.
   mcp/          tools.ts (names, descriptions, shapes), handlers.ts (what each does), server.ts (protocol, instructions); mcp.ts wires it.
   web/          React PWA, bundled by Bun from the web/index.html import.
     lib/          api.ts (the API from a browser), sync.ts (the offline outbox and syncer), listing.ts, draft.ts, storage.ts (localStorage).
@@ -83,7 +83,7 @@ Type-only imports are always fine: sharing `Note` couples nothing at runtime.
 Every non-2xx body is `{ "error": "<code>", "message": "<english>" }`. The code (from `shared/errors.ts`, also an enum in `/openapi.json`) is the contract; the message is for people and agents reading raw responses.
 
 - A handler refuses a request with `yield* refuse(code, status, detail?)`, an `HttpError`.
-- The store fails with tagged errors (`NoteNotFound`, `NoteExists`, `NoteChanged`, `RevisionNotFound`, `ViewNotFound`, `ViewExists`, and `DatabaseUnavailable`, which only `ping` raises); `guard` maps each to its code and status, and the `Failure` type lists everything a handler may fail with.
+- The store fails with tagged errors (`NoteNotFound`, `NoteExists`, `NoteChanged`, `RevisionNotFound`, `ViewNotFound`, `ViewExists`, `PinLimit`, and `DatabaseUnavailable`, which only `ping` raises); `guard` maps each to its code and status, and the `Failure` type lists everything a handler may fail with.
 - A defect (a bug, a broken database) is logged and answered with `500 internal`.
 
 Clients get `ApiError` (`client/client.ts`) carrying the status and code.
@@ -107,7 +107,7 @@ Notes live in one SQLite table with an FTS5 index kept in sync by triggers. `Sto
 
 ## History
 
-Every create and every content change (title, body, tags, kind; not pinning) is written to `note_revisions` in the same transaction, attributed to the `X-Pad-Author` of that request. Saves by one author within `REVISION_WINDOW_MS` (5 minutes) fold into the latest revision, so an autosaving editor records editing sessions, not keystrokes; a folded revision that ends up equal to the one before it is dropped. Each revision stores its full content plus lines added/removed, so diffs are computed on read (`GET /api/notes/:id/diff`) and any revision can be restored with a plain PATCH. Deleting a note deletes its history.
+Every create and every content change (title, body, tags, kind; not pinning, which lives in its own `pins` table and leaves `updated_at` alone) is written to `note_revisions` in the same transaction, attributed to the `X-Pad-Author` of that request. Saves by one author within `REVISION_WINDOW_MS` (5 minutes) fold into the latest revision, so an autosaving editor records editing sessions, not keystrokes; a folded revision that ends up equal to the one before it is dropped. Each revision stores its full content plus lines added/removed, so diffs are computed on read (`GET /api/notes/:id/diff`) and any revision can be restored with a plain PATCH. Deleting a note deletes its history.
 
 ## Concurrent and offline writes
 

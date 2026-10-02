@@ -2,6 +2,7 @@
 // the OpenAPI document.
 import { ERROR_CODES } from "@/shared/errors";
 import { KIND_NAMES, KINDS } from "@/shared/kinds";
+import { MAX_PINS } from "@/shared/pins";
 
 export const llmsTxt = (base: string) => `# Scratchpad
 
@@ -24,6 +25,7 @@ Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 - GET    /api/notes/{id}/diff?from=&to=&since=   unified diff; default the latest change
 - GET    /api/tags
 - GET    /api/views, POST /api/views {name, query}, DELETE /api/views/{id}   saved searches
+- GET    /api/pins, PUT /api/pins/{id}, DELETE /api/pins/{id}   the user's pinned notes (at most ${MAX_PINS}): what matters most right now
 
 Every note carries \`progress: {done, total}\`, counted from its markdown checkboxes.
 

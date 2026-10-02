@@ -34,7 +34,7 @@ export class ApiError extends Schema.TaggedError<ApiError>()("ApiError", {
   code: Schema.optional(Schema.String),
 }) {}
 
-type Method = "GET" | "POST" | "PATCH" | "DELETE";
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 function query(q: Record<string, string | number | boolean | readonly string[] | undefined>) {
   const params = new URLSearchParams();
@@ -93,6 +93,10 @@ const make = Effect.fnUntraced(function* ({
     views: () => req<View[]>("GET", "/api/views"),
     createView: (name: string, query: string) => req<View>("POST", "/api/views", { name, query }),
     deleteView: (id: string) => req<void>("DELETE", `/api/views/${encodeURIComponent(id)}`),
+    /** The pinned notes, in the order they were pinned. */
+    pins: () => req<Note[]>("GET", "/api/pins"),
+    pin: (id: string) => req<void>("PUT", `/api/pins/${encodeURIComponent(id)}`),
+    unpin: (id: string) => req<void>("DELETE", `/api/pins/${encodeURIComponent(id)}`),
     health: () => req<{ ok: boolean }>("GET", "/api/health"),
     /** A note's history, newest first. */
     revisions: (id: string, q: { limit?: number; offset?: number } = {}) =>

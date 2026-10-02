@@ -136,6 +136,14 @@ export const routes = (token: Redacted.Redacted | undefined) =>
           DELETE: Effect.as(Effect.flatMap(routeId, store.deleteView), noContent),
         }),
 
+        resource("/api/pins", { GET: Effect.map(store.pins, (notes) => json(notes)) }),
+
+        // PUT and DELETE on the note's id: both idempotent, so a client can retry either blindly.
+        resource("/api/pins/:id", {
+          PUT: Effect.as(Effect.flatMap(routeId, store.pin), noContent),
+          DELETE: Effect.as(Effect.flatMap(routeId, store.unpin), noContent),
+        }),
+
         HttpRouter.route("GET", "/openapi.json", json(openapi)),
         HttpRouter.route("GET", "/llms.txt", (req) =>
           Effect.succeed(
