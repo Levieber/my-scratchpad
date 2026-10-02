@@ -25,6 +25,7 @@ pad add "idea: …" --tag ideas        # or: echo … | pad add
 pad ls [query] [--tag x]... [--kind reference] [--author agent] [--json]   # query: words, kind:reference, author:agent, '#tag', @view
 pad history <id> · pad diff <id> [--since <time>]   # who changed a note, and what
 pad show <id> · pad append <id> "…" · pad edit <id> · pad set <id> --kind reference · pad rm <id>
+pad export [file] [--tag x] [--kind k] · pad import [file]   # notes as JSON; import skips ids that already exist
 pad status · pad login <url> <token> · pad logout
 ```
 

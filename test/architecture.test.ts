@@ -20,6 +20,7 @@ const CLIENTS = [
   "src/cli.ts",
   "src/mcp.ts",
   "src/client.ts",
+  "src/transfer.ts",
   "integrations/**/*.ts",
 ];
 

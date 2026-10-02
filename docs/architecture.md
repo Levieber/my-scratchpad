@@ -17,6 +17,7 @@ src/
   openapi.ts      The contract (/openapi.json) and the agent quick-start (/llms.txt).
   config.ts       Every env var and ~/.config/scratchpad/config.json, read in one place.
   client.ts       Typed HTTP client used by the CLI, MCP server and Claude Code hook.
+  transfer.ts     `pad export` / `pad import`: notes as a JSON array (the shape of `pad ls --json`), built on the public API. Import keeps ids, so it is safe to repeat; author and timestamps are not carried over.
   cli.ts          `pad` — human-friendly and `--json` output.
   mcp.ts          MCP stdio server — native tools for Claude Code.
   web/            React PWA (bundled by Bun from the web/index.html import); talks to the API via web/api.ts,

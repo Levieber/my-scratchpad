@@ -8,6 +8,7 @@ import { ApiError, Client } from "./client";
 import { clientConfigPath, config } from "./config";
 import type { Note } from "./db";
 import { isKind, KIND_NAMES, type Kind } from "./kinds";
+import { exportNotes, importNotes, parseExport } from "./transfer";
 
 const HELP = `pad — scratchpad CLI (talks to ${config.url})
 
@@ -23,6 +24,8 @@ Usage:
   pad rm <id>                                          delete a note
   pad history <id> [-n limit]                          list a note's revisions
   pad diff <id> [--from rev] [--to rev] [--since time] what changed (default: the latest change)
+  pad export [file] [--tag x]... [--kind k] [--author a] write notes as JSON (stdout or file)
+  pad import [file]                                    create notes from \`pad export\` JSON (file or stdin)
   pad tags                                            list tags
   pad status                                           show which server is in use
   pad login <url> [token]                              point CLI/MCP at a server (e.g. Railway)
@@ -30,6 +33,7 @@ Usage:
   pad serve                                            run the API + PWA server
   pad open                                             open the PWA in a browser
 
+Import keeps ids, so re-importing skips notes that exist; the author becomes you, not the original.
 Kinds: ${KIND_NAMES.join(", ")}. Search operators: pad ls kind:reference author:agent '#launch' seo (author: human, agent, or a name)
 Global: --json for machine-readable output.
 Env (overrides \`pad login\`): PAD_URL, PAD_TOKEN, PAD_AUTHOR.`;
@@ -202,6 +206,40 @@ async function main() {
         d,
         () => [...fields, d.diff.trimEnd()].filter(Boolean).join("\n") || "(no changes)",
       );
+    }
+    case "export": {
+      const notes = await exportNotes(client, {
+        tag: opts.tag,
+        kind: kindOpt(),
+        author: opts.author,
+      });
+      const json = JSON.stringify(notes, null, 2) + "\n";
+      const [file] = args;
+      if (!file || file === "-") return void process.stdout.write(json);
+      await Bun.write(file, json);
+      return out(
+        { exported: notes.length, file },
+        () => `exported ${notes.length} notes to ${file}`,
+      );
+    }
+    case "import": {
+      const [file] = args;
+      if (!file && process.stdin.isTTY)
+        throw new ApiError(400, "Usage: pad import <file>, or pipe JSON on stdin.");
+      const source = file && file !== "-" ? Bun.file(file) : Bun.stdin;
+      const text = await source.text().catch(() => {
+        throw new ApiError(400, `Cannot read ${file}.`);
+      });
+      const result = await importNotes(client, parseExport(text));
+      out(
+        result,
+        () =>
+          `created ${result.created}, skipped ${result.skipped} existing` +
+          result.failed.map((f) => `\nitem ${f.item}: ${f.message}`).join("") +
+          (result.failed.length ? `\nfailed ${result.failed.length}` : ""),
+      );
+      if (result.failed.length) process.exitCode = 1;
+      return;
     }
     case "tags": {
       const tags = await client.tags();
