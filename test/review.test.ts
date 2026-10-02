@@ -52,9 +52,9 @@ describe("review hooks, end to end", () => {
     rmSync(cache, { recursive: true, force: true });
   });
 
-  // Runs a hook script the way Claude Code does: the event as JSON on stdin, output on stdout.
-  async function hook(script: string, event: object, env: Record<string, string> = {}) {
-    const proc = Bun.spawn(["bun", join(ROOT, "integrations/claude-code", script)], {
+  // Runs `pad hook <name>` the way Claude Code does: the event as JSON on stdin, output on stdout.
+  async function hook(name: string, event: object, env: Record<string, string> = {}) {
+    const proc = Bun.spawn(["bun", join(ROOT, "src/cli.ts"), "hook", name], {
       stdin: new Blob([JSON.stringify(event)]),
       stdout: "pipe",
       env: {
@@ -90,13 +90,13 @@ describe("review hooks, end to end", () => {
   }
 
   const edit = (session: string, file: string) =>
-    hook("record-edit.ts", {
+    hook("record-edit", {
       session_id: session,
       tool_name: "Edit",
       tool_input: { file_path: file },
     });
   const stop = (session: string, active = false, env?: Record<string, string>) =>
-    hook("review-hook.ts", { session_id: session, stop_hook_active: active, cwd: ROOT }, env);
+    hook("review", { session_id: session, stop_hook_active: active, cwd: ROOT }, env);
 
   test("blocks once after edits, listing the files and reference titles", async () => {
     await boot();

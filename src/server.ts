@@ -1,7 +1,10 @@
-import { join } from "node:path";
-
 import * as BunHttpServer from "@effect/platform-bun/BunHttpServer";
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+// Imported as files rather than read from public/ at run time, so `pad` compiled into one
+// executable carries them too.
+import icon from "@public/icon.svg" with { type: "file" };
+import manifest from "@public/manifest.webmanifest" with { type: "file" };
+import serviceWorker from "@public/sw.js" with { type: "file" };
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import type * as HttpPlatform from "effect/http/HttpPlatform";
@@ -41,7 +44,6 @@ import { llmsTxt, openapi } from "./openapi";
 import { parseQuery } from "./query";
 import homepage from "./web/index.html";
 
-const PUBLIC_DIR = join(import.meta.dir, "..", "public");
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 
 type Method = (typeof METHODS)[number];
@@ -180,8 +182,8 @@ const readListQuery = (p: URLSearchParams) =>
     });
   });
 
-const staticFile = (name: string, contentType?: string, headers: Record<string, string> = {}) =>
-  HttpServerResponse.file(join(PUBLIC_DIR, name), { contentType, headers }).pipe(Effect.orDie);
+const staticFile = (path: string, contentType?: string, headers: Record<string, string> = {}) =>
+  HttpServerResponse.file(path, { contentType, headers }).pipe(Effect.orDie);
 
 const routeId = Effect.map(HttpRouter.params, (p) => p.id ?? "");
 
@@ -376,14 +378,14 @@ export const routes = (token: Redacted.Redacted | undefined) =>
         HttpRouter.route(
           "GET",
           "/sw.js",
-          staticFile("sw.js", undefined, { "cache-control": "no-cache" }),
+          staticFile(serviceWorker, undefined, { "cache-control": "no-cache" }),
         ),
         HttpRouter.route(
           "GET",
           "/manifest.webmanifest",
-          staticFile("manifest.webmanifest", "application/manifest+json"),
+          staticFile(manifest, "application/manifest+json"),
         ),
-        HttpRouter.route("GET", "/icon.svg", staticFile("icon.svg")),
+        HttpRouter.route("GET", "/icon.svg", staticFile(icon, "image/svg+xml")),
 
         // Everything else, under /api or not.
         HttpRouter.route("*", "*", errorJson("notFound", 404)),

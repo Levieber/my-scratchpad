@@ -15,7 +15,8 @@
     "types": ["bun"],
     "paths": {
       "@/*": ["./src/*"],
-      "@integrations/*": ["./integrations/*"]
+      "@integrations/*": ["./integrations/*"],
+      "@public/*": ["./public/*"]
     }
   },
   "include": ["src", "integrations", "test"]

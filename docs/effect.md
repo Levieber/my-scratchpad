@@ -61,7 +61,7 @@ The HTTP contract did not change: the API tests pass with only their setup rewri
 - **Fewer runtime dependencies.** The MCP SDK (express, hono, ajv, jose and 13 more direct dependencies) and zod are gone from runtime. `effect` has no dependencies; `@effect/platform-bun` adds only `ws`. This fits the supply-chain caution in `bunfig.toml`. The SDK remains a dev dependency, as the reference client in `test/mcp.test.ts`.
 - **Better CLI errors and help.** `--kind memo` and `-n abc` are refused with the allowed values, and `pad <command> --help` works for every command.
 - **Shutdown is structured.** `BunRuntime.runMain` interrupts the server on SIGINT/SIGTERM (what Railway sends on a redeploy) and runs finalizers: the database is closed, which SQLite shows by removing its `-wal` file. Hooks no longer `process.exit` to escape a pending timer.
-- **More tests.** New: config rules, MCP end to end, concurrent writes, the clock, the new boundaries (125 → 221 tests, most of the new ones per-file architecture checks).
+- **More tests.** New: config rules, MCP end to end, concurrent writes, the clock, the new boundaries (125 → 220 tests, many of the new ones per-file architecture checks), and the compiled `pad` built and run in a test.
 
 ## Costs
 
@@ -72,7 +72,7 @@ The HTTP contract did not change: the API tests pass with only their setup rewri
   | `bun build --target=bun --minify`               | ~27 ms | 140 KB |
   | `bun build --compile --minify --bytecode` (exe) | ~15 ms | ~84 MB |
 
-  `pad status` as a compiled bytecode executable is ~27 ms. Bytecode without `--compile` needs CommonJS, which a dependency's `import.meta` rules out. Nothing is built yet: the hooks and `pad` still run from source.
+  Bytecode without `--compile` needs CommonJS, which a dependency's `import.meta` rules out. So `bun run setup:claude` compiles `pad` (`bun run build:pad`, the hooks being `pad hook <name>`): a hook or `pad status` takes ~25 ms (median of 15), ~10 ms more than a hook-only executable because the whole CLI loads. The catch is that the executable must be rebuilt after a code change ([claude-code.md](claude-code.md)).
 
 - **Size.** `effect` is 54 MB installed (sources, maps and types). Nothing ships to the browser.
 - **A new release.** 4.0.0 was published on 2026-10-01; early bugs are likely, and some modules (`http`, `cli`, `ai`) are marked unstable. Versions are pinned exactly.
@@ -80,7 +80,7 @@ The HTTP contract did not change: the API tests pass with only their setup rewri
 - **CLI surface changed.**
   - `pad --help` is generated, and lists Effect's own flags (`--version`/`-v`, `--completions`, `--wizard`, `--log-level`).
   - Text starting with `-` needs `--` (`pad append <id> -- "- [ ] item"`); the old CLI crashed on it.
-  - `search` still works but is unlisted (a command takes one alias).
+  - `pad search` is gone: a command takes one alias, `list`, and `ls` is the name.
 - **Small output changes.**
   - MCP tool results are compact JSON (they were pretty-printed), plus `structuredContent` where the result is an object.
   - The server's startup line goes through Effect's logger (`[time] INFO (#1): scratchpad listening on …`).

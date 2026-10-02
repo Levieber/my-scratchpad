@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
+import { HOOK_RUNNERS } from "@integrations/claude-code/hooks";
 import * as Argument from "effect/cli/Argument";
 import * as Command from "effect/cli/Command";
 import * as Flag from "effect/cli/Flag";
@@ -134,35 +135,29 @@ const findView = Effect.fn(function* (name: string) {
   return view;
 });
 
-const listing = <const Name extends string>(name: Name) =>
-  Command.make(
-    name,
-    { query: words("query"), tag, kind, author, limit },
-    Effect.fn(function* (a) {
-      // `@name` stands for a saved search's query, so it can be combined with more words.
-      const expanded = yield* Effect.forEach(a.query, (word) =>
-        word.startsWith("@")
-          ? Effect.map(findView(word.slice(1)), (v) => v.query)
-          : Effect.succeed(word),
-      );
-      const notes = yield* (yield* Client).list({
-        q: expanded.join(" ") || undefined,
-        tag: a.tag,
-        kind: Option.getOrUndefined(a.kind),
-        author: Option.getOrUndefined(a.author),
-        limit: Option.getOrUndefined(a.limit),
-      });
-      yield* out(notes, () => notes.map(line).join("\n") || "(no notes)");
-    }, reported),
-  );
-
-const ls = listing("ls").pipe(
+const ls = Command.make(
+  "ls",
+  { query: words("query"), tag, kind, author, limit },
+  Effect.fn(function* (a) {
+    // `@name` stands for a saved search's query, so it can be combined with more words.
+    const expanded = yield* Effect.forEach(a.query, (word) =>
+      word.startsWith("@")
+        ? Effect.map(findView(word.slice(1)), (v) => v.query)
+        : Effect.succeed(word),
+    );
+    const notes = yield* (yield* Client).list({
+      q: expanded.join(" ") || undefined,
+      tag: a.tag,
+      kind: Option.getOrUndefined(a.kind),
+      author: Option.getOrUndefined(a.author),
+      limit: Option.getOrUndefined(a.limit),
+    });
+    yield* out(notes, () => notes.map(line).join("\n") || "(no notes)");
+  }, reported),
+).pipe(
   Command.withAlias("list"),
   Command.withDescription("List / search; `@<view>` runs a saved search"),
 );
-
-// A command has one alias, and `search` was always a third name for `ls`.
-const search = listing("search").pipe(Command.unlisted);
 
 const show = Command.make(
   "show",
@@ -433,12 +428,32 @@ const open = Command.make(
   }, reported),
 ).pipe(Command.withDescription("Open the PWA in a browser"));
 
+// Claude Code runs these (see integrations/claude-code/settings.ts); they live in the CLI so they
+// start as fast as the compiled `pad` does.
+const hook = Command.make("hook").pipe(
+  Command.withDescription(
+    "Claude Code hooks, run by Claude Code (installed by `bun run setup:claude`)",
+  ),
+  Command.withSubcommands(
+    Object.entries(HOOK_RUNNERS).map(([name, run]) =>
+      Command.make(
+        name,
+        {},
+        Effect.fn(function* () {
+          const event = yield* Effect.promise(() => Bun.stdin.json().catch(() => ({})));
+          // Hooks only read; attributed as Claude Code all the same.
+          yield* run(event).pipe(Effect.provide(Client.layer("claude-code")));
+        }),
+      ),
+    ),
+  ),
+);
+
 // --- wiring ----------------------------------------------------------------------------------
 
 const commands = [
   add,
   ls,
-  search,
   show,
   append,
   edit,
@@ -455,6 +470,7 @@ const commands = [
   logout,
   serve,
   open,
+  hook,
 ] as const;
 
 pad.pipe(

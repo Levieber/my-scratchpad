@@ -10,6 +10,7 @@ bun test             # API, migrations and architecture tests
 bun run lint         # oxlint + oxfmt + knip   (bun run lint:fix to fix)
 bun run typecheck
 bun run setup:claude # user-scope Claude Code wiring (integrations/claude-code/)
+bun run build:pad    # recompile dist/pad (= ~/.local/bin/pad and the hooks) after changing code
 ```
 
 Use Bun for everything: `bun`, `bun test`, `bun install`, `bunx`. No Node, npm, Jest, Vite, dotenv, express or better-sqlite3.

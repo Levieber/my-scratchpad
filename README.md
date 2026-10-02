@@ -18,6 +18,7 @@ bun run dev        # http://127.0.0.1:7777 with HMR
 bun test           # API, migrations and architecture tests
 bun run lint       # oxlint + oxfmt + knip
 bun run typecheck
+bun run build:pad  # compile `pad` (and the Claude Code hooks) after changing code
 ```
 
 ```sh

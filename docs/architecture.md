@@ -26,7 +26,7 @@ src/
   web/            React PWA (bundled by Bun from the web/index.html import); talks to the API via web/api.ts,
                   writes through the outbox in web/sync.ts.
 public/           Files that must live at the site root: service worker, manifest, icon.
-integrations/     Claude Code wiring (installer, SessionStart hook, skill).
+integrations/     Claude Code wiring: installer, hooks (run as `pad hook <name>`), skills.
 test/support.ts   Fixtures: the production layers on an in-memory database, in a ManagedRuntime.
 ```
 

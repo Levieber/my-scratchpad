@@ -13,6 +13,7 @@
     "dev": "bun --hot src/server.ts",
     "start": "NODE_ENV=production bun src/server.ts",
     "build": "bun build src/web/index.html --production --outdir=dist",
+    "build:pad": "bun build src/cli.ts --compile --minify --bytecode --format=esm --outfile=dist/pad",
     "mcp": "bun src/mcp.ts",
     "typecheck": "tsc --noEmit",
     "lint": "bun run --parallel \"lint:check:*\"",

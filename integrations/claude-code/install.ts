@@ -18,7 +18,7 @@ import { dirname, join, resolve } from "node:path";
 //   bun run setup:claude --uninstall     remove everything this script added
 import { $ } from "bun";
 
-import { HOOKS, hookScript, type Settings, withOurs, withoutOurs } from "./settings";
+import { HOOKS, type Settings, withOurs, withoutOurs } from "./settings";
 
 const REPO = resolve(import.meta.dir, "../..");
 // Prefer the PATH entry (e.g. a mise shim) over execPath, which pins a version directory that upgrades remove.
@@ -30,6 +30,8 @@ const CLAUDE_MD = join(CLAUDE_DIR, "CLAUDE.md");
 const SKILL_LINK = join(CLAUDE_DIR, "skills", "scratchpad");
 const REVIEW_SKILL_LINK = join(CLAUDE_DIR, "skills", "pad-review");
 const PAD_LINK = join(HOME, ".local", "bin", "pad");
+// `bun run build:pad` writes it; the link follows every rebuild.
+const PAD_BINARY = join(REPO, "dist", "pad");
 const UNIT = join(
   process.env.XDG_CONFIG_HOME ?? join(HOME, ".config"),
   "systemd",
@@ -68,10 +70,11 @@ function editClaudeMd(block: string | null) {
 }
 
 async function install() {
-  step(`pad CLI -> ${PAD_LINK}`);
+  // Compiled with bytecode: `pad` and the hooks start in ~25 ms instead of ~100 ms from source.
+  step(`pad CLI (compiled) -> ${PAD_LINK}`);
+  await $`${BUN} run build:pad`.cwd(REPO);
   for (const f of ["src/cli.ts", "src/mcp.ts"]) chmodSync(join(REPO, f), 0o755);
-  for (const { script } of Object.values(HOOKS)) chmodSync(hookScript(REPO, script), 0o755);
-  link(join(REPO, "src/cli.ts"), PAD_LINK);
+  link(PAD_BINARY, PAD_LINK);
 
   if (withService) {
     step(`local server as systemd user service (${UNIT})`);
@@ -108,14 +111,14 @@ WantedBy=default.target
   step(
     `hooks (${Object.keys(HOOKS).join(", ")}) + permissions -> ${SETTINGS} (backup: settings.json.bak-scratchpad)`,
   );
-  editSettings((s) => withOurs(s, BUN, REPO));
+  editSettings((s) => withOurs(s, PAD_LINK));
 
   step(`instructions block -> ${CLAUDE_MD}`);
   editClaudeMd(readFileSync(join(import.meta.dir, "CLAUDE.snippet.md"), "utf8"));
 
   step("check");
   if (withService) await Bun.sleep(800);
-  await $`${BUN} ${join(REPO, "src/cli.ts")} status`.nothrow();
+  await $`${PAD_LINK} status`.nothrow();
   console.log("\nDone. Restart Claude Code sessions to pick up the MCP server, skills and hooks.");
 }
 
