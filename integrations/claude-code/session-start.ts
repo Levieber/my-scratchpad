@@ -4,6 +4,7 @@
 import { Client } from "@/client";
 import { config } from "@/config";
 import type { Note } from "@/db";
+
 import { withTimeout } from "./timeout";
 
 const MAX_PINNED_CHARS = 3000;

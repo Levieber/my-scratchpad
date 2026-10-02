@@ -1,9 +1,9 @@
 // Browser client for the same HTTP API the CLI and agents use.
-import type { FullRevision, Note, NoteInput, Revision } from "../db";
+import type { FullRevision, Note, NoteInput, Revision, View } from "../db";
 import { readError } from "../errors";
 import type { NoteDiff } from "../server";
 
-export type { FullRevision, Note, NoteDiff, NoteInput, Revision };
+export type { FullRevision, Note, NoteDiff, NoteInput, Revision, View };
 export type Tag = { tag: string; count: number };
 
 export class Unauthorized extends Error {}
@@ -86,10 +86,10 @@ async function req<T>(
 }
 
 export const api = {
-  list: (q: { q?: string; kind?: string; limit?: number }) => {
+  // Kind, author and tags travel inside `q` as operators (src/query.ts).
+  list: (q: { q?: string; limit?: number }) => {
     const p = new URLSearchParams();
     if (q.q) p.set("q", q.q);
-    if (q.kind) p.set("kind", q.kind);
     if (q.limit) p.set("limit", String(q.limit));
     return req<Note[]>("GET", `/api/notes?${p}`);
   },
@@ -101,6 +101,9 @@ export const api = {
   delete: (id: string) => req<void>("DELETE", `/api/notes/${id}`),
   daily: (date: string) => req<Note>("PUT", `/api/daily/${date}`),
   tags: () => req<Tag[]>("GET", "/api/tags"),
+  views: () => req<View[]>("GET", "/api/views"),
+  createView: (name: string, query: string) => req<View>("POST", "/api/views", { name, query }),
+  deleteView: (id: string) => req<void>("DELETE", `/api/views/${id}`),
   revisions: (id: string) => req<Revision[]>("GET", `/api/notes/${id}/revisions?limit=100`),
   revision: (id: string, rev: number) =>
     req<FullRevision>("GET", `/api/notes/${id}/revisions/${rev}`),

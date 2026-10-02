@@ -81,6 +81,18 @@ export const MIGRATIONS: Migration[] = [
        FROM notes ORDER BY created_at`,
     ],
   },
+  {
+    // A saved search. The name is unique ignoring case, so two views can't differ only by it.
+    id: "0006.views",
+    statements: [
+      `CREATE TABLE views (
+         id TEXT PRIMARY KEY,
+         name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+         query TEXT NOT NULL,
+         created_at TEXT NOT NULL
+       )`,
+    ],
+  },
 ];
 
 /** Applies every migration not yet recorded, all in one transaction. Returns the ids it ran. */

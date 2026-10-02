@@ -16,6 +16,8 @@ export const ERROR_MESSAGES = {
   noteExists: "A note with this id already exists",
   noteChanged: "The note changed since the version in If-Match; fetch it and merge",
   revisionNotFound: "Revision not found",
+  viewNotFound: "View not found",
+  viewExists: "A view with this name already exists",
   notFound: "No such endpoint",
   methodNotAllowed: "Method not allowed",
   internal: "Internal error",

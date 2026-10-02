@@ -72,17 +72,23 @@ server.registerTool(
         .string()
         .optional()
         .describe(
-          "Full-text search terms; omit to list recent notes. Also takes `kind:reference` and `#tag` operators",
+          "Full-text search terms; omit to list recent notes. Also takes `kind:reference`, `author:agent` and `#tag` operators",
         ),
       tags: z.array(z.string()).optional().describe("Notes must carry all of these"),
       kind,
+      author: z
+        .string()
+        .optional()
+        .describe("human, agent (anyone who isn't the human), or an author's name"),
       pinned: z.boolean().optional().describe("Only pinned notes"),
       limit: z.number().int().min(1).max(100).optional().describe("Default 20"),
     },
     annotations: { readOnlyHint: true },
   },
-  safe(async ({ query, tags, kind, pinned, limit }) =>
-    (await client.list({ q: query, tag: tags, kind, pinned, limit: limit ?? 20 })).map(summary),
+  safe(async ({ query, tags, kind, author, pinned, limit }) =>
+    (await client.list({ q: query, tag: tags, kind, author, pinned, limit: limit ?? 20 })).map(
+      summary,
+    ),
   ),
 );
 

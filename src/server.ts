@@ -139,6 +139,7 @@ function readListQuery(p: URLSearchParams): ListQuery {
   return {
     q: parsed.text || undefined,
     kind: kind ?? parsed.kind,
+    author: p.get("author") ?? parsed.author,
     tags: [...p.getAll("tag"), ...parsed.tags],
     pinned: pinned === null ? undefined : pinned === "true",
     limit: Number(p.get("limit") ?? 50) || 50,
@@ -313,6 +314,31 @@ export function createRoutes(store: Store, { token }: { token?: string } = {}) {
     }),
 
     "/api/tags": resource({ GET: () => json(store.tags()) }),
+
+    "/api/views": resource({
+      GET: () => json(store.views()),
+      POST: async (req) => {
+        const body: unknown = await req.json().catch(() => {
+          throw new HttpError("invalidJson", 400);
+        });
+        const { name, query } = (body && typeof body === "object" ? body : {}) as Record<
+          string,
+          unknown
+        >;
+        if (typeof name !== "string" || !name.trim() || typeof query !== "string" || !query.trim())
+          throw new HttpError("invalidBody", 400, "name and query must be non-empty strings");
+        const view = store.createView(name.trim().slice(0, 64), query.trim());
+        if (!view) throw new HttpError("viewExists", 409);
+        return json(view, 201);
+      },
+    }),
+
+    "/api/views/:id": resource({
+      DELETE: (req) => {
+        if (!store.deleteView(id(req))) throw new HttpError("viewNotFound", 404);
+        return new Response(null, { status: 204 });
+      },
+    }),
 
     "/api/*": () => fail("notFound", 404),
 

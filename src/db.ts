@@ -38,6 +38,8 @@ export type ListQuery = {
   /** Full-text search words; the search operators are parsed before this (src/query.ts). */
   q?: string;
   kind?: string;
+  /** `human`, `agent` (anyone else), or an author's name. */
+  author?: string;
   /** Notes must carry every one of these. */
   tags?: string[];
   pinned?: boolean;
@@ -64,6 +66,9 @@ export type Revision = {
 };
 
 export type FullRevision = Revision & { body: string };
+
+/** A named search: `query` is what goes in the search box, operators included (src/query.ts). */
+export type View = { id: string; name: string; query: string; created_at: string };
 
 type Row = Omit<Note, "tags" | "pinned" | "progress"> & { tags: string; pinned: number };
 type RevisionRow = Omit<FullRevision, "tags"> & { tags: string };
@@ -113,7 +118,7 @@ export class Store {
     migrate(this.db);
   }
 
-  list({ q, kind, tags = [], pinned, limit = 50, offset = 0 }: ListQuery = {}): Note[] {
+  list({ q, kind, author, tags = [], pinned, limit = 50, offset = 0 }: ListQuery = {}): Note[] {
     const where: string[] = [];
     const params: Record<string, string | number> = { limit: Math.min(limit, 500), offset };
     let from = "notes n";
@@ -131,6 +136,13 @@ export class Store {
     if (kind) {
       where.push("n.kind = $kind");
       params.kind = kind;
+    }
+    if (author) {
+      if (author.toLowerCase() === "agent") where.push("n.author <> 'human'");
+      else {
+        where.push("lower(n.author) = $author");
+        params.author = author.toLowerCase();
+      }
     }
     tags.forEach((tag, i) => {
       where.push(`EXISTS (SELECT 1 FROM json_each(n.tags) WHERE value = $tag${i})`);
@@ -335,5 +347,29 @@ export class Store {
          GROUP BY value ORDER BY count DESC, tag`,
       )
       .all() as { tag: string; count: number }[];
+  }
+
+  views(): View[] {
+    return this.db.query("SELECT * FROM views ORDER BY name").all() as View[];
+  }
+
+  /** Null when a view with this name (ignoring case) exists already. */
+  createView(name: string, query: string): View | null {
+    const view: View = { id: newId(), name, query, created_at: this.now().toISOString() };
+    try {
+      this.db
+        .query(
+          "INSERT INTO views (id, name, query, created_at) VALUES ($id, $name, $query, $created_at)",
+        )
+        .run(view);
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("UNIQUE")) return null;
+      throw e;
+    }
+    return view;
+  }
+
+  deleteView(id: string): boolean {
+    return this.db.query("DELETE FROM views WHERE id = ?").run(id).changes > 0;
   }
 }

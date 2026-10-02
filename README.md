@@ -22,7 +22,7 @@ bun run typecheck
 
 ```sh
 pad add "idea: …" --tag ideas        # or: echo … | pad add
-pad ls [query] [--tag x]... [--kind reference] [--json]   # query: words, kind:reference, '#tag'
+pad ls [query] [--tag x]... [--kind reference] [--author agent] [--json]   # query: words, kind:reference, author:agent, '#tag', @view
 pad today                            # the daily review, open items carried over
 pad history <id> · pad diff <id> [--since <time>]   # who changed a note, and what
 pad show <id> · pad append <id> "…" · pad edit <id> · pad set <id> --pin · pad rm <id>

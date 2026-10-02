@@ -458,3 +458,50 @@ button:disabled {
     grid-template-rows: minmax(0, 30%) 1fr;
   }
 }
+
+/* Kind and author filters share a row, wrapping on a narrow sidebar. */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.views {
+  align-items: center;
+}
+.views .view {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.views .view[data-active="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.views .view button {
+  border: 0;
+  background: none;
+  font-size: 12px;
+  padding: 2px 8px;
+  color: var(--muted);
+}
+.views .view[data-active="true"] button.apply {
+  color: var(--text);
+}
+.views .view button.remove {
+  padding: 2px 6px 2px 0;
+}
+.views form {
+  display: flex;
+  gap: 4px;
+}
+.views input {
+  font-size: 12px;
+  padding: 2px 8px;
+  width: 120px;
+}
+fieldset.views {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

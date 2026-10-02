@@ -14,7 +14,9 @@ const HELP = `pad — scratchpad CLI (talks to ${config.url})
 
 Usage:
   pad add [text...] [-t title] [--tag x]... [--kind k] [--pin]   create a note (text or stdin)
-  pad ls [query...] [--tag x]... [--kind k] [--pinned] [-n limit] list / full-text search
+  pad ls [query...] [--tag x]... [--kind k] [--author a] [--pinned] [-n limit] list / search
+  pad views [add <name> <query...> | rm <name>]        list, save or delete saved searches
+  pad ls @<view>                                       run a saved search
   pad show <id>                                        print a note
   pad append <id> [text...]                            append a line (text or stdin)
   pad edit <id>                                        edit body in $EDITOR
@@ -30,7 +32,7 @@ Usage:
   pad serve                                            run the API + PWA server
   pad open                                             open the PWA in a browser
 
-Kinds: ${KIND_NAMES.join(", ")}. Search operators: pad ls kind:reference '#launch' seo
+Kinds: ${KIND_NAMES.join(", ")}. Search operators: pad ls kind:reference author:agent '#launch' seo (author: human, agent, or a name)
 Global: --json for machine-readable output.
 Env (overrides \`pad login\`): PAD_URL, PAD_TOKEN, PAD_AUTHOR.`;
 
@@ -40,6 +42,7 @@ const { values: opts, positionals } = parseArgs({
     title: { type: "string", short: "t" },
     tag: { type: "string", multiple: true },
     kind: { type: "string" },
+    author: { type: "string" },
     pin: { type: "boolean" },
     unpin: { type: "boolean" },
     pinned: { type: "boolean" },
@@ -116,10 +119,22 @@ async function main() {
     case "ls":
     case "list":
     case "search": {
+      // `@name` stands for a saved search's query, so it can be combined with more words.
+      const expanded = await Promise.all(
+        args.map(async (a) => {
+          if (!a.startsWith("@")) return a;
+          const view = (await client.views()).find(
+            (v) => v.name.toLowerCase() === a.slice(1).toLowerCase(),
+          );
+          if (!view) throw new ApiError(404, `No saved view named "${a.slice(1)}".`);
+          return view.query;
+        }),
+      );
       const notes = await client.list({
-        q: args.join(" ") || undefined,
+        q: expanded.join(" ") || undefined,
         tag: opts.tag,
         kind: kindOpt(),
+        author: opts.author,
         pinned: opts.pinned || undefined,
         limit: opts.limit ? Number(opts.limit) : undefined,
       });
@@ -209,6 +224,29 @@ async function main() {
     case "tags": {
       const tags = await client.tags();
       return out(tags, () => tags.map((t) => `#${t.tag} (${t.count})`).join("\n") || "(no tags)");
+    }
+    case "views": {
+      const [action, name, ...query] = args;
+      if (action === "add") {
+        if (!name || !query.length)
+          throw new ApiError(400, "Usage: pad views add <name> <query...>");
+        const v = await client.createView(name, query.join(" "));
+        return out(v, () => `saved ${v.name}: ${v.query}`);
+      }
+      if (action === "rm" || action === "delete") {
+        const view = (await client.views()).find(
+          (v) => v.name.toLowerCase() === (name ?? "").toLowerCase(),
+        );
+        if (!view) throw new ApiError(404, `No saved view named "${name ?? ""}".`);
+        await client.deleteView(view.id);
+        return out({ deleted: view.name }, () => `deleted ${view.name}`);
+      }
+      if (action) throw new ApiError(400, "Usage: pad views [add <name> <query...> | rm <name>]");
+      const views = await client.views();
+      return out(
+        views,
+        () => views.map((v) => `@${v.name}  ${v.query}`).join("\n") || "(no views)",
+      );
     }
     case "status": {
       const ok = await client.health().then(

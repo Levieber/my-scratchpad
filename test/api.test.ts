@@ -153,6 +153,53 @@ describe("notes API", () => {
     expect(await titles(`q=${encodeURIComponent("kind:refer")}`)).toEqual([]);
   });
 
+  test("filters by who created the note: human, any agent, or one by name", async () => {
+    const note = (body: string, author?: string) =>
+      call("POST", "/api/notes", { body }, author ? { "x-pad-author": author } : {});
+    await note("mine");
+    await note("from claude", "claude-code");
+    await note("from another agent", "Other-Bot");
+    const bodies = async (qs: string) =>
+      ((await call("GET", `/api/notes?${qs}`)).data as Note[]).map((n) => n.body).sort();
+
+    expect(await bodies("author=human")).toEqual(["mine"]);
+    expect(await bodies("author=agent")).toEqual(["from another agent", "from claude"]);
+    expect(await bodies("author=claude-code")).toEqual(["from claude"]);
+    expect(await bodies(`q=${encodeURIComponent("author:other-bot")}`)).toEqual([
+      "from another agent",
+    ]);
+    expect(await bodies(`q=${encodeURIComponent("author:agent claude")}`)).toEqual(["from claude"]);
+  });
+
+  test("saved views: create, list by name, delete", async () => {
+    const made = await call("POST", "/api/views", {
+      name: " Agent logs ",
+      query: "author:agent #log",
+    });
+    expect(made.status).toBe(201);
+    expect(made.data).toMatchObject({ name: "Agent logs", query: "author:agent #log" });
+    await call("POST", "/api/views", { name: "Checklists", query: "kind:reference" });
+
+    expect(
+      ((await call("GET", "/api/views")).data as { name: string }[]).map((v) => v.name),
+    ).toEqual(["Agent logs", "Checklists"]);
+    const cases: [string, string, unknown, number, string][] = [
+      ["POST", "/api/views", { name: "agent LOGS", query: "x" }, 409, "viewExists"],
+      ["POST", "/api/views", { name: "", query: "x" }, 400, "invalidBody"],
+      ["POST", "/api/views", { name: "x" }, 400, "invalidBody"],
+      ["POST", "/api/views", "{nope", 400, "invalidJson"],
+      ["DELETE", "/api/views/nope", undefined, 404, "viewNotFound"],
+    ];
+    for (const [method, path, body, status, code] of cases) {
+      const json: Record<string, string> =
+        typeof body === "string" ? { "content-type": "application/json" } : {};
+      const res = await call(method, path, body, json);
+      expect([method, path, res.status, res.data.error]).toEqual([method, path, status, code]);
+    }
+    expect((await call("DELETE", `/api/views/${made.data.id}`)).status).toBe(204);
+    expect((await call("GET", "/api/views")).data).toHaveLength(1);
+  });
+
   test("patch, append, delete", async () => {
     const { data: n } = await call("POST", "/api/notes", { body: "log" });
     const patched = (

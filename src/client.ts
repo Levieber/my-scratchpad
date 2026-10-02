@@ -1,13 +1,15 @@
 // Thin typed client over the HTTP API. The CLI and MCP server both use this — never the DB directly.
 import { config } from "./config";
-import type { FullRevision, Note, NoteInput, Revision } from "./db";
+import type { FullRevision, Note, NoteInput, Revision, View } from "./db";
 import { readError } from "./errors";
 import type { NoteDiff } from "./server";
 
-/** `GET /api/notes` parameters. `q` may carry `kind:x` and `#tag` operators (src/query.ts). */
+/** `GET /api/notes` parameters. `q` may carry `kind:x`, `author:x` and `#tag` operators. */
 export type ListParams = {
   q?: string;
   kind?: string;
+  /** `human`, `agent` (anyone else), or an author's name. */
+  author?: string;
   /** Notes must carry every one of these. */
   tag?: string[];
   pinned?: boolean;
@@ -70,6 +72,10 @@ export class Client {
   /** The daily review for a local YYYY-MM-DD date, created on first request. */
   daily = (date: string) => this.req<Note>("PUT", `/api/daily/${encodeURIComponent(date)}`);
   tags = () => this.req<{ tag: string; count: number }[]>("GET", "/api/tags");
+  views = () => this.req<View[]>("GET", "/api/views");
+  createView = (name: string, query: string) =>
+    this.req<View>("POST", "/api/views", { name, query });
+  deleteView = (id: string) => this.req<void>("DELETE", `/api/views/${encodeURIComponent(id)}`);
   health = () => this.req<{ ok: boolean }>("GET", "/api/health");
   /** A note's history, newest first. */
   revisions = (id: string, q: { limit?: number; offset?: number } = {}) =>

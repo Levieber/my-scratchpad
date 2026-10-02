@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { hasToken, parseQuery, toggleToken } from "../src/query";
+import { hasToken, operatorValue, parseQuery, setOperator, toggleToken } from "../src/query";
 
 describe("parseQuery", () => {
   test("splits kind and tag operators from the search words", () => {
@@ -21,6 +21,29 @@ describe("parseQuery", () => {
 
   test("the last kind wins and is lowercased", () => {
     expect(parseQuery("KIND:note kind:Reference").kind).toBe("reference");
+  });
+});
+
+describe("author operator", () => {
+  test("parses author next to the other operators", () => {
+    expect(parseQuery("Author:Agent #log kind:note seo")).toEqual({
+      text: "seo",
+      kind: "note",
+      author: "agent",
+      tags: ["log"],
+    });
+    expect(parseQuery("author:").author).toBeUndefined();
+  });
+
+  test("setOperator replaces the earlier value and clears on empty", () => {
+    expect(setOperator("seo author:human", "author", "agent")).toBe("seo author:agent");
+    expect(setOperator("seo #web kind:reference", "kind", "")).toBe("seo #web");
+    expect(setOperator("", "kind", "reference")).toBe("kind:reference");
+  });
+
+  test("operatorValue reads it back, or empty", () => {
+    expect(operatorValue("author:Agent", "author")).toBe("agent");
+    expect(operatorValue("seo", "kind")).toBe("");
   });
 });
 

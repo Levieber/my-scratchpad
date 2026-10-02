@@ -3,16 +3,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { localDate } from "../daily";
 import { newId } from "../ids";
 import type { Kind } from "../kinds";
-import { hasToken, parseQuery, toggleToken } from "../query";
+import { hasToken, operatorValue, parseQuery, setOperator, toggleToken } from "../query";
 import {
   api,
   type FullRevision,
+  isApiError,
   Offline,
   onConnectivity,
   token,
   Unauthorized,
   type Note,
   type Tag,
+  type View,
 } from "./api";
 import { History } from "./History";
 import { ago, groupNotes, preview, visibleTags } from "./listing";
@@ -82,8 +84,11 @@ type SaveState = "" | "pending" | "saving" | "saved" | "local" | "merged" | "con
 export function App() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [views, setViews] = useState<View[]>([]);
+  const [naming, setNaming] = useState<string | null>(null);
+  // Everything that narrows the list (kind, author, tags, words) is one query string, so a view
+  // is just that string saved under a name.
   const [q, setQ] = useState("");
-  const [kind, setKind] = useState<Kind | "">("");
   const [limit, setLimit] = useState(PAGE);
   const [allTags, setAllTags] = useState(false);
   const [width, setWidth] = useState(storedWidth);
@@ -116,14 +121,15 @@ export function App() {
 
   const refreshList = useCallback(async () => {
     try {
-      const [n, t] = await Promise.all([api.list({ q, kind, limit }), api.tags()]);
+      const [n, t, v] = await Promise.all([api.list({ q, limit }), api.tags(), api.views()]);
       setNotes(n);
       setTags(t);
+      setViews(v);
       return n;
     } catch (e) {
       handle(e);
     }
-  }, [q, kind, limit, handle]);
+  }, [q, limit, handle]);
 
   // Sends the outbox. What the server answers for the open note arrives through onSettled below.
   const sync = useCallback(async () => {
@@ -364,14 +370,37 @@ export function App() {
     } catch {}
   }, [width]);
 
-  const filter = (next: { q?: string; kind?: Kind | "" }) => {
-    if (next.q !== undefined) setQ(next.q);
-    if (next.kind !== undefined) setKind(next.kind);
+  const filter = (next: string) => {
+    setQ(next);
     setLimit(PAGE);
   };
 
-  // Tag chips edit the search box, so several tags combine and the query stays visible.
+  // Chips edit the search box, so several tags combine and the query stays visible.
   const selectedTags = parseQuery(q).tags;
+  const kind = operatorValue(q, "kind");
+  const author = operatorValue(q, "author");
+  const sameQuery = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const activeView = views.find((v) => sameQuery(v.query, q));
+
+  const saveView = async (name: string) => {
+    setNaming(null);
+    try {
+      await api.createView(name, q.trim());
+      await refreshList();
+    } catch (e) {
+      // A name already taken is the only failure the person can fix, and the field says so.
+      if (isApiError(e, "viewExists")) setNaming(name);
+      else handle(e);
+    }
+  };
+  const removeView = async (v: View) => {
+    try {
+      await api.deleteView(v.id);
+      await refreshList();
+    } catch (e) {
+      handle(e);
+    }
+  };
   const shownTags = allTags ? tags : visibleTags(tags, selectedTags, TAG_LIMIT);
 
   const saveLabel = {
@@ -385,7 +414,7 @@ export function App() {
     error: `not saved: ${saveError}`,
   }[saveState];
 
-  const shown = withPending(notes, pending, !q && !kind);
+  const shown = withPending(notes, pending, !q);
   // History lives on the server, so a note it hasn't seen yet has none.
   const unsynced = pending.some((p) => p.id === current?.id && p.op === "save" && !p.base);
 
@@ -415,27 +444,98 @@ export function App() {
           type="search"
           placeholder="Search…  (/)"
           value={q}
-          onChange={(e) => filter({ q: e.target.value })}
+          onChange={(e) => filter(e.target.value)}
         />
-        <fieldset className="kinds" aria-label="Kind">
-          {(
-            [
-              ["", "All"],
-              ["reference", "Reference"],
-            ] as const
-          ).map(([k, label]) => (
-            <button key={k} aria-pressed={kind === k} onClick={() => filter({ kind: k })}>
-              {label}
-            </button>
-          ))}
-        </fieldset>
+        <div className="filters">
+          <fieldset className="kinds" aria-label="Kind">
+            {(
+              [
+                ["", "All"],
+                ["note", "Notes"],
+                ["reference", "Reference"],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                aria-pressed={kind === k}
+                onClick={() => filter(setOperator(q, "kind", k))}
+              >
+                {label}
+              </button>
+            ))}
+          </fieldset>
+          <fieldset className="kinds" aria-label="Author">
+            {(
+              [
+                ["", "Anyone"],
+                ["human", "Me"],
+                ["agent", "Agents"],
+              ] as const
+            ).map(([a, label]) => (
+              <button
+                key={a}
+                aria-pressed={author === a}
+                onClick={() => filter(setOperator(q, "author", a))}
+              >
+                {label}
+              </button>
+            ))}
+          </fieldset>
+        </div>
+        {(views.length > 0 || q.trim()) && (
+          <fieldset className="tags views" aria-label="Saved views">
+            {views.map((v) => (
+              <span key={v.id} className="view" data-active={activeView?.id === v.id}>
+                <button
+                  className="apply"
+                  aria-pressed={activeView?.id === v.id}
+                  title={v.query}
+                  onClick={() => filter(activeView?.id === v.id ? "" : v.query)}
+                >
+                  {v.name}
+                </button>
+                <button
+                  className="remove"
+                  aria-label={`Delete view ${v.name}`}
+                  onClick={() => void removeView(v)}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            {q.trim() && !activeView && naming === null && (
+              <button className="more" onClick={() => setNaming("")}>
+                Save this search
+              </button>
+            )}
+            {naming !== null && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (naming.trim()) void saveView(naming.trim());
+                }}
+              >
+                <input
+                  // Opened by the person pressing "Save this search", so focus belongs here.
+                  ref={(el) => el?.focus()}
+                  aria-label="View name"
+                  placeholder="Name this view"
+                  value={naming}
+                  onChange={(e) => setNaming(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && setNaming(null)}
+                />
+                <button className="more">Save</button>
+              </form>
+            )}
+          </fieldset>
+        )}
         {tags.length > 0 && (
           <div className="tags">
             {shownTags.map((t) => (
               <button
                 key={t.tag}
                 aria-pressed={hasToken(q, `#${t.tag}`)}
-                onClick={() => filter({ q: toggleToken(q, `#${t.tag}`) })}
+                onClick={() => filter(toggleToken(q, `#${t.tag}`))}
               >
                 #{t.tag} {t.count}
               </button>
@@ -476,7 +576,7 @@ export function App() {
                             </span>
                           )}
                           {ago(n.updated_at)}
-                          {n.kind === "reference" && !kind && (
+                          {n.kind === "reference" && kind !== "reference" && (
                             <span className="badge kind">reference</span>
                           )}
                           {n.author !== "human" && <span className="badge">{n.author}</span>}
@@ -489,7 +589,7 @@ export function App() {
               </ul>
             </section>
           ))}
-          {shown.length === 0 && <p className="m">{q || kind ? "No matches." : "No notes yet."}</p>}
+          {shown.length === 0 && <p className="m">{q ? "No matches." : "No notes yet."}</p>}
           {notes.length >= limit && (
             <button className="more" onClick={() => setLimit((l) => l + PAGE)}>
               Load more

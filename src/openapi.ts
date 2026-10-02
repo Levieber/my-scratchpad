@@ -108,6 +108,17 @@ const Diff = {
   },
 };
 
+const View = {
+  type: "object",
+  required: ["id", "name", "query", "created_at"],
+  properties: {
+    id: { type: "string" },
+    name: { type: "string", description: "Unique, ignoring case" },
+    query: { type: "string", description: "What goes in the search box, operators included" },
+    created_at: { type: "string", format: "date-time" },
+  },
+};
+
 const idParam = { name: "id", in: "path", required: true, schema: { type: "string" } };
 const json = (schema: object) => ({ content: { "application/json": { schema } } });
 const notFound = { description: "Not found", ...json({ $ref: "#/components/schemas/Error" }) };
@@ -143,6 +154,7 @@ export const openapi = {
       Revision,
       FullRevision,
       Diff,
+      View,
       Error: {
         type: "object",
         required: ["error", "message"],
@@ -165,9 +177,16 @@ export const openapi = {
             in: "query",
             schema: { type: "string" },
             description:
-              "Full-text search. `kind:<kind>` and `#<tag>` narrow it, e.g. `kind:reference #launch seo`",
+              "Full-text search. `kind:<kind>`, `author:<who>` and `#<tag>` narrow it, e.g. `kind:reference #launch seo` or `author:agent`",
           },
           { name: "kind", in: "query", schema: { type: "string", enum: KIND_NAMES } },
+          {
+            name: "author",
+            in: "query",
+            schema: { type: "string" },
+            description:
+              "`human`, `agent` (anyone who isn't the human) or an author's name such as `claude-code`",
+          },
           {
             name: "tag",
             in: "query",
@@ -361,6 +380,47 @@ export const openapi = {
         },
       },
     },
+    "/api/views": {
+      get: {
+        operationId: "listViews",
+        summary: "Saved searches, by name",
+        responses: {
+          200: {
+            description: "Views",
+            ...json({ type: "array", items: { $ref: "#/components/schemas/View" } }),
+          },
+        },
+      },
+      post: {
+        operationId: "createView",
+        summary: "Save a search under a name",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name", "query"],
+                properties: { name: { type: "string" }, query: { type: "string" } },
+              },
+            },
+          },
+        },
+        responses: {
+          201: { description: "Created", ...json({ $ref: "#/components/schemas/View" }) },
+          400: error("Missing name or query"),
+          409: error("A view with this name exists"),
+        },
+      },
+    },
+    "/api/views/{id}": {
+      delete: {
+        operationId: "deleteView",
+        summary: "Delete a saved search",
+        parameters: [idParam],
+        responses: { 204: { description: "Deleted" }, 404: notFound },
+      },
+    },
     "/api/health": {
       get: {
         operationId: "health",
@@ -382,7 +442,7 @@ Auth: if the server has PAD_TOKEN set, send \`Authorization: Bearer <token>\`.
 Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 
 ## Endpoints
-- GET    /api/notes?q=&kind=&tag=&pinned=&limit=&offset=   list / full-text search
+- GET    /api/notes?q=&kind=&author=&tag=&pinned=&limit=&offset=   list / full-text search
 - POST   /api/notes            {title?, body, tags?, pinned?, kind?, id?}  (or text/plain body)
 - GET    /api/notes/{id}
 - PATCH  /api/notes/{id}       {title?, body?, tags?, pinned?, kind?}
@@ -393,6 +453,7 @@ Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 - GET    /api/notes/{id}/diff?from=&to=&since=   unified diff; default the latest change
 - PUT    /api/daily/{YYYY-MM-DD}  the daily review for the user's local date (created on first request)
 - GET    /api/tags
+- GET    /api/views, POST /api/views {name, query}, DELETE /api/views/{id}   saved searches
 
 Every note carries \`progress: {done, total}\`, counted from its markdown checkboxes.
 
@@ -402,7 +463,7 @@ Note responses carry \`ETag: "<updated_at>"\`. Send it back as \`If-Match\` on P
 
 ## Kinds and search
 ${KIND_NAMES.map((k) => `- ${k}: ${KINDS[k]}`).join("\n")}
-A use case is a tag, not a kind. \`q\` takes operators: \`kind:reference #checklist #launch\` finds launch checklists; repeat \`tag=\` to require several tags.
+A use case is a tag, not a kind. \`q\` takes operators: \`kind:reference #checklist #launch\` finds launch checklists; repeat \`tag=\` to require several tags. \`author:human\`, \`author:agent\` (anyone who isn't the human) or \`author:<name>\` narrows by who created the note.
 
 ## Errors
 Non-2xx responses are \`{ "error": "<code>", "message": "<english>" }\`. Branch on the code:
