@@ -399,9 +399,12 @@ export const openapi = {
     "/api/health": {
       get: {
         operationId: "health",
-        summary: "Liveness check",
+        summary: "Health check: reads the database, so it fails while the database can't answer",
         security: [{}],
-        responses: { 200: { description: "OK" } },
+        responses: {
+          200: { description: "OK" },
+          503: { description: "The database is not reachable (error: unavailable)" },
+        },
       },
     },
   },

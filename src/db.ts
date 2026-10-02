@@ -51,6 +51,11 @@ export class NoteChanged extends Schema.TaggedError<NoteChanged>()("NoteChanged"
 export class RevisionNotFound extends Schema.TaggedError<RevisionNotFound>()("RevisionNotFound", {
   id: Schema.Number,
 }) {}
+/** The database can't be queried; `cause` is the driver's error. */
+export class DatabaseUnavailable extends Schema.TaggedError<DatabaseUnavailable>()(
+  "DatabaseUnavailable",
+  { cause: Schema.Unknown },
+) {}
 export class ViewNotFound extends Schema.TaggedError<ViewNotFound>()("ViewNotFound", {
   id: Schema.String,
 }) {}
@@ -310,6 +315,15 @@ const make = Effect.gen(function* () {
           firstRevision,
         ),
       ),
+
+    /**
+     * Reads a row of the notes table: fails when the file can't be read at all, not just when a
+     * query is wrong. The one SQL failure that is an outcome instead of a defect, since the
+     * health check exists to report it.
+     */
+    ping: Effect.catchIf(sql`SELECT 1 FROM notes LIMIT 1`, SqlError.isSqlError, (cause) =>
+      Effect.fail(new DatabaseUnavailable({ cause })),
+    ).pipe(Effect.asVoid),
 
     tags: run(
       sql<Tag>`SELECT value AS tag, COUNT(*) AS count FROM notes, json_each(notes.tags)

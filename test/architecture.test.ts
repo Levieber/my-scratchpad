@@ -40,7 +40,7 @@ const RULES: Rule[] = [
       },
       { specifier: /^bun:sqlite$/, because: "only the server's storage opens SQLite" },
       {
-        specifier: local("server"),
+        specifier: local("server", "routes", "http"),
         because: "clients talk to the server over HTTP, not by importing it",
         // `pad serve` starts the server process; it never calls it in-process as a client.
         except: ["src/cli.ts"],
@@ -62,7 +62,7 @@ const RULES: Rule[] = [
     files: ["src/db.ts", "src/migrations.ts"],
     mayNotImport: [
       {
-        specifier: local("server", "client", "openapi", "errors"),
+        specifier: local("server", "routes", "http", "client", "openapi", "errors"),
         because: "storage knows nothing about HTTP",
       },
       { specifier: /^effect\/http(\/|$)/, because: "storage knows nothing about HTTP" },

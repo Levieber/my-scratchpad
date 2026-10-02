@@ -6,7 +6,10 @@ Everything but the PWA is written with Effect 4; why, and what it cost, is in [e
 
 ```
 src/
-  server.ts       HttpRouter routes on BunHttpServer: auth, validation, error codes. The only HTTP entry point.
+  server.ts       Serves the routes on BunHttpServer and starts it (`pad serve`): config, loopback/token check, JSON logs in production. The only HTTP entry point.
+  routes.ts       The endpoints: `resource(path, { GET, … })`, `guard` (bearer check, error mapping), the health check.
+  http.ts         What the routes share: reading a request (body, If-Match, query, paging) and writing a response or a refusal.
+  observability.ts  A request id on every request and response, one log line per request carrying it, and the JSON logger.
   db.ts           Store service: notes and saved views in SQLite + FTS5 (effect/sql). Only the server uses it.
   migrations.ts   Named schema changes, recorded in schema_migrations.
   domain.ts       The API's shapes as Schemas (Note, NoteInput, Revision, View); every client shares the types.
@@ -18,10 +21,11 @@ src/
   ids.ts          Note ids; the PWA mints them too, for notes written offline (accepted ones: NoteId in domain.ts).
   title.ts        The title derived from a body's first line.
   openapi.ts      The contract (/openapi.json) and the agent quick-start (/llms.txt).
-  config.ts       Every env var and ~/.config/scratchpad/config.json, read in one place (Effect Config).
+  config.ts       Every env var and the files in ~/.config/scratchpad (config.json from `pad login`, hooks.json from `pad hooks`), read in one place (Effect Config).
   client.ts       Client service over the HTTP API, used by the CLI, MCP server and Claude Code hooks.
   transfer.ts     `pad export` / `pad import`: notes as a JSON array (the shape of `pad ls --json`), built on the public API. Import keeps ids, so it is safe to repeat; author and timestamps are not carried over.
-  cli.ts          `pad` (effect/cli) — human-friendly and `--json` output.
+  cli.ts          `pad` (effect/cli): the commands and their `--json` output.
+  format.ts       How `pad` prints a note for a person (one line, or in full).
   mcp.ts          MCP stdio server (effect/ai McpServer) — native tools for Claude Code.
   web/            React PWA (bundled by Bun from the web/index.html import); talks to the API via web/api.ts,
                   writes through the outbox in web/sync.ts.
@@ -34,9 +38,9 @@ test/support.ts   Fixtures: the production layers on an in-memory database, in a
 
 `test/architecture.test.ts` fails the build when an import crosses a boundary, and says why:
 
-- Clients (`src/web/**`, `cli.ts`, `mcp.ts`, `client.ts`, `integrations/**`) never import `db.ts`, `migrations.ts`, `bun:sqlite` or `server.ts` at runtime — they go through HTTP. (`pad serve` may import the server: it launches it, it doesn't call it.)
+- Clients (`src/web/**`, `cli.ts`, `mcp.ts`, `client.ts`, `integrations/**`) never import `db.ts`, `migrations.ts`, `bun:sqlite`, `server.ts`, `routes.ts` or `http.ts` at runtime — they go through HTTP. (`pad serve` may import the server: it launches it, it doesn't call it.)
 - `src/web/**` imports no `bun`/`node:` modules and not `config.ts`/`client.ts`: it runs in a browser.
-- Storage (`db.ts`, `migrations.ts`) knows nothing about HTTP (`server.ts`, `client.ts`, `errors.ts`, `effect/http`).
+- Storage (`db.ts`, `migrations.ts`) knows nothing about HTTP (`server.ts`, `routes.ts`, `http.ts`, `client.ts`, `errors.ts`, `effect/http`).
 - `src/web/**` imports no Effect: it stays out of the browser bundle.
 - Effect modules are imported by path (`effect/Effect`), never through a barrel (`effect`, `effect/http`, `@effect/platform-bun`): Bun loads a whole barrel at runtime, ~30 ms on every `pad` and hook run.
 - No `../`, tests included: `@/` is `src/`, `@integrations/` is `integrations/`, `./` is for a sibling.
@@ -45,22 +49,31 @@ A boundary holds however the module is written (`./db`, `../db`, `@/db`). Type-o
 
 ## Adding a capability
 
-1. API first: a route in `routes` (`src/server.ts`), its schema in `src/openapi.ts` (and `/llms.txt` if agents should know), a test in `test/api.test.ts`. A new shape goes in `src/domain.ts`; a new storage outcome is a tagged error in `src/db.ts`, mapped in `guard`.
+1. API first: a route in `routes` (`src/routes.ts`; request and response helpers are in `src/http.ts`), its schema in `src/openapi.ts` (and `/llms.txt` if agents should know), a test in `test/api.test.ts`. A new shape goes in `src/domain.ts`; a new storage outcome is a tagged error in `src/db.ts`, mapped in `guard`.
 2. Then the clients that need it: `src/client.ts` (+ a `cli.ts` command, a `mcp.ts` tool), `src/web/api.ts`.
 
 ## Routes
 
-`routes(token)` is a layer adding an `HttpRouter` route per path: `resource(path, { GET, POST, … })` dispatches on the method, wraps each handler in `guard` (the bearer check and error mapping) and answers the methods a path doesn't define with `405` and an `Allow` header. Handlers are Effects that read the request (`HttpServerRequest`) and path params (`HttpRouter.params`); the store is yielded once, when the routes are built. `serverLayer` serves them on `BunHttpServer`, with Bun itself serving the HTML import at `/` (HMR in development). `main` reads `ServerConfig`, refuses a non-loopback address without `PAD_TOKEN`, and launches it all with `BunRuntime.runMain`.
+`routes(token)` (`src/routes.ts`) is a layer adding an `HttpRouter` route per path: `resource(path, { GET, POST, … })` dispatches on the method, wraps each handler in `guard` (the bearer check and error mapping) and answers the methods a path doesn't define with `405` and an `Allow` header. Handlers are Effects that read the request (`HttpServerRequest`) and path params (`HttpRouter.params`); the store is yielded once, when the routes are built. `serverLayer` (`src/server.ts`) serves them, with `requestLogging` around every route, on `BunHttpServer`, with Bun itself serving the HTML import at `/` (HMR in development). `main` reads `ServerConfig`, refuses a non-loopback address without `PAD_TOKEN`, and launches it all with `BunRuntime.runMain`.
 
 ## Errors
 
 Every non-2xx body is `{ "error": "<code>", "message": "<english>" }`. The code (from `src/errors.ts`, also an enum in `/openapi.json`) is the contract; the message is for people and agents reading raw responses.
 
 - A handler refuses a request with `yield* refuse(code, status, detail?)`, an `HttpError`.
-- The store fails with tagged errors (`NoteNotFound`, `NoteExists`, `NoteChanged`, `RevisionNotFound`, `ViewNotFound`, `ViewExists`); `guard` maps each to its code and status, and the `Failure` type lists everything a handler may fail with.
+- The store fails with tagged errors (`NoteNotFound`, `NoteExists`, `NoteChanged`, `RevisionNotFound`, `ViewNotFound`, `ViewExists`, and `DatabaseUnavailable`, which only `ping` raises); `guard` maps each to its code and status, and the `Failure` type lists everything a handler may fail with.
 - A defect (a bug, a broken database) is logged and answered with `500 internal`.
 
 Clients get `ApiError` (`src/client.ts`) carrying the status and code.
+
+## Observability
+
+- **Request id.** Every response carries `x-request-id`: the platform's own (`x-railway-request-id`, then a caller's `x-request-id`) when it is a short run of plain characters, else one the server makes up. A line in the platform's access log therefore leads to ours. Anything else in the header is ignored, not cut down, since it is echoed back and logged.
+- **One log line per request**: `request` with `requestId`, `method`, `path`, `status` and `durationMs` (level `ERROR` for a 5xx). The query string is never logged (it holds what the user searched for), nor is the Authorization header, and a healthy health check stays out. Everything logged while handling the request, a defect's cause included, carries the same `requestId`.
+- **JSON in production.** With `NODE_ENV=production` the logger writes one JSON object per line (`message`, `level`, `timestamp`, `annotations`, and `cause` for failures); locally it stays human-readable. Read it with `railway logs --json | jq 'select(.annotations.requestId == "…")'`.
+- **Health.** `GET /api/health` needs no token and reads a row of `notes` (`Store.ping`): `200 {"ok":true}`, or `503 unavailable` while the database can't answer, with the driver's error (`SQLITE_*` code and all) in the log, never in the body. Railway waits for it on every deploy.
+
+Tests read what the server logs through `testServer().logs` instead of printing it.
 
 ## Storage and migrations
 

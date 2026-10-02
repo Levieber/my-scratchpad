@@ -15,18 +15,18 @@ Effect gives each of these one mechanism, checked by the compiler: failures in t
 
 ## What each part became
 
-| Part                          | Before                                       | Now                                                                                                                                                                  |
-| ----------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shapes (`src/domain.ts`, new) | TS types spread over `db.ts` and `server.ts` | Schemas; types derived from them. Requests and SQL rows are decoded with them.                                                                                       |
-| Storage (`src/db.ts`)         | `Store` class on `bun:sqlite`                | `Store` service on `SqlClient` (`@effect/sql-sqlite-bun`); fails with `NoteNotFound`, `NoteExists`, `NoteChanged`, `RevisionNotFound`, `ViewNotFound`, `ViewExists`. |
-| Migrations                    | sync runner                                  | the same runner as an Effect; same table, ids and statements.                                                                                                        |
-| HTTP (`src/server.ts`)        | `Bun.serve` route table                      | `HttpRouter` on `BunHttpServer`; Bun still serves the HTML import (`/`).                                                                                             |
-| Config (`src/config.ts`)      | `process.env` read at import                 | `Config`: `ServerConfig`, and a `ClientConfig` service.                                                                                                              |
-| Client (`src/client.ts`)      | class over `fetch`                           | `Client` service on `HttpClient`, failing with a typed `ApiError`.                                                                                                   |
-| CLI (`src/cli.ts`)            | `node:util` `parseArgs` + `switch`           | `effect/cli` commands.                                                                                                                                               |
-| MCP (`src/mcp.ts`)            | `@modelcontextprotocol/sdk` + zod            | `effect/ai` `McpServer` with Schema tools.                                                                                                                           |
-| Hooks                         | `withTimeout` + `process.exit`               | `Effect.timeout` + `Effect.ignoreCause` (`quietly`).                                                                                                                 |
-| Tests                         | `new Store(":memory:")`, `createServer`      | `test/support.ts`: the production layers in a `ManagedRuntime`, `TestClock` for time.                                                                                |
+| Part                                | Before                                       | Now                                                                                                                                                                  |
+| ----------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shapes (`src/domain.ts`, new)       | TS types spread over `db.ts` and `server.ts` | Schemas; types derived from them. Requests and SQL rows are decoded with them.                                                                                       |
+| Storage (`src/db.ts`)               | `Store` class on `bun:sqlite`                | `Store` service on `SqlClient` (`@effect/sql-sqlite-bun`); fails with `NoteNotFound`, `NoteExists`, `NoteChanged`, `RevisionNotFound`, `ViewNotFound`, `ViewExists`. |
+| Migrations                          | sync runner                                  | the same runner as an Effect; same table, ids and statements.                                                                                                        |
+| HTTP (`src/server.ts`, `routes.ts`) | `Bun.serve` route table                      | `HttpRouter` on `BunHttpServer`; Bun still serves the HTML import (`/`).                                                                                             |
+| Config (`src/config.ts`)            | `process.env` read at import                 | `Config`: `ServerConfig`, and a `ClientConfig` service.                                                                                                              |
+| Client (`src/client.ts`)            | class over `fetch`                           | `Client` service on `HttpClient`, failing with a typed `ApiError`.                                                                                                   |
+| CLI (`src/cli.ts`)                  | `node:util` `parseArgs` + `switch`           | `effect/cli` commands.                                                                                                                                               |
+| MCP (`src/mcp.ts`)                  | `@modelcontextprotocol/sdk` + zod            | `effect/ai` `McpServer` with Schema tools.                                                                                                                           |
+| Hooks                               | `withTimeout` + `process.exit`               | `Effect.timeout` + `Effect.ignoreCause` (`quietly`).                                                                                                                 |
+| Tests                               | `new Store(":memory:")`, `createServer`      | `test/support.ts`: the production layers in a `ManagedRuntime`, `TestClock` for time.                                                                                |
 
 The HTTP contract did not change: the API tests pass with only their setup rewritten.
 
@@ -54,7 +54,7 @@ The HTTP contract did not change: the API tests pass with only their setup rewri
 
 ## Benefits
 
-- **Failures are in the types.** A handler that forgets a store outcome doesn't compile: `guard` in `server.ts` lists every failure it maps to a response.
+- **Failures are in the types.** A handler that forgets a store outcome doesn't compile: `guard` in `routes.ts` lists every failure it maps to a response.
 - **One schema per shape.** The same `NoteInput` validates the API body, the import file and the derived TypeScript type. MCP tool inputs are Schemas too, so their JSON Schema is generated, not written again in zod.
 - **Dependencies are explicit and swappable.** Tests provide an in-memory store, a `TestClock` or a `ConfigProvider` instead of mutating `process.env` or passing `now` callbacks.
 - **Config fails loudly.** `PAD_PORT=abc` was `NaN`; now startup fails and says why. Tokens are `Redacted`, so a logged config shows `<redacted>`.

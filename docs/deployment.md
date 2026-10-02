@@ -16,6 +16,17 @@ Every variable is read in `src/config.ts`, as Effect `Config`: a value that is s
 
 Clients (CLI, MCP server, SessionStart hook) prefer `pad login <url> <token>`, which writes `~/.config/scratchpad/config.json` (mode 600). Env vars override it.
 
+## Logs
+
+With `NODE_ENV=production` (Railway) the server logs one JSON object per line: a `request` line per request (`requestId`, `method`, `path`, `status`, `durationMs`; no query string, no token) and the cause of every failure, all sharing the `requestId` that is also the response's `x-request-id` header and, when Railway sent one, its `x-railway-request-id`. Find the error behind a 5xx from the platform's access log:
+
+```sh
+railway logs --json | jq -c 'select(.annotations.requestId == "<id>")'
+railway logs --json | jq -c 'select(.level == "ERROR")'
+```
+
+Locally the log stays human-readable.
+
 ## Running
 
 - `bun run dev` — HMR, and browser console output streamed to the terminal.
@@ -29,7 +40,7 @@ Infrastructure as Code in `.railway/railway.ts`; `.railway/package.json` pins th
 It declares one `web` service deployed from `github.com/Levieber/my-scratchpad` on every push to `main`, started with `bun run start`, with:
 
 - a 1 GB volume at `/data` holding the SQLite file — that volume _is_ the database, so exactly one replica;
-- a `/api/health` healthcheck;
+- a `/api/health` healthcheck, which reads the database: a deploy whose volume can't be queried never goes live (see [Observability](architecture.md#observability));
 - `PAD_TOKEN` via `preserve()`: set once in Railway, never in the repo. The server refuses to start publicly without it.
 
 ```sh

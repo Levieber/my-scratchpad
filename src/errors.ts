@@ -20,6 +20,7 @@ export const ERROR_MESSAGES = {
   notFound: "No such endpoint",
   methodNotAllowed: "Method not allowed",
   internal: "Internal error",
+  unavailable: "The database is not reachable",
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_MESSAGES;
