@@ -8,7 +8,7 @@ import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 
 import { Client } from "@/client";
-import { ClientConfig } from "@/config";
+import { ClientConfig, HookConfig } from "@/config";
 
 import { editedFile, editsPath, reviewReason } from "./review";
 
@@ -22,24 +22,34 @@ type HookEvent = {
 const quietly = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.timeout("1500 millis"), Effect.ignoreCause);
 
-/** SessionStart: tells Claude the scratchpad exists and lists the most recent note titles. */
+/**
+ * SessionStart: tells Claude the scratchpad exists and lists the titles of the notes the user
+ * selected (`pad hooks`; by default the most recently changed ones that aren't references).
+ */
 export const sessionStart = (_event: HookEvent) =>
   quietly(
     Effect.gen(function* () {
       const { url } = yield* ClientConfig;
-      const recent = yield* (yield* Client).list({ limit: 8 });
+      const { chosen, queries } = yield* HookConfig;
+      const selected = yield* (yield* Client).list({ q: queries["session-start"], limit: 8 });
 
-      const recentText = recent
+      const selectedText = selected
         .map((n) => `- ${n.title} (id: ${n.id}, ${n.author}, ${n.updated_at.slice(0, 10)})`)
         .join("\n");
+      const custom = chosen["session-start"] !== undefined;
 
       const context = [
         `# Scratchpad (${url})`,
         "The user's shared scratchpad is available via the `scratchpad_*` MCP tools (or the `pad` CLI).",
         "Search it before asking the user to repeat context; save things they ask you to remember; append progress logs on long tasks.",
-        // Reference notes stay out of this context on purpose: they load on demand (`review`).
-        "The user's reference notes (practices, principles, checklists) aren't loaded here: after a turn that edits files you'll be asked to check the edits against the ones that apply.",
-        recent.length ? `\n## Recent notes\n${recentText}` : "",
+        // By default reference notes stay out of this context: they load on demand (`review`). Not
+        // said when the user chose the notes, since their choice may well include references.
+        custom
+          ? ""
+          : "The user's reference notes (practices, principles, checklists) aren't loaded here: after a turn that edits files you'll be asked to check the edits against the ones that apply.",
+        selected.length
+          ? `\n## ${custom ? `Notes selected by the user (${queries["session-start"]})` : "Recent notes"}\n${selectedText}`
+          : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -83,7 +93,8 @@ export const review = (event: HookEvent) =>
       // `stop_hook_active` means this turn is Claude answering our own review, so its edits are
       // the review's fixes, not new work to review.
       if (!files.length || event.stop_hook_active || process.env.PAD_REVIEW === "off") return;
-      const notes = yield* (yield* Client).list({ kind: "reference", limit: 100 });
+      const { queries } = yield* HookConfig;
+      const notes = yield* (yield* Client).list({ q: queries.review, limit: 100 });
       if (!notes.length) return;
       const cwd = typeof event.cwd === "string" ? event.cwd : process.cwd();
       const root = Bun.spawnSync(["git", "-C", cwd, "rev-parse", "--show-toplevel"]);

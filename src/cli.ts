@@ -17,8 +17,8 @@ import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 
 import { ApiError, Client } from "./client";
-import { ClientConfig } from "./config";
-import type { Note } from "./domain";
+import { ClientConfig, HOOK_QUERIES, HookConfig, type HookQueryName } from "./config";
+import { full, line } from "./format";
 import { KIND_NAMES } from "./kinds";
 import { exportNotes, importNotes, parseExport } from "./transfer";
 
@@ -31,26 +31,6 @@ const Author = Config.all([
     Option.getOrElse(author, () => (Option.isSome(claude) ? "claude-code" : "human")),
   ),
 );
-
-const ago = (iso: string) => {
-  const s = (Date.now() - Date.parse(iso)) / 1000;
-  if (s < 60) return "now";
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
-};
-
-// Progress means something on a to-do list; on a reference checklist it's just the item count.
-const done = (n: Note) =>
-  n.kind === "note" && n.progress.total ? ` ${n.progress.done}/${n.progress.total}` : "";
-
-const line = (n: Note) =>
-  `${n.id}  ${n.title}${done(n)}${n.kind === "note" ? "" : ` [${n.kind}]`}${n.tags.length ? "  #" + n.tags.join(" #") : ""}  (${ago(n.updated_at)}, ${n.author})`;
-
-const full = (n: Note) =>
-  `${n.title}\nid: ${n.id} · by ${n.author} · updated ${n.updated_at}${
-    n.tags.length ? " · #" + n.tags.join(" #") : ""
-  }\n\n${n.body}`;
 
 const usage = (message: string) => new ApiError({ status: 400, message });
 
@@ -345,6 +325,71 @@ const views = Command.make(
   ]),
 );
 
+const HOOK_NAMES = Object.keys(HOOK_QUERIES) as HookQueryName[];
+
+const saveChosen = (path: string, chosen: Partial<Record<HookQueryName, string>>) =>
+  Effect.sync(() => {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(chosen, null, 2) + "\n");
+  });
+
+/** The notes a hook would put in front of Claude now, so a choice shows what it does. */
+const previewNotes = Effect.fn(function* (name: HookQueryName, query: string) {
+  const notes = yield* (yield* Client).list({
+    q: query,
+    limit: name === "session-start" ? 8 : 100,
+  });
+  return notes.length ? notes.map(line).join("\n") : "(no notes match: the hook adds nothing)";
+});
+
+const hooks = Command.make(
+  "hooks",
+  {},
+  Effect.fn(function* () {
+    const { path, chosen, queries } = yield* HookConfig;
+    yield* out({ path, queries, chosen }, () =>
+      HOOK_NAMES.map(
+        (name) => `${name.padEnd(15)}${queries[name]}${name in chosen ? "" : "  (default)"}`,
+      ).join("\n"),
+    );
+  }, reported),
+).pipe(
+  Command.withDescription("Which notes the Claude Code hooks use (session-start, review)"),
+  Command.withSubcommands([
+    Command.make(
+      "set",
+      {
+        hook: Argument.Literals("hook", HOOK_NAMES),
+        query: Argument.String("query").pipe(Argument.atLeast(1)),
+      },
+      Effect.fn(function* (a) {
+        const { path, chosen } = yield* HookConfig;
+        const query = a.query.join(" ");
+        yield* saveChosen(path, { ...chosen, [a.hook]: query });
+        const preview = yield* previewNotes(a.hook, query);
+        yield* out({ hook: a.hook, query, saved: path }, () => `${a.hook}: ${query}\n${preview}`);
+      }, reported),
+    ).pipe(
+      Command.withDescription(
+        "Choose the notes a hook uses, as a search: pad hooks set session-start '#pinned'",
+      ),
+    ),
+    Command.make(
+      "reset",
+      { hook: Argument.Literals("hook", HOOK_NAMES).pipe(Argument.optional) },
+      Effect.fn(function* (a) {
+        const { path, chosen } = yield* HookConfig;
+        const rest = Option.match(a.hook, {
+          onNone: () => ({}),
+          onSome: (name) => Object.fromEntries(Object.entries(chosen).filter(([k]) => k !== name)),
+        });
+        yield* saveChosen(path, rest);
+        yield* out({ chosen: rest }, () => "Back to the defaults.");
+      }, reported),
+    ).pipe(Command.withDescription("Back to the default notes (every hook, or just one)")),
+  ]),
+);
+
 const status = Command.make(
   "status",
   {},
@@ -465,6 +510,7 @@ const commands = [
   importCmd,
   tags,
   views,
+  hooks,
   status,
   login,
   logout,
@@ -484,6 +530,7 @@ pad.pipe(
         }),
       ),
       ClientConfig.layer,
+      HookConfig.layer,
       BunServices.layer,
     ),
   ),

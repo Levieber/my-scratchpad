@@ -47,20 +47,28 @@ export const ServerConfig = Config.all({
   production: Config.map(optional("NODE_ENV"), (env) => Option.getOrNull(env) === "production"),
 });
 
+const configFile = (name: string) =>
+  Config.map(xdg("XDG_CONFIG_HOME", ".config"), (dir) => join(dir, "scratchpad", name));
+
 // Client-side settings written by `pad login`, so the CLI, MCP server and hooks
 // can point at a local or a deployed (Railway) server without juggling env vars.
-const clientConfigPath = Config.map(xdg("XDG_CONFIG_HOME", ".config"), (dir) =>
-  join(dir, "scratchpad", "config.json"),
-);
+const clientConfigPath = configFile("config.json");
 
-const readClientFile = (path: string) =>
-  Effect.sync((): { url?: string; token?: string } => {
+const readJsonFile = (path: string) =>
+  Effect.sync((): Record<string, unknown> => {
     try {
-      return JSON.parse(readFileSync(path, "utf8"));
+      const parsed = JSON.parse(readFileSync(path, "utf8"));
+      return parsed && typeof parsed === "object" ? parsed : {};
     } catch {
       return {};
     }
   });
+
+const readClientFile = (path: string) =>
+  Effect.map(readJsonFile(path), (file): { url?: string; token?: string } => ({
+    url: typeof file.url === "string" ? file.url : undefined,
+    token: typeof file.token === "string" ? file.token : undefined,
+  }));
 
 /** Where the API lives and the token to send. Env wins over `pad login`. */
 export class ClientConfig extends Context.Service<
@@ -85,6 +93,46 @@ export class ClientConfig extends Context.Service<
       const url = Option.getOrElse(env.url, () => file.url ?? `http://127.0.0.1:${env.port}`);
       const token = Option.orElse(env.token, () => Option.fromNullishOr(file.token || undefined));
       return { path, url: url.replace(/\/$/, ""), token: Option.map(token, Redacted.make) };
+    }),
+  );
+}
+
+/**
+ * The notes each Claude Code hook puts in front of Claude, as the search box's language
+ * (`kind:x author:x #tag words`, see query.ts) and what applies until the user picks otherwise.
+ */
+export const HOOK_QUERIES = {
+  "session-start": "kind:note",
+  review: "kind:reference",
+} as const;
+
+export type HookQueryName = keyof typeof HOOK_QUERIES;
+
+/**
+ * Which notes the hooks use: `pad hooks set` writes them to `hooks.json`, beside the login file
+ * but apart from it, so logging in or out never forgets them. Per machine, like the hooks.
+ */
+export class HookConfig extends Context.Service<
+  HookConfig,
+  {
+    readonly path: string;
+    /** What the user chose; a hook not listed uses its default. */
+    readonly chosen: Partial<Record<HookQueryName, string>>;
+    /** What each hook uses: the choice, else the default. */
+    readonly queries: Record<HookQueryName, string>;
+  }
+>()("pad/HookConfig") {
+  static readonly layer = Layer.effect(
+    HookConfig,
+    Effect.gen(function* () {
+      const path = yield* configFile("hooks.json");
+      const file = yield* readJsonFile(path);
+      const chosen: Partial<Record<HookQueryName, string>> = {};
+      for (const name of Object.keys(HOOK_QUERIES) as HookQueryName[]) {
+        const value = file[name];
+        if (typeof value === "string" && value.trim()) chosen[name] = value.trim();
+      }
+      return { path, chosen, queries: { ...HOOK_QUERIES, ...chosen } };
     }),
   );
 }

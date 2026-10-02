@@ -9,7 +9,7 @@ import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 
-import { ClientConfig, ServerConfig } from "@/config";
+import { ClientConfig, HookConfig, ServerConfig } from "@/config";
 
 const env = (vars: Record<string, string>) =>
   ConfigProvider.fromEnvRecord({ HOME: "/home/u", ...vars });
@@ -47,6 +47,50 @@ describe("server config", () => {
     expect(Option.map(token, Redacted.value)).toEqual(Option.some("s3cret"));
     expect(Bun.inspect({ token })).not.toContain("s3cret");
     expect(Option.isNone((await server({ PAD_TOKEN: "" })).token)).toBe(true);
+  });
+});
+
+describe("hook config", () => {
+  const load = (dir: string) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        return yield* HookConfig;
+      }).pipe(
+        Effect.provide(HookConfig.layer),
+        Effect.provide(ConfigProvider.layer(env({ XDG_CONFIG_HOME: dir }))),
+      ),
+    );
+  const withFile = async (content: string | undefined) => {
+    const dir = mkdtempSync(join(tmpdir(), "pad-hooks-"));
+    try {
+      mkdirSync(join(dir, "scratchpad"));
+      if (content !== undefined) writeFileSync(join(dir, "scratchpad", "hooks.json"), content);
+      return await load(dir);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  test("without a file, every hook uses its default", async () => {
+    const config = await withFile(undefined);
+    expect(config.chosen).toEqual({});
+    expect(config.queries).toEqual({ "session-start": "kind:note", review: "kind:reference" });
+  });
+
+  test("a chosen query replaces the default of that hook only", async () => {
+    const config = await withFile(JSON.stringify({ review: "  #seo kind:reference " }));
+    expect(config.chosen).toEqual({ review: "#seo kind:reference" });
+    expect(config.queries).toEqual({
+      "session-start": "kind:note",
+      review: "#seo kind:reference",
+    });
+  });
+
+  test("a broken or odd file is ignored value by value", async () => {
+    expect((await withFile("not json")).chosen).toEqual({});
+    expect((await withFile("[]")).chosen).toEqual({});
+    const odd = await withFile(JSON.stringify({ review: 3, "session-start": " ", other: "x" }));
+    expect(odd.chosen).toEqual({});
   });
 });
 
