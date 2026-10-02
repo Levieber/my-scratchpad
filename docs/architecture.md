@@ -47,8 +47,10 @@ src/
     commands/     notes.ts, find.ts (search, tags, saved views), pins.ts (pin, unpin, pins), history.ts, transfer.ts, connection.ts (status, login, serve…), hooks.ts.
   mcp/          tools.ts (names, descriptions, shapes), handlers.ts (what each does), server.ts (protocol, instructions); mcp.ts wires it.
   web/          React PWA, bundled by Bun from the web/index.html import.
-    lib/          api.ts (the API from a browser), sync.ts (the offline outbox and syncer), listing.ts, draft.ts, storage.ts (localStorage).
+    index.css     The only stylesheet: Tailwind, the palette (light and dark), the breakpoint, base rules.
+    lib/          api.ts (the API from a browser), sync.ts (the offline outbox and syncer), listing.ts, draft.ts, pins.ts (when a note can be pinned), storage.ts (localStorage), classes.ts (the repeated controls' class lists), utils.ts (shadcn's `cn`).
     components/   Sidebar (Filters, SavedViews, TagChips, NoteList), Editor, History, Splitter, TokenDialog.
+      ui/           shadcn components, as `bunx shadcn add <name>` writes them (components.json).
     App.tsx       The state and effects that tie them together; main.tsx mounts it.
 public/           Files that must live at the site root: service worker, manifest, icon.
 integrations/     Claude Code wiring: installer, hooks (run as `pad hook <name>`), skills.
@@ -122,11 +124,23 @@ The PWA builds offline editing on those two rules (`src/web/lib/sync.ts`):
 - A note deleted elsewhere while edited here is recreated rather than losing the edit.
 - The service worker serves cached GETs when the network is down and marks them with `x-pad-offline`, so the app can show that it is offline while still reading notes.
 
+## Styling the PWA
+
+Tailwind v4, utilities on the elements themselves; menus and other components with real interaction (focus, keyboard, positioning) come from [shadcn](https://ui.shadcn.com) on Base UI.
+
+- `src/web/index.css` is the only stylesheet: Tailwind (with its preflight), the palette, and what is about elements rather than components. The palette is a set of variables named as shadcn names them (`--background`, `--card`, `--primary`, `--accent`, `--destructive`…), switched for dark mode, and mapped to Tailwind colors in `@theme inline`, so `bg-card` or `text-muted-foreground` follow the theme and shadcn's components follow it too. The base layer keeps the rules no utility can: fields at least 1rem (iOS), the placeholder color, disabled buttons.
+- The breakpoint is `wide` (721 px, `wide:` and `max-wide:`): side by side above it, one column at a time below. `desktop-mouse:` is the one variant that assumes hovering (a wide screen with a mouse); anything hidden until hover hides behind it, so a phone always shows it. Tailwind's `hover:` already applies only where hovering exists.
+- The controls the app repeats (buttons, chips, fields, badges) are class lists in `src/web/lib/classes.ts`; adjust one with `cn(button, "…")`. One-off styling stays on the element.
+- Small text keeps the page's 1.5 line height (the `--text-*--line-height` overrides): Tailwind's tighter defaults would shrink chips below the 24 px tap target.
+- Tailwind scans `src/web/` only (`source(none)` + `@source`): the default scan would read `repos/`.
+- Add a component with `bunx shadcn add <name>` (`components.json`: style `base-vega`, lucide icons). The CLI may install an npm package named `cn` for the `cn` helper: remove it, and point the import at `@/web/lib/utils`. Keep the file whole; knip ignores its unused exports.
+- Bun compiles the Tailwind through `bun-plugin-tailwind`, set in `bunfig.toml` (`[serve.static]`) for the server's HTML import, in dev and at startup. The `bun build` CLI doesn't read that setting, so the builds that bundle the PWA (`build`, `build:pad`) go through `scripts/build.ts`, which passes the plugin to `Bun.build`.
+
 ## The PWA on a phone
 
 **Icons.** `public/icon.svg` is the source; `icon-maskable.svg` is the same artwork full-bleed. `bun run build:icons` (`scripts/build-icons.ts`, needs a Chrome) renders the committed PNGs from them: 192 and 512 px with the rounded corners (`any`), a 512 px maskable one (the OS crops it, so no corners of its own), and the 180 px `apple-touch-icon`. iOS ignores SVG icons and paints transparency black, so its icon is opaque and full-bleed (iOS rounds it). The manifest lists each icon for one purpose only: `any maskable` on one image suits neither. `index.html` links the apple-touch-icon statically, as a relative path the bundler turns into an asset; the manifest and the SVG icon are added by `main.tsx` (see there), and `server/pwa.ts` also serves every icon from the root, where iOS looks for `/apple-touch-icon.png` by itself. `test/server/pwa.test.ts` checks each icon's size and opacity.
 
-**Responsiveness.** The rules, so a phone and its owner's settings work (`test/web/styles.test.ts` holds the checkable ones):
+**Responsiveness.** The rules, so a phone and its owner's settings work (`test/web/styles.test.ts` holds the checkable ones, on the CSS Tailwind compiles and on the components' class lists):
 
 - Text sizes are `rem`, so the reader's text-size setting applies; nothing disables zoom in the viewport meta.
 - Form fields are at least `1rem`: iOS Safari zooms into any smaller field when it is focused, and doesn't zoom back.
