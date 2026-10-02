@@ -1,3 +1,5 @@
+import { MAX_PINS } from "./pins";
+
 /**
  * Every error the API can answer with. Responses carry the stable `error` code for programs to
  * branch on, plus an English `message` for people and agents reading raw responses. A client that
@@ -17,6 +19,7 @@ export const ERROR_MESSAGES = {
   revisionNotFound: "Revision not found",
   viewNotFound: "View not found",
   viewExists: "A view with this name already exists",
+  pinLimit: `At most ${MAX_PINS} notes can be pinned; unpin one first`,
   notFound: "No such endpoint",
   methodNotAllowed: "Method not allowed",
   internal: "Internal error",

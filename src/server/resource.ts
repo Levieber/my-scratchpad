@@ -43,6 +43,7 @@ export const resourceWith = (token: Redacted.Redacted | undefined) => {
         RevisionNotFound: () => Effect.succeed(errorJson("revisionNotFound", 404)),
         ViewNotFound: () => Effect.succeed(errorJson("viewNotFound", 404)),
         ViewExists: () => Effect.succeed(errorJson("viewExists", 409)),
+        PinLimit: () => Effect.succeed(errorJson("pinLimit", 409)),
         // The driver's error is the diagnosis (a locked, missing or corrupt file), so it is logged.
         DatabaseUnavailable: (e) =>
           Effect.as(

@@ -11,6 +11,7 @@ import type {
   NoteChanged,
   NoteExists,
   NoteNotFound,
+  PinLimit,
   RevisionNotFound,
   ViewExists,
   ViewNotFound,
@@ -40,6 +41,7 @@ export type Failure =
   | RevisionNotFound
   | ViewNotFound
   | ViewExists
+  | PinLimit
   | DatabaseUnavailable;
 
 export const refuse = (code: ErrorCode, status: number, detail?: string) =>

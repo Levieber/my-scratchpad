@@ -1,5 +1,6 @@
 import { ERROR_CODES } from "@/shared/errors";
 import { KIND_NAMES, KINDS } from "@/shared/kinds";
+import { MAX_PINS } from "@/shared/pins";
 
 const kind = {
   type: "string",
@@ -394,6 +395,36 @@ export const openapi = {
         summary: "Delete a saved search",
         parameters: [idParam],
         responses: { 204: { description: "Deleted" }, 404: notFound },
+      },
+    },
+    "/api/pins": {
+      get: {
+        operationId: "listPins",
+        summary: `The pinned notes (at most ${MAX_PINS}), in the order they were pinned`,
+        responses: {
+          200: {
+            description: "Pinned notes",
+            ...json({ type: "array", items: { $ref: "#/components/schemas/Note" } }),
+          },
+        },
+      },
+    },
+    "/api/pins/{id}": {
+      parameters: [idParam],
+      put: {
+        operationId: "pinNote",
+        summary:
+          "Pin a note to the home page. Pinning doesn't change the note: not its updated_at, not its history",
+        responses: {
+          204: { description: "Pinned (or already was)" },
+          404: notFound,
+          409: error(`${MAX_PINS} notes are pinned already (pinLimit)`),
+        },
+      },
+      delete: {
+        operationId: "unpinNote",
+        summary: "Unpin a note",
+        responses: { 204: { description: "Unpinned (or wasn't pinned)" }, 404: notFound },
       },
     },
     "/api/health": {

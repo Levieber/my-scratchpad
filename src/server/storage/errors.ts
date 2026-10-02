@@ -26,3 +26,7 @@ export class ViewNotFound extends Schema.TaggedError<ViewNotFound>()("ViewNotFou
 export class ViewExists extends Schema.TaggedError<ViewExists>()("ViewExists", {
   name: Schema.String,
 }) {}
+/** Pinning one more note would go past MAX_PINS. */
+export class PinLimit extends Schema.TaggedError<PinLimit>()("PinLimit", {
+  max: Schema.Number,
+}) {}

@@ -104,6 +104,17 @@ export const MIGRATIONS: Migration[] = [
       "CREATE INDEX notes_order ON notes(updated_at DESC)",
     ],
   },
+  {
+    // Pinning is back as a short list for the home page rather than a flag on every note: its
+    // own table keeps it out of the note's content, its version and its history.
+    id: "0008.pins",
+    statements: [
+      `CREATE TABLE pins (
+         note_id TEXT PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+         pinned_at TEXT NOT NULL
+       )`,
+    ],
+  },
 ];
 
 /**

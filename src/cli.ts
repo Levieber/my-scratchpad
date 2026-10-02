@@ -12,6 +12,7 @@ import { ls, tags, views } from "@/cli/commands/find";
 import { diff, history } from "@/cli/commands/history";
 import { hook, hooks } from "@/cli/commands/hooks";
 import { add, append, edit, rm, set, show } from "@/cli/commands/notes";
+import { pin, pins, unpin } from "@/cli/commands/pins";
 import { exportCmd, importCmd } from "@/cli/commands/transfer";
 import { Author, pad } from "@/cli/root";
 import { Client } from "@/client/client";
@@ -26,6 +27,9 @@ const commands = [
   edit,
   set,
   rm,
+  pin,
+  unpin,
+  pins,
   history,
   diff,
   exportCmd,
