@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import type { Note, NoteInput } from "../src/db";
+import type { Note, NoteInput } from "../src/domain";
 import { ApiError, Offline } from "../src/web/api";
 import {
   baseOf,

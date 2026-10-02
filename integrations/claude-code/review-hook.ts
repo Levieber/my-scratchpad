@@ -5,11 +5,13 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { basename } from "node:path";
 
+import * as Console from "effect/Console";
+import * as Effect from "effect/Effect";
+
 import { Client } from "@/client";
-import { config } from "@/config";
 
 import { editsPath, reviewReason } from "./review";
-import { withTimeout } from "./timeout";
+import { quietly } from "./timeout";
 
 const event = await Bun.stdin.json().catch(() => ({}));
 const file = editsPath(String(event.session_id ?? "unknown"));
@@ -20,20 +22,16 @@ rmSync(file, { force: true });
 // `stop_hook_active` means this turn is Claude answering our own review, so its edits are the
 // review's fixes, not new work to review.
 if (files.length && !event.stop_hook_active && process.env.PAD_REVIEW !== "off") {
-  try {
-    const notes = await withTimeout(
-      new Client(config.url, "claude-code").list({ kind: "reference", limit: 100 }),
+  const review = Effect.gen(function* () {
+    const notes = yield* (yield* Client).list({ kind: "reference", limit: 100 });
+    if (!notes.length) return;
+    const cwd = typeof event.cwd === "string" ? event.cwd : process.cwd();
+    const root = Bun.spawnSync(["git", "-C", cwd, "rev-parse", "--show-toplevel"]);
+    const repo = basename(root.success ? root.stdout.toString().trim() : cwd);
+    yield* Console.log(
+      JSON.stringify({ decision: "block", reason: reviewReason({ files, cwd, repo, notes }) }),
     );
-    if (notes.length) {
-      const cwd = typeof event.cwd === "string" ? event.cwd : process.cwd();
-      const root = Bun.spawnSync(["git", "-C", cwd, "rev-parse", "--show-toplevel"]);
-      const repo = basename(root.success ? root.stdout.toString().trim() : cwd);
-      console.log(
-        JSON.stringify({ decision: "block", reason: reviewReason({ files, cwd, repo, notes }) }),
-      );
-    }
-  } catch {
-    // Server down or slow: finishing the turn matters more than the review.
-  }
+  });
+  // Server down or slow: finishing the turn matters more than the review.
+  await Effect.runPromise(quietly(review).pipe(Effect.provide(Client.layer("claude-code"))));
 }
-process.exit(0); // don't wait on the pending timeout timer

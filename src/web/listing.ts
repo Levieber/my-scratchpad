@@ -1,5 +1,5 @@
 // Pure helpers behind the note list, kept apart from React so they can be tested directly.
-import type { Note } from "../db";
+import type { Note } from "../domain";
 import type { Tag } from "./api";
 
 const stripLine = (line: string) =>

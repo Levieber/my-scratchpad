@@ -1,4 +1,5 @@
-import type { Database } from "bun:sqlite";
+import * as Effect from "effect/Effect";
+import * as SqlClient from "effect/sql/SqlClient";
 
 /**
  * One schema change, identified by a permanent name and recorded in `schema_migrations` once
@@ -105,30 +106,33 @@ export const MIGRATIONS: Migration[] = [
   },
 ];
 
-/** Applies every migration not yet recorded, all in one transaction. Returns the ids it ran. */
-export function migrate(db: Database, migrations: Migration[] = MIGRATIONS): string[] {
-  db.run(`CREATE TABLE IF NOT EXISTS schema_migrations (
-            id TEXT PRIMARY KEY,
-            applied_at TEXT NOT NULL
-          )`);
+/**
+ * Applies every migration not yet recorded, all in one transaction. Succeeds with the ids it ran.
+ * Ours rather than effect/sql's Migrator: databases in use already record `schema_migrations` with
+ * these string ids, which that Migrator (numeric ids, its own table) wouldn't recognise.
+ */
+export const migrateWith = Effect.fnUntraced(function* (migrations: readonly Migration[]) {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`CREATE TABLE IF NOT EXISTS schema_migrations (
+               id TEXT PRIMARY KEY,
+               applied_at TEXT NOT NULL
+             )`;
   const applied = new Set(
-    db
-      .query<{ id: string }, []>("SELECT id FROM schema_migrations")
-      .all()
-      .map((row) => row.id),
+    (yield* sql<{ id: string }>`SELECT id FROM schema_migrations`).map((row) => row.id),
   );
   const pending = migrations.filter((m) => !applied.has(m.id));
 
-  db.transaction(() => {
+  yield* Effect.gen(function* () {
     for (const migration of pending) {
-      for (const statement of migration.statements) db.run(statement);
-      // Positional parameters: named ones depend on how the caller opened the database.
-      db.query("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run(
-        migration.id,
-        new Date().toISOString(),
-      );
+      for (const statement of migration.statements) yield* sql.unsafe(statement);
+      yield* sql`INSERT INTO schema_migrations ${sql.insert({
+        id: migration.id,
+        applied_at: new Date().toISOString(),
+      })}`;
     }
-  })();
+  }).pipe(sql.withTransaction);
 
   return pending.map((m) => m.id);
-}
+});
+
+export const migrate = migrateWith(MIGRATIONS);

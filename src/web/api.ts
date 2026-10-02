@@ -1,7 +1,6 @@
 // Browser client for the same HTTP API the CLI and agents use.
-import type { FullRevision, Note, NoteInput, Revision, View } from "../db";
+import type { FullRevision, Note, NoteDiff, NoteInput, Revision, View } from "../domain";
 import { readError } from "../errors";
-import type { NoteDiff } from "../server";
 
 export type { FullRevision, Note, NoteDiff, NoteInput, Revision, View };
 export type Tag = { tag: string; count: number };

@@ -3,9 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import * as Effect from "effect/Effect";
+
 import { editedFile, editsPath, MAX_FILES, reviewReason } from "../integrations/claude-code/review";
 import { Store } from "../src/db";
-import { createServer } from "../src/server";
+import { type TestServer, testServer } from "./support";
 
 const ROOT = join(import.meta.dir, "..");
 
@@ -42,10 +44,10 @@ describe("review helpers", () => {
 });
 
 describe("review hooks, end to end", () => {
-  let server: ReturnType<typeof createServer> | undefined;
+  let server: TestServer | undefined;
   let cache = "";
   afterEach(async () => {
-    await server?.stop(true);
+    await server?.stop();
     rmSync(cache, { recursive: true, force: true });
   });
 
@@ -69,16 +71,20 @@ describe("review hooks, end to end", () => {
     return out.trim();
   }
 
-  function boot() {
-    const store = new Store(":memory:");
-    store.create({
-      title: "SEO checklist",
-      body: "- [ ] sitemap",
-      kind: "reference",
-      tags: ["seo"],
-    });
-    store.create({ title: "Groceries", body: "milk" });
-    server = createServer({ store });
+  async function boot() {
+    server = await testServer();
+    await server.run(
+      Effect.gen(function* () {
+        const store = yield* Store;
+        yield* store.create({
+          title: "SEO checklist",
+          body: "- [ ] sitemap",
+          kind: "reference",
+          tags: ["seo"],
+        });
+        yield* store.create({ title: "Groceries", body: "milk" });
+      }),
+    );
     cache = mkdtempSync(join(tmpdir(), "pad-review-"));
   }
 
@@ -92,7 +98,7 @@ describe("review hooks, end to end", () => {
     hook("review-hook.ts", { session_id: session, stop_hook_active: active, cwd: ROOT }, env);
 
   test("blocks once after edits, listing the files and reference titles", async () => {
-    boot();
+    await boot();
     await edit("s1", join(ROOT, "src/web/App.tsx"));
     const out = JSON.parse(await stop("s1"));
     expect(out.decision).toBe("block");
@@ -104,7 +110,7 @@ describe("review hooks, end to end", () => {
   });
 
   test("edits made while answering the review don't start another one", async () => {
-    boot();
+    await boot();
     await edit("s2", join(ROOT, "a.ts"));
     await stop("s2");
     await edit("s2", join(ROOT, "a.ts"));
@@ -113,7 +119,7 @@ describe("review hooks, end to end", () => {
   });
 
   test("stays silent without edits, and when turned off", async () => {
-    boot();
+    await boot();
     expect(await stop("s3")).toBe("");
     await edit("s4", join(ROOT, "a.ts"));
     expect(await stop("s4", false, { PAD_REVIEW: "off" })).toBe("");

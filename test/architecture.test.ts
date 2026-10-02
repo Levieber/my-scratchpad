@@ -59,6 +59,27 @@ const RULES: Rule[] = [
         specifier: /^\.{1,2}\/(.*\/)?(server|client|openapi|errors)(\.ts)?$/,
         because: "storage knows nothing about HTTP",
       },
+      { specifier: /^effect\/http(\/|$)/, because: "storage knows nothing about HTTP" },
+    ],
+  },
+  {
+    files: ["src/**/*.{ts,tsx}", "integrations/**/*.ts"],
+    mayNotImport: [
+      {
+        specifier: /^(effect|effect\/[a-z-]+|@effect\/[a-z-]+)$/,
+        because:
+          "a barrel loads every module it re-exports (Bun doesn't tree-shake at runtime), ~30 ms on each `pad` and hook run; import the module, e.g. effect/Effect",
+      },
+    ],
+  },
+  {
+    files: ["src/web/**/*.{ts,tsx}"],
+    mayNotImport: [
+      {
+        specifier: /^(effect|@effect\/.*)(\/|$)/,
+        because:
+          "Effect stays out of the PWA bundle; the browser side is React state and the outbox (see docs/effect.md)",
+      },
     ],
   },
 ];

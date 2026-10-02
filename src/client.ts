@@ -1,8 +1,18 @@
-// Thin typed client over the HTTP API. The CLI and MCP server both use this — never the DB directly.
-import { config } from "./config";
-import type { FullRevision, Note, NoteInput, Revision, View } from "./db";
+// Typed client over the HTTP API, as an Effect service. The CLI, MCP server and Claude Code hooks
+// all use this — never the DB directly.
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
+import * as HttpClient from "effect/http/HttpClient";
+import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
+
+import { ClientConfig } from "./config";
+import type { FullRevision, Note, NoteDiff, NoteInput, Revision, Tag, View } from "./domain";
 import { readError } from "./errors";
-import type { NoteDiff } from "./server";
 
 /** `GET /api/notes` parameters. `q` may carry `kind:x`, `author:x` and `#tag` operators. */
 export type ListParams = {
@@ -11,84 +21,109 @@ export type ListParams = {
   /** `human`, `agent` (anyone else), or an author's name. */
   author?: string;
   /** Notes must carry every one of these. */
-  tag?: string[];
+  tag?: readonly string[];
   limit?: number;
   offset?: number;
 };
 
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-    /** The API's stable error code (see src/errors.ts), when the server sent one. */
-    public code?: string,
-  ) {
-    super(message);
-  }
-}
+export class ApiError extends Schema.TaggedError<ApiError>()("ApiError", {
+  /** The HTTP status; 0 when the server couldn't be reached. */
+  status: Schema.Number,
+  message: Schema.String,
+  /** The API's stable error code (see src/errors.ts), when the server sent one. */
+  code: Schema.optional(Schema.String),
+}) {}
 
-export class Client {
-  constructor(
-    private base = config.url,
-    private author = process.env.PAD_AUTHOR ?? "human",
-    private token = config.token,
-  ) {}
+type Method = "GET" | "POST" | "PATCH" | "DELETE";
 
-  private async req<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = { "x-pad-author": this.author };
-    if (this.token) headers.authorization = `Bearer ${this.token}`;
-    if (body !== undefined) headers["content-type"] = "application/json";
-    let res: Response;
-    try {
-      res = await fetch(this.base + path, {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-    } catch {
-      throw new ApiError(
-        0,
-        `Scratchpad server not reachable at ${this.base}. Start it with \`pad serve\` or \`systemctl --user start scratchpad\`.`,
-      );
-    }
-    if (res.status === 204) return undefined as T;
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const { code, message } = readError(data);
-      throw new ApiError(res.status, message ?? code ?? res.statusText, code);
-    }
-    return data as T;
-  }
-
-  list = (q: ListParams = {}) => this.req<Note[]>("GET", `/api/notes${query(q)}`);
-  get = (id: string) => this.req<Note>("GET", `/api/notes/${encodeURIComponent(id)}`);
-  create = (input: NoteInput) => this.req<Note>("POST", "/api/notes", input);
-  update = (id: string, patch: NoteInput) =>
-    this.req<Note>("PATCH", `/api/notes/${encodeURIComponent(id)}`, patch);
-  append = (id: string, text: string) =>
-    this.req<Note>("POST", `/api/notes/${encodeURIComponent(id)}/append`, { text });
-  delete = (id: string) => this.req<void>("DELETE", `/api/notes/${encodeURIComponent(id)}`);
-  tags = () => this.req<{ tag: string; count: number }[]>("GET", "/api/tags");
-  views = () => this.req<View[]>("GET", "/api/views");
-  createView = (name: string, query: string) =>
-    this.req<View>("POST", "/api/views", { name, query });
-  deleteView = (id: string) => this.req<void>("DELETE", `/api/views/${encodeURIComponent(id)}`);
-  health = () => this.req<{ ok: boolean }>("GET", "/api/health");
-  /** A note's history, newest first. */
-  revisions = (id: string, q: { limit?: number; offset?: number } = {}) =>
-    this.req<Revision[]>("GET", `/api/notes/${encodeURIComponent(id)}/revisions${query(q)}`);
-  revision = (id: string, rev: number) =>
-    this.req<FullRevision>("GET", `/api/notes/${encodeURIComponent(id)}/revisions/${rev}`);
-  /** The latest change by default; `since` (ISO time) for everything changed after it. */
-  diff = (id: string, q: { from?: number; to?: number; since?: string } = {}) =>
-    this.req<NoteDiff>("GET", `/api/notes/${encodeURIComponent(id)}/diff${query(q)}`);
-}
-
-function query(q: Record<string, string | number | boolean | string[] | undefined>): string {
+function query(q: Record<string, string | number | boolean | readonly string[] | undefined>) {
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(q))
     for (const one of [v].flat())
       if (one !== undefined && one !== "") params.append(k, String(one));
   const qs = params.toString();
   return qs ? "?" + qs : "";
+}
+
+const make = Effect.fnUntraced(function* ({
+  url,
+  author,
+  token,
+}: {
+  url: string;
+  author: string;
+  token: Option.Option<Redacted.Redacted>;
+}) {
+  const http = yield* HttpClient.HttpClient;
+  const unreachable = new ApiError({
+    status: 0,
+    message: `Scratchpad server not reachable at ${url}. Start it with \`pad serve\` or \`systemctl --user start scratchpad\`.`,
+  });
+
+  // Responses are trusted, not decoded: the CLI and a deployed server are often different
+  // versions, and a field one side doesn't know about shouldn't turn into a failure.
+  const req = <T>(method: Method, path: string, body?: unknown) =>
+    Effect.gen(function* () {
+      let request = HttpClientRequest.make(method)(url + path).pipe(
+        HttpClientRequest.setHeader("x-pad-author", author),
+      );
+      if (Option.isSome(token))
+        request = HttpClientRequest.bearerToken(request, Redacted.value(token.value));
+      if (body !== undefined) request = HttpClientRequest.bodyJsonUnsafe(request, body);
+      const res = yield* Effect.mapError(http.execute(request), () => unreachable);
+      if (res.status === 204) return undefined as T;
+      const data: unknown = yield* res.json.pipe(Effect.orElseSucceed(() => ({})));
+      if (res.status >= 400) {
+        const { code, message } = readError(data);
+        return yield* new ApiError({ status: res.status, message: message ?? code ?? "", code });
+      }
+      return data as T;
+    });
+
+  const note = (id: string) => `/api/notes/${encodeURIComponent(id)}`;
+
+  return {
+    list: (q: ListParams = {}) => req<Note[]>("GET", `/api/notes${query(q)}`),
+    get: (id: string) => req<Note>("GET", note(id)),
+    create: (input: NoteInput) => req<Note>("POST", "/api/notes", input),
+    update: (id: string, patch: NoteInput) => req<Note>("PATCH", note(id), patch),
+    append: (id: string, text: string) => req<Note>("POST", `${note(id)}/append`, { text }),
+    delete: (id: string) => req<void>("DELETE", note(id)),
+    tags: () => req<Tag[]>("GET", "/api/tags"),
+    views: () => req<View[]>("GET", "/api/views"),
+    createView: (name: string, query: string) => req<View>("POST", "/api/views", { name, query }),
+    deleteView: (id: string) => req<void>("DELETE", `/api/views/${encodeURIComponent(id)}`),
+    health: () => req<{ ok: boolean }>("GET", "/api/health"),
+    /** A note's history, newest first. */
+    revisions: (id: string, q: { limit?: number; offset?: number } = {}) =>
+      req<Revision[]>("GET", `${note(id)}/revisions${query(q)}`),
+    revision: (id: string, rev: number) => req<FullRevision>("GET", `${note(id)}/revisions/${rev}`),
+    /** The latest change by default; `since` (ISO time) for everything changed after it. */
+    diff: (id: string, q: { from?: number; to?: number; since?: string } = {}) =>
+      req<NoteDiff>("GET", `${note(id)}/diff${query(q)}`),
+  };
+});
+
+export class Client extends Context.Service<Client, Effect.Success<ReturnType<typeof make>>>()(
+  "pad/Client",
+) {
+  /** Against an explicit server, e.g. one a test started. */
+  static readonly layerWith = (options: {
+    url: string;
+    author: string;
+    token?: Option.Option<Redacted.Redacted>;
+  }) =>
+    Layer.effect(Client, make({ token: Option.none(), ...options })).pipe(
+      Layer.provide(FetchHttpClient.layer),
+    );
+
+  /** Against the configured server (env, then `pad login`), writing as `author`. */
+  static readonly layer = (author: string) =>
+    Layer.effect(
+      Client,
+      Effect.gen(function* () {
+        const { url, token } = yield* ClientConfig;
+        return yield* make({ url, author, token });
+      }),
+    ).pipe(Layer.provide([ClientConfig.layer, FetchHttpClient.layer]));
 }

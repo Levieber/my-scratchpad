@@ -4,7 +4,7 @@
 import { homedir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
 
-import type { Note } from "@/db";
+import type { Note } from "@/domain";
 
 /** Where a session's edited paths are kept between the PostToolUse and Stop hooks. */
 export const editsPath = (

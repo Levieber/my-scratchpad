@@ -1,20 +1,21 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { type Note, Store } from "../src/db";
-import { createServer } from "../src/server";
+import * as Effect from "effect/Effect";
+import * as SqlClient from "effect/sql/SqlClient";
 
-let server: ReturnType<typeof createServer> | undefined;
-let store: Store;
+import type { Note } from "../src/domain";
+import { type TestServer, testServer } from "./support";
+
+let server: TestServer | undefined;
 
 // A real server on a random port: the route table only exists inside Bun.serve.
-function boot(token?: string) {
-  store = new Store(":memory:");
-  server = createServer({ store, token });
+async function boot(token?: string) {
+  server = await testServer({ token });
   return server;
 }
 
 afterEach(async () => {
-  await server?.stop(true);
+  await server?.stop();
   server = undefined;
 });
 
@@ -24,7 +25,7 @@ async function call(
   body?: unknown,
   headers: Record<string, string> = {},
 ) {
-  const s = server ?? boot();
+  const s = server ?? (await boot());
   const init: RequestInit = { method, headers: { ...headers } };
   if (typeof body === "string") init.body = body;
   else if (body !== undefined) {
@@ -222,7 +223,7 @@ describe("notes API", () => {
   });
 
   test("bearer token auth", async () => {
-    boot("s3cret");
+    await boot("s3cret");
     expect((await call("GET", "/api/health")).status).toBe(200);
     const denied = await call("GET", "/api/notes");
     expect([denied.status, denied.data.error]).toEqual([401, "unauthorized"]);
@@ -290,7 +291,10 @@ describe("notes API", () => {
   test("deleting a note deletes its history", async () => {
     const { data: n } = await call("POST", "/api/notes", { body: "x" });
     await call("DELETE", `/api/notes/${n.id}`);
-    expect(store.db.query("SELECT COUNT(*) AS n FROM note_revisions").get()).toEqual({ n: 0 });
+    const rows = await server!.run(
+      Effect.flatMap(SqlClient.SqlClient, (sql) => sql`SELECT COUNT(*) AS n FROM note_revisions`),
+    );
+    expect(rows).toEqual([{ n: 0 }]);
   });
 
   test("If-Match: a write based on an old version is refused", async () => {
@@ -315,6 +319,24 @@ describe("notes API", () => {
     expect(
       (await call("PATCH", `/api/notes/${n.id}`, { body: "v4" }, { "if-match": "*" })).status,
     ).toBe(200);
+  });
+
+  test("concurrent appends to one note all land", async () => {
+    const { data: n } = await call("POST", "/api/notes", { body: "log" });
+    const lines = Array.from({ length: 25 }, (_, i) => `line ${i}`);
+    await Promise.all(lines.map((line) => call("POST", `/api/notes/${n.id}/append`, line)));
+    const body: string = (await call("GET", `/api/notes/${n.id}`)).data.body;
+    expect(body.split("\n").toSorted()).toEqual(["log", ...lines].toSorted());
+  });
+
+  test("of two writes based on the same version, exactly one wins", async () => {
+    const { data: n } = await call("POST", "/api/notes", { body: "v1" });
+    const ifMatch = { "if-match": `"${n.updated_at}"` };
+    const results = await Promise.all([
+      call("PATCH", `/api/notes/${n.id}`, { body: "left" }, ifMatch),
+      call("PATCH", `/api/notes/${n.id}`, { body: "right" }, ifMatch),
+    ]);
+    expect(results.map((r) => r.status).toSorted((a, b) => a - b)).toEqual([200, 412]);
   });
 
   test("a client-chosen id makes a create safe to retry", async () => {
