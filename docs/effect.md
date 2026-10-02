@@ -65,7 +65,15 @@ The HTTP contract did not change: the API tests pass with only their setup rewri
 
 ## Costs
 
-- **Startup time.** A hook or `pad` run went from ~10 ms to ~71 ms (median of 9, server unreachable). Effect's HTTP client and `Config` both load Schema, which is most of that. Next to a model turn it's noise; on a tight shell loop of `pad` calls it adds up.
+- **Startup time.** Run from source, the SessionStart hook went from ~13 ms to ~73 ms, and `pad status` from ~11 ms to ~109 ms (median of 15, server unreachable). Bun transpiles and resolves each of the ~150 modules on every run, and Effect's HTTP client and `Config` both load Schema. Next to a model turn it's noise; in a tight shell loop of `pad` calls it adds up. Building wins most of it back (same measurement):
+
+  | Hook built as                                   | Time   | Size   |
+  | ----------------------------------------------- | ------ | ------ |
+  | `bun build --target=bun --minify`               | ~27 ms | 140 KB |
+  | `bun build --compile --minify --bytecode` (exe) | ~15 ms | ~84 MB |
+
+  `pad status` as a compiled bytecode executable is ~27 ms. Bytecode without `--compile` needs CommonJS, which a dependency's `import.meta` rules out. Nothing is built yet: the hooks and `pad` still run from source.
+
 - **Size.** `effect` is 54 MB installed (sources, maps and types). Nothing ships to the browser.
 - **A new release.** 4.0.0 was published on 2026-10-01; early bugs are likely, and some modules (`http`, `cli`, `ai`) are marked unstable. Versions are pinned exactly.
 - **Learning curve.** Generators, layers and services are a new vocabulary for contributors; `repos/effect` and this page are the way in.
