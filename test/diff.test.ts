@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { CONFLICT_MARKERS, diffLines, diffStats, lines, merge3, unifiedDiff } from "../src/diff";
+import { CONFLICT_MARKERS, diffLines, diffStats, lines, merge3, unifiedDiff } from "@/diff";
 
 const sides = (ops: ReturnType<typeof diffLines>) => ({
   a: ops.filter((o) => o.type !== "insert").map((o) => o.line),

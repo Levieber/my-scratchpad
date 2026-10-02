@@ -3,7 +3,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 
-import type { Note } from "../src/domain";
+import type { Note } from "@/domain";
+
 import { type TestServer, testServer } from "./support";
 
 let server: TestServer | undefined;

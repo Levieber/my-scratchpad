@@ -7,8 +7,8 @@ import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Redacted from "effect/Redacted";
 import * as TestClock from "effect/testing/TestClock";
 
-import { Store } from "../src/db";
-import { serverLayer } from "../src/server";
+import { Store } from "@/db";
+import { serverLayer } from "@/server";
 
 const runner =
   <R>(runtime: ManagedRuntime.ManagedRuntime<R, unknown>) =>

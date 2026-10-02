@@ -5,8 +5,8 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as SqlClient from "effect/sql/SqlClient";
 
-import { sqlite } from "../src/db";
-import { MIGRATIONS, migrate, migrateWith } from "../src/migrations";
+import { sqlite } from "@/db";
+import { MIGRATIONS, migrate, migrateWith } from "@/migrations";
 
 const ids = MIGRATIONS.map((m) => m.id);
 

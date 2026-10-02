@@ -14,7 +14,8 @@
     "noUncheckedIndexedAccess": true,
     "types": ["bun"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@integrations/*": ["./integrations/*"]
     }
   },
   "include": ["src", "integrations", "test"]

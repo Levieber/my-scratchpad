@@ -9,7 +9,7 @@ import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 
-import { ClientConfig, ServerConfig } from "../src/config";
+import { ClientConfig, ServerConfig } from "@/config";
 
 const env = (vars: Record<string, string>) =>
   ConfigProvider.fromEnvRecord({ HOME: "/home/u", ...vars });

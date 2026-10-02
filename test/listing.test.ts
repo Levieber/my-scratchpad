@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import type { Note } from "../src/domain";
-import { groupNotes, preview, visibleTags } from "../src/web/listing";
+import type { Note } from "@/domain";
+import { groupNotes, preview, visibleTags } from "@/web/listing";
 
 const note = (patch: Partial<Note>): Note => ({
   id: "x",

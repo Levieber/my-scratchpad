@@ -6,7 +6,7 @@ import {
   type Settings,
   withOurs,
   withoutOurs,
-} from "../integrations/claude-code/settings";
+} from "@integrations/claude-code/settings";
 
 const mine: Settings = {
   model: "opus",

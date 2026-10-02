@@ -2,8 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import * as Effect from "effect/Effect";
 
-import { Client } from "../src/client";
-import { exportNotes, importNotes, parseExport } from "../src/transfer";
+import { Client } from "@/client";
+import { exportNotes, importNotes, parseExport } from "@/transfer";
+
 import { type TestServer, testServer } from "./support";
 
 let server: TestServer | undefined;

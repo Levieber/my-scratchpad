@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { hasToken, operatorValue, parseQuery, setOperator, toggleToken } from "../src/query";
+import { hasToken, operatorValue, parseQuery, setOperator, toggleToken } from "@/query";
 
 describe("parseQuery", () => {
   test("splits kind and tag operators from the search words", () => {

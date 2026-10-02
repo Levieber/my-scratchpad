@@ -3,10 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { editedFile, editsPath, MAX_FILES, reviewReason } from "@integrations/claude-code/review";
 import * as Effect from "effect/Effect";
 
-import { editedFile, editsPath, MAX_FILES, reviewReason } from "../integrations/claude-code/review";
-import { Store } from "../src/db";
+import { Store } from "@/db";
+
 import { type TestServer, testServer } from "./support";
 
 const ROOT = join(import.meta.dir, "..");

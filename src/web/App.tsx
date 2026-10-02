@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { newId } from "../ids";
-import type { Kind } from "../kinds";
-import { hasToken, operatorValue, parseQuery, setOperator, toggleToken } from "../query";
+import { newId } from "@/ids";
+import type { Kind } from "@/kinds";
+import { hasToken, operatorValue, parseQuery, setOperator, toggleToken } from "@/query";
+
 import {
   api,
   type FullRevision,

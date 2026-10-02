@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { progress } from "../src/checklist";
+import { progress } from "@/checklist";
 
 describe("progress", () => {
   test("counts ticked and total checkboxes in any list style", () => {

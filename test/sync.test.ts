@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import type { Note, NoteInput } from "../src/domain";
-import { ApiError, Offline } from "../src/web/api";
+import type { Note, NoteInput } from "@/domain";
+import { ApiError, Offline } from "@/web/api";
 import {
   baseOf,
   type Fields,
@@ -10,7 +10,7 @@ import {
   type Outcome,
   Syncer,
   withPending,
-} from "../src/web/sync";
+} from "@/web/sync";
 
 const fields = (patch: Partial<Fields> = {}): Fields => ({
   title: "",

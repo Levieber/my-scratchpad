@@ -2,10 +2,11 @@
 // so nothing typed is lost to a dropped connection, a closed tab, or someone else's write: an
 // edit carries the version it started from, and if the note changed since, the two are merged.
 // Kept apart from React so it can be tested directly.
-import { progress } from "../checklist";
-import { merge3 } from "../diff";
-import type { Kind } from "../kinds";
-import { deriveTitle } from "../title";
+import { progress } from "@/checklist";
+import { merge3 } from "@/diff";
+import type { Kind } from "@/kinds";
+import { deriveTitle } from "@/title";
+
 import { isApiError, Offline, Unauthorized, type Note, type NoteInput } from "./api";
 
 /** What the editor changes. */

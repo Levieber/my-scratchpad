@@ -19,6 +19,7 @@ Use Bun for everything: `bun`, `bun test`, `bun install`, `bunx`. No Node, npm, 
 - The HTTP API is the only way in: clients never import `db.ts`, `migrations.ts` or `server.ts` at runtime. New capabilities land in the API first (route, `openapi.ts`, test), then in the clients. `test/architecture.test.ts` enforces the boundaries.
 - API errors are `{ error: <code from src/errors.ts>, message }`. Add a code rather than inventing a string.
 - Schema changes append a migration to `src/migrations.ts`. Never edit one that has shipped.
+- Import by alias, never `../`: `@/` is `src/`, `@integrations/` is `integrations/`; `./` only for a sibling. Effect modules by path (`effect/Effect`, not `effect`). Both are checked by `test/architecture.test.ts`.
 - Comments explain a decision; don't narrate the code.
 - Never `git push` or open a PR unless the user asks — pushing `main` deploys to Railway.
 

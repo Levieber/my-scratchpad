@@ -3,7 +3,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
-import { REVISION_WINDOW_MS, Store } from "../src/db";
+import { REVISION_WINDOW_MS, Store } from "@/db";
+
 import { testStore } from "./support";
 
 let fixture: Awaited<ReturnType<typeof testStore>> | undefined;

@@ -12,8 +12,14 @@ import { Glob } from "bun";
 type Rule = {
   /** Globs (from the repo root) the rule applies to. */
   files: string[];
+  /** Test files too; most rules are about what ships, so they skip them. */
+  withTests?: boolean;
   mayNotImport: { specifier: RegExp; because: string; except?: string[] }[];
 };
+
+/** One of our top-level src/ modules, however it is written: `./db`, `../db` or `@/db`. */
+const local = (...names: string[]) =>
+  new RegExp(`^(\\.{1,2}\\/(.*\\/)?|@\\/)(${names.join("|")})(\\.ts)?$`);
 
 const CLIENTS = [
   "src/web/**/*.{ts,tsx}",
@@ -29,12 +35,12 @@ const RULES: Rule[] = [
     files: CLIENTS,
     mayNotImport: [
       {
-        specifier: /^\.{1,2}\/(.*\/)?(db|migrations)(\.ts)?$/,
+        specifier: local("db", "migrations"),
         because: "clients go through the HTTP API, never the database (API-first)",
       },
       { specifier: /^bun:sqlite$/, because: "only the server's storage opens SQLite" },
       {
-        specifier: /^\.{1,2}\/(.*\/)?server(\.ts)?$/,
+        specifier: local("server"),
         because: "clients talk to the server over HTTP, not by importing it",
         // `pad serve` starts the server process; it never calls it in-process as a client.
         except: ["src/cli.ts"],
@@ -46,7 +52,7 @@ const RULES: Rule[] = [
     mayNotImport: [
       { specifier: /^(bun|bun:.*|node:.*)$/, because: "the PWA runs in a browser" },
       {
-        specifier: /^\.{1,2}\/(.*\/)?(config|client)(\.ts)?$/,
+        specifier: local("config", "client"),
         because:
           "they read process.env and ~/.config, which a browser doesn't have; use web/api.ts",
       },
@@ -56,7 +62,7 @@ const RULES: Rule[] = [
     files: ["src/db.ts", "src/migrations.ts"],
     mayNotImport: [
       {
-        specifier: /^\.{1,2}\/(.*\/)?(server|client|openapi|errors)(\.ts)?$/,
+        specifier: local("server", "client", "openapi", "errors"),
         because: "storage knows nothing about HTTP",
       },
       { specifier: /^effect\/http(\/|$)/, because: "storage knows nothing about HTTP" },
@@ -79,6 +85,17 @@ const RULES: Rule[] = [
         specifier: /^(effect|@effect\/.*)(\/|$)/,
         because:
           "Effect stays out of the PWA bundle; the browser side is React state and the outbox (see docs/effect.md)",
+      },
+    ],
+  },
+  {
+    files: ["src/**/*.{ts,tsx}", "integrations/**/*.ts", "test/**/*.ts"],
+    withTests: true,
+    mayNotImport: [
+      {
+        specifier: /^\.\.\//,
+        because:
+          "climbing directories breaks when files move; import by alias (@/ for src, @integrations/ for integrations), `./` for a sibling",
       },
     ],
   },
@@ -113,16 +130,16 @@ function importsOf(source: string): Import[] {
 
 const ROOT = join(import.meta.dir, "..");
 
-function filesFor(globs: string[]): string[] {
+function filesFor(globs: string[], withTests = false): string[] {
   const out = new Set<string>();
   for (const pattern of globs)
     for (const file of new Glob(pattern).scanSync({ cwd: ROOT })) out.add(file);
-  return [...out].filter((f) => !f.endsWith(".test.ts")).sort();
+  return [...out].filter((f) => withTests || !f.endsWith(".test.ts")).sort();
 }
 
 describe("architecture", () => {
   for (const rule of RULES) {
-    for (const file of filesFor(rule.files)) {
+    for (const file of filesFor(rule.files, rule.withTests)) {
       test(`${file} respects its import boundaries`, () => {
         const violations = importsOf(readFileSync(join(ROOT, file), "utf8"))
           .filter((i) => !i.typeOnly)
@@ -135,6 +152,13 @@ describe("architecture", () => {
       });
     }
   }
+
+  test("a boundary holds however the module is written", () => {
+    for (const specifier of ["./db", "../db", "../../src/db", "@/db", "@/db.ts"])
+      expect([specifier, local("db").test(specifier)]).toEqual([specifier, true]);
+    for (const specifier of ["@/dbx", "@/web/db", "db", "./dbx"])
+      expect([specifier, local("db").test(specifier)]).toEqual([specifier, false]);
+  });
 
   test("every rule matches at least one file (a typo would silently disable it)", () => {
     for (const rule of RULES) expect(filesFor(rule.files).length).toBeGreaterThan(0);
