@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { newId } from "@/ids";
-import type { Kind } from "@/kinds";
-import { hasToken, operatorValue, parseQuery, setOperator, toggleToken } from "@/query";
-
+import { newId } from "@/shared/ids";
+import { Editor } from "@/web/components/Editor";
+import { Sidebar } from "@/web/components/Sidebar";
+import { Splitter } from "@/web/components/Splitter";
+import { TokenDialog } from "@/web/components/TokenDialog";
 import {
   api,
   type FullRevision,
@@ -15,88 +16,28 @@ import {
   type Note,
   type Tag,
   type View,
-} from "./api";
-import { History } from "./History";
-import { ago, groupNotes, preview, visibleTags } from "./listing";
+} from "@/web/lib/api";
 import {
-  baseOf,
-  type Fields,
-  fieldsOf,
-  localNote,
-  mergeFields,
-  Outbox,
-  Syncer,
-  withPending,
-} from "./sync";
+  type Draft,
+  emptyDraft,
+  fromDraft,
+  type SaveState,
+  saveLabel,
+  toDraft,
+} from "@/web/lib/draft";
+import { outbox, storedWidth, storeWidth, syncer } from "@/web/lib/storage";
+import { localNote, mergeFields, baseOf, fieldsOf, withPending } from "@/web/lib/sync";
 
 const PAGE = 50;
-const TAG_LIMIT = 8;
-const WIDTH_KEY = "pad-sidebar-width";
-const MIN_WIDTH = 260;
-const MAX_WIDTH = 560;
-const clampWidth = (w: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(w)));
-
-// The width is a per-device convenience, so storage failing (private mode) just means the default.
-const storedWidth = () => {
-  try {
-    const w = Number(localStorage.getItem(WIDTH_KEY));
-    return w ? clampWidth(w) : 360;
-  } catch {
-    return 360;
-  }
-};
-
-// Private mode can refuse storage; the outbox then lasts as long as the tab.
-const browserStorage = () => {
-  try {
-    return localStorage;
-  } catch {
-    return null;
-  }
-};
-
-const outbox = new Outbox(browserStorage());
-const syncer = new Syncer(outbox, api);
-
-type Draft = { title: string; body: string; tags: string; kind: Kind };
-
-const emptyDraft: Draft = { title: "", body: "", tags: "", kind: "note" };
-const toDraft = (n: Fields): Draft => ({
-  title: n.title,
-  body: n.body,
-  tags: n.tags.join(", "),
-  kind: n.kind,
-});
-const fromDraft = (d: Draft): Fields => ({
-  title: d.title,
-  body: d.body,
-  tags: d.tags
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean),
-  kind: d.kind,
-});
-
-type SaveState = "" | "pending" | "saving" | "saved" | "local" | "merged" | "conflict" | "error";
 
 export function App() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [views, setViews] = useState<View[]>([]);
-  const [naming, setNaming] = useState<string | null>(null);
-  const [nameTaken, setNameTaken] = useState(false);
-  const nameRef = useRef<HTMLInputElement>(null);
-  // Focus moves to the field once, when the person opens the form: not on every re-render, which
-  // the 5 s poll would otherwise turn into stealing focus from the Save button.
-  const formOpen = naming !== null;
-  useEffect(() => {
-    if (formOpen) nameRef.current?.focus();
-  }, [formOpen]);
   // Everything that narrows the list (kind, author, tags, words) is one query string, so a view
   // is just that string saved under a name.
   const [q, setQ] = useState("");
   const [limit, setLimit] = useState(PAGE);
-  const [allTags, setAllTags] = useState(false);
   const [width, setWidth] = useState(storedWidth);
   const [listHidden, setListHidden] = useState(false);
   const [online, setOnline] = useState(true);
@@ -368,34 +309,25 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(WIDTH_KEY, String(width));
-    } catch {}
-  }, [width]);
+  useEffect(() => storeWidth(width), [width]);
 
   const filter = (next: string) => {
     setQ(next);
     setLimit(PAGE);
   };
 
-  // Chips edit the search box, so several tags combine and the query stays visible.
-  const selectedTags = parseQuery(q).tags;
-  const kind = operatorValue(q, "kind");
-  const author = operatorValue(q, "author");
-  const sameQuery = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-  const activeView = views.find((v) => sameQuery(v.query, q));
+  const activeSave = saveLabel(saveState, saveError);
 
   const saveView = async (name: string) => {
     try {
       await api.createView(name, q.trim());
-      setNaming(null);
-      await refreshList();
+      void refreshList();
+      return "saved" as const;
     } catch (e) {
-      // A name already taken is the only failure the person can fix, so the form stays open and
-      // says so (announced, and linked to the field).
-      if (isApiError(e, "viewExists")) setNameTaken(true);
-      else handle(e);
+      // A name already taken is the only failure the person can fix.
+      if (isApiError(e, "viewExists")) return "taken" as const;
+      handle(e);
+      return "failed" as const;
     }
   };
   const removeView = async (v: View) => {
@@ -406,18 +338,6 @@ export function App() {
       handle(e);
     }
   };
-  const shownTags = allTags ? tags : visibleTags(tags, selectedTags, TAG_LIMIT);
-
-  const saveLabel = {
-    "": "",
-    pending: "…",
-    saving: "saving…",
-    saved: "saved",
-    local: "saved on this device · syncs when online",
-    merged: "merged with changes made elsewhere",
-    conflict: "edited elsewhere too: both versions kept between <<<<<<< and >>>>>>>",
-    error: `not saved: ${saveError}`,
-  }[saveState];
 
   const shown = withPending(notes, pending, !q);
   // History lives on the server, so a note it hasn't seen yet has none.
@@ -430,279 +350,48 @@ export function App() {
       data-list={open && listHidden ? "hidden" : undefined}
       style={{ "--sidebar": `${width}px` } as React.CSSProperties}
     >
-      <aside className="sidebar">
-        <header className="bar">
-          <h1>Scratchpad</h1>
-          <button
-            className="primary"
-            title="New note (Ctrl+Alt+N)"
-            onClick={() => newNote().then(() => bodyRef.current?.focus())}
-          >
-            + New
-          </button>
-        </header>
-        <input
-          ref={searchRef}
-          type="search"
-          placeholder="Search…  (/)"
-          value={q}
-          onChange={(e) => filter(e.target.value)}
-        />
-        <div className="filters">
-          <fieldset className="kinds" aria-label="Kind">
-            {(
-              [
-                ["", "All"],
-                ["note", "Notes"],
-                ["reference", "Reference"],
-              ] as const
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                aria-pressed={kind === k}
-                onClick={() => filter(setOperator(q, "kind", k))}
-              >
-                {label}
-              </button>
-            ))}
-          </fieldset>
-          <fieldset className="kinds" aria-label="Author">
-            {(
-              [
-                ["", "Anyone"],
-                ["human", "Me"],
-                ["agent", "Agents"],
-              ] as const
-            ).map(([a, label]) => (
-              <button
-                key={a}
-                aria-pressed={author === a}
-                onClick={() => filter(setOperator(q, "author", a))}
-              >
-                {label}
-              </button>
-            ))}
-          </fieldset>
-        </div>
-        {(views.length > 0 || q.trim()) && (
-          <fieldset className="tags views" aria-label="Saved views">
-            {views.map((v) => (
-              <span key={v.id} className="view" data-active={activeView?.id === v.id}>
-                <button
-                  className="apply"
-                  aria-pressed={activeView?.id === v.id}
-                  title={v.query}
-                  onClick={() => filter(activeView?.id === v.id ? "" : v.query)}
-                >
-                  {v.name}
-                </button>
-                <button
-                  className="remove"
-                  aria-label={`Delete view ${v.name}`}
-                  onClick={() => void removeView(v)}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            {q.trim() && !activeView && naming === null && (
-              <button
-                className="more"
-                onClick={() => {
-                  setNameTaken(false);
-                  setNaming("");
-                }}
-              >
-                Save this search
-              </button>
-            )}
-            {naming !== null && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (naming.trim()) void saveView(naming.trim());
-                }}
-              >
-                <input
-                  ref={nameRef}
-                  aria-label="View name"
-                  aria-invalid={nameTaken}
-                  aria-describedby={nameTaken ? "view-name-error" : undefined}
-                  placeholder="Name this view"
-                  value={naming}
-                  onChange={(e) => {
-                    setNameTaken(false);
-                    setNaming(e.target.value);
-                  }}
-                  onKeyDown={(e) => e.key === "Escape" && setNaming(null)}
-                />
-                <button className="more">Save</button>
-                {nameTaken && (
-                  <span id="view-name-error" role="alert" className="error">
-                    A view with this name already exists
-                  </span>
-                )}
-              </form>
-            )}
-          </fieldset>
-        )}
-        {tags.length > 0 && (
-          <div className="tags">
-            {shownTags.map((t) => (
-              <button
-                key={t.tag}
-                aria-pressed={hasToken(q, `#${t.tag}`)}
-                onClick={() => filter(toggleToken(q, `#${t.tag}`))}
-              >
-                #{t.tag} {t.count}
-              </button>
-            ))}
-            {tags.length > TAG_LIMIT && (
-              <button className="more" aria-expanded={allTags} onClick={() => setAllTags(!allTags)}>
-                {allTags ? "Fewer tags" : `+${tags.length - shownTags.length} more`}
-              </button>
-            )}
-          </div>
-        )}
-        <nav className="list" aria-label="Notes">
-          {groupNotes(shown).map((g) => (
-            <section key={g.label} aria-label={g.label}>
-              <h2 className="group">{g.label}</h2>
-              <ul>
-                {g.notes.map((n) => {
-                  const p = preview(n);
-                  return (
-                    <li key={n.id}>
-                      {/* A real button, so the list works from the keyboard and screen readers. */}
-                      <button
-                        className="item"
-                        aria-current={current?.id === n.id}
-                        onClick={() => void openNote(n.id)}
-                      >
-                        <span className="t">{n.title}</span>
-                        {p && <span className="p">{p}</span>}
-                        <span className="m">
-                          {n.kind === "note" && n.progress.total > 0 && (
-                            <span className="done">
-                              <progress
-                                value={n.progress.done}
-                                max={n.progress.total}
-                                aria-hidden="true"
-                              />
-                              {n.progress.done}/{n.progress.total} ·{" "}
-                            </span>
-                          )}
-                          {ago(n.updated_at)}
-                          {n.kind === "reference" && kind !== "reference" && (
-                            <span className="badge kind">reference</span>
-                          )}
-                          {n.author !== "human" && <span className="badge">{n.author}</span>}
-                          {n.tags.length > 0 && <span> · #{n.tags.join(" #")}</span>}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
-          {shown.length === 0 && <p className="m">{q ? "No matches." : "No notes yet."}</p>}
-          {notes.length >= limit && (
-            <button className="more" onClick={() => setLimit((l) => l + PAGE)}>
-              Load more
-            </button>
-          )}
-        </nav>
-        <footer className="foot">
-          <output className={online ? "status" : "status off"}>
-            {online ? "online" : "offline"}
-            {pending.length > 0 &&
-              ` · ${pending.length} ${pending.length === 1 ? "change" : "changes"} to sync`}
-          </output>
-          <a href="/openapi.json" target="_blank">
-            API
-          </a>
-        </footer>
-      </aside>
+      <Sidebar
+        q={q}
+        onFilter={filter}
+        searchRef={searchRef}
+        onNew={() => newNote().then(() => bodyRef.current?.focus())}
+        views={views}
+        onSaveView={saveView}
+        onRemoveView={(v) => void removeView(v)}
+        tags={tags}
+        notes={shown}
+        currentId={current?.id}
+        canLoadMore={notes.length >= limit}
+        onLoadMore={() => setLimit((l) => l + PAGE)}
+        onOpen={(id) => void openNote(id)}
+        online={online}
+        pendingChanges={pending.length}
+      />
 
       {open && !listHidden && <Splitter width={width} onChange={setWidth} />}
 
       {open && (
-        <main className="editor">
-          <header className="bar">
-            <button
-              className="ghost back"
-              aria-label="Back to list"
-              onClick={() => {
-                flush();
-                setOpen(false);
-              }}
-            >
-              ←
-            </button>
-            <button
-              className="ghost toggleList"
-              aria-label={listHidden ? "Show note list" : "Hide note list"}
-              aria-expanded={!listHidden}
-              onClick={() => setListHidden(!listHidden)}
-            >
-              {listHidden ? "»" : "«"}
-            </button>
-            <input
-              className="title"
-              placeholder="Title"
-              value={draft.title}
-              onChange={(e) => edit({ title: e.target.value })}
-            />
-            <button
-              className="ghost kindToggle"
-              aria-pressed={draft.kind === "reference"}
-              title="Reference: reusable rules to check work against (practices, checklists)"
-              onClick={() => edit({ kind: draft.kind === "reference" ? "note" : "reference" })}
-            >
-              Reference
-            </button>
-            <button
-              className="ghost kindToggle"
-              aria-pressed={showHistory}
-              disabled={!current || unsynced}
-              title={
-                unsynced ? "History starts once the note has synced" : "What changed, and when"
-              }
-              onClick={() => void toggleHistory()}
-            >
-              History
-            </button>
-            <button className="ghost danger" title="Delete" onClick={remove}>
-              🗑
-            </button>
-          </header>
-          {showHistory && current ? (
-            <History key={current.id} noteId={current.id} onRestore={restore} />
-          ) : (
-            <>
-              <input
-                className="tagsInput"
-                placeholder="tags, comma separated"
-                value={draft.tags}
-                onChange={(e) => edit({ tags: e.target.value })}
-              />
-              <textarea
-                ref={bodyRef}
-                placeholder="Write anything. Markdown welcome."
-                value={draft.body}
-                onChange={(e) => edit({ body: e.target.value })}
-              />
-            </>
-          )}
-          <footer className="foot">
-            <span>
-              {current ? `by ${current.author} · created ${ago(current.created_at)}` : "new note"}
-            </span>
-            {/* Announced, since it can say an edit is only on this device or conflicted. */}
-            <output>{saveLabel}</output>
-          </footer>
-        </main>
+        <Editor
+          draft={draft}
+          onEdit={edit}
+          current={current}
+          showHistory={showHistory}
+          historyDisabled={!current || unsynced}
+          historyHint={
+            unsynced ? "History starts once the note has synced" : "What changed, and when"
+          }
+          listHidden={listHidden}
+          onToggleList={() => setListHidden(!listHidden)}
+          onBack={() => {
+            flush();
+            setOpen(false);
+          }}
+          onToggleHistory={() => void toggleHistory()}
+          onDelete={remove}
+          onRestore={restore}
+          bodyRef={bodyRef}
+          saveLabel={activeSave}
+        />
       )}
 
       {needsToken && (
@@ -718,71 +407,3 @@ export function App() {
     </div>
   );
 }
-
-function TokenDialog({ onSave }: { onSave: (token: string) => void }) {
-  const [value, setValue] = useState("");
-  // The dialog blocks the whole app, so moving focus into it is expected (unlike autoFocus on a page).
-  const input = useRef<HTMLInputElement>(null);
-  useEffect(() => input.current?.focus(), []);
-  return (
-    <div className="overlay">
-      <form
-        className="dialog"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (value) onSave(value);
-        }}
-      >
-        <p>This scratchpad requires an access token.</p>
-        <input
-          ref={input}
-          type="password"
-          placeholder="PAD_TOKEN"
-          aria-label="Access token"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
-        <button className="primary">Save</button>
-      </form>
-    </div>
-  );
-}
-
-// WAI-ARIA's window splitter is a focusable separator carrying a value, so keyboard and screen
-// reader users can resize the list too; jsx-a11y treats every separator as non-interactive.
-/* oxlint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */
-function Splitter({ width, onChange }: { width: number; onChange: (width: number) => void }) {
-  // The sidebar starts at the left edge, so the pointer's x is the new width.
-  const drag = (e: React.PointerEvent<HTMLHRElement>) => {
-    const handle = e.currentTarget;
-    handle.setPointerCapture(e.pointerId);
-    const move = (ev: PointerEvent) => onChange(clampWidth(ev.clientX));
-    const up = () => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", up);
-    };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", up);
-  };
-  const key = (e: React.KeyboardEvent) => {
-    const step = { ArrowLeft: -20, ArrowRight: 20 }[e.key];
-    if (step) {
-      e.preventDefault();
-      onChange(clampWidth(width + step));
-    }
-  };
-  return (
-    <hr
-      className="resize"
-      aria-orientation="vertical"
-      aria-label="Resize note list"
-      aria-valuemin={MIN_WIDTH}
-      aria-valuemax={MAX_WIDTH}
-      aria-valuenow={width}
-      tabIndex={0}
-      onPointerDown={drag}
-      onKeyDown={key}
-    />
-  );
-}
-/* oxlint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */

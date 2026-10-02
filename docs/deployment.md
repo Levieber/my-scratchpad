@@ -2,7 +2,7 @@
 
 ## Configuration
 
-Every variable is read in `src/config.ts`, as Effect `Config`: a value that is set but malformed (`PAD_PORT=abc`) stops startup with the reason instead of being used, an empty one counts as unset, and tokens are `Redacted`, so they never show in a log.
+Every variable is read in `src/config/` (`env.ts` has what the configs share), as Effect `Config`: a value that is set but malformed (`PAD_PORT=abc`) stops startup with the reason instead of being used, an empty one counts as unset, and tokens are `Redacted`, so they never show in a log.
 
 | Var                 | Default                            |                                                                   |
 | ------------------- | ---------------------------------- | ----------------------------------------------------------------- |

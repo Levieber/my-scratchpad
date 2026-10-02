@@ -1,5 +1,7 @@
 // Shared test fixtures: the real server and store, built from the same layers production uses, on
 // an in-memory database. Each fixture owns a ManagedRuntime, so `run` reaches its services directly.
+import { join } from "node:path";
+
 import * as Effect from "effect/Effect";
 import * as HttpServer from "effect/http/HttpServer";
 import * as Layer from "effect/Layer";
@@ -8,8 +10,11 @@ import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Redacted from "effect/Redacted";
 import * as TestClock from "effect/testing/TestClock";
 
-import { Store } from "@/db";
-import { serverLayer } from "@/server";
+import { serverLayer } from "@/server/serve";
+import { Store } from "@/server/storage/store";
+
+/** The repository root, for tests that run the real `pad` or the MCP server from source. */
+export const ROOT = join(import.meta.dir, "..");
 
 const runner =
   <R>(runtime: ManagedRuntime.ManagedRuntime<R, unknown>) =>

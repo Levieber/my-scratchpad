@@ -17,34 +17,38 @@ type Rule = {
   mayNotImport: { specifier: RegExp; because: string; except?: string[] }[];
 };
 
-/** One of our top-level src/ modules, however it is written: `./db`, `../db` or `@/db`. */
-const local = (...names: string[]) =>
-  new RegExp(`^(\\.{1,2}\\/(.*\\/)?|@\\/)(${names.join("|")})(\\.ts)?$`);
+/**
+ * A folder of src/ and everything under it, however it is imported. Always by the `@/` alias:
+ * `../` is forbidden below, and `./` only reaches a sibling in the same folder.
+ */
+const under = (path: string, { except }: { except?: string[] } = {}) =>
+  new RegExp(`^@\\/${path}(\\/${except ? `(?!(${except.join("|")})(\\/|$))` : ""}.*)?$`);
 
 const CLIENTS = [
   "src/web/**/*.{ts,tsx}",
   "src/cli.ts",
+  "src/cli/**/*.ts",
   "src/mcp.ts",
-  "src/client.ts",
-  "src/transfer.ts",
+  "src/mcp/**/*.ts",
+  "src/client/**/*.ts",
   "integrations/**/*.ts",
 ];
+
+const SHARED_BECAUSE =
+  "shared/ is what the server, the clients and the PWA all use: it knows no process, so nothing in it may reach into one";
 
 const RULES: Rule[] = [
   {
     files: CLIENTS,
     mayNotImport: [
       {
-        specifier: local("db", "migrations"),
-        because: "clients go through the HTTP API, never the database (API-first)",
+        specifier: under("server"),
+        because:
+          "clients go through the HTTP API: they never import the server, its routes or its database (API-first)",
+        // `pad serve` starts the server process; it never calls it in-process as a client.
+        except: ["src/cli/commands/connection.ts"],
       },
       { specifier: /^bun:sqlite$/, because: "only the server's storage opens SQLite" },
-      {
-        specifier: local("server", "routes", "http"),
-        because: "clients talk to the server over HTTP, not by importing it",
-        // `pad serve` starts the server process; it never calls it in-process as a client.
-        except: ["src/cli.ts"],
-      },
     ],
   },
   {
@@ -52,20 +56,53 @@ const RULES: Rule[] = [
     mayNotImport: [
       { specifier: /^(bun|bun:.*|node:.*)$/, because: "the PWA runs in a browser" },
       {
-        specifier: local("config", "client"),
+        specifier: new RegExp(`${under("config").source}|${under("client").source}`),
         because:
           "they read process.env and ~/.config, which a browser doesn't have; use web/api.ts",
       },
     ],
   },
   {
-    files: ["src/db.ts", "src/migrations.ts"],
+    files: ["src/server/storage/**/*.ts"],
     mayNotImport: [
       {
-        specifier: local("server", "routes", "http", "client", "openapi", "errors"),
-        because: "storage knows nothing about HTTP",
+        specifier: under("server", { except: ["storage"] }),
+        because: "storage knows nothing about HTTP: routes depend on it, not the other way round",
       },
+      {
+        specifier: new RegExp(
+          `${under("client").source}|${under("cli").source}|${under("mcp").source}`,
+        ),
+        because: "storage belongs to the server alone",
+      },
+      { specifier: /^@\/shared\/errors$/, because: "the error codes are the HTTP API's" },
       { specifier: /^effect\/http(\/|$)/, because: "storage knows nothing about HTTP" },
+    ],
+  },
+  {
+    files: ["src/server/**/*.ts", "src/server.ts"],
+    mayNotImport: [
+      {
+        specifier: new RegExp(
+          `${under("client").source}|${under("cli").source}|${under("mcp").source}`,
+        ),
+        because: "the server doesn't use the clients; it is what they talk to",
+      },
+    ],
+  },
+  {
+    files: ["src/shared/**/*.ts"],
+    mayNotImport: [
+      {
+        specifier: new RegExp(
+          ["server", "client", "cli", "mcp", "config", "web"]
+            .map((name) => under(name).source)
+            .join("|"),
+        ),
+        because: SHARED_BECAUSE,
+      },
+      { specifier: /^@integrations\//, because: SHARED_BECAUSE },
+      { specifier: /^(bun|bun:.*|node:.*)$/, because: SHARED_BECAUSE },
     ],
   },
   {
@@ -153,11 +190,18 @@ describe("architecture", () => {
     }
   }
 
-  test("a boundary holds however the module is written", () => {
-    for (const specifier of ["./db", "../db", "../../src/db", "@/db", "@/db.ts"])
-      expect([specifier, local("db").test(specifier)]).toEqual([specifier, true]);
-    for (const specifier of ["@/dbx", "@/web/db", "db", "./dbx"])
-      expect([specifier, local("db").test(specifier)]).toEqual([specifier, false]);
+  test("a boundary covers its whole folder, and only that folder", () => {
+    const server = under("server");
+    for (const specifier of ["@/server", "@/server/serve", "@/server/storage/store"])
+      expect([specifier, server.test(specifier)]).toEqual([specifier, true]);
+    for (const specifier of ["@/serverless", "@/web/server", "@/shared/server", "./server"])
+      expect([specifier, server.test(specifier)]).toEqual([specifier, false]);
+
+    const outsideStorage = under("server", { except: ["storage"] });
+    for (const specifier of ["@/server/serve", "@/server/routes", "@/server/docs/openapi"])
+      expect([specifier, outsideStorage.test(specifier)]).toEqual([specifier, true]);
+    for (const specifier of ["@/server/storage/store", "@/server/storage", "@/serverless"])
+      expect([specifier, outsideStorage.test(specifier)]).toEqual([specifier, false]);
   });
 
   test("every rule matches at least one file (a typo would silently disable it)", () => {

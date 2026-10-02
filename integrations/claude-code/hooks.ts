@@ -7,8 +7,9 @@ import { basename, dirname } from "node:path";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 
-import { Client } from "@/client";
-import { ClientConfig, HookConfig } from "@/config";
+import { Client } from "@/client/client";
+import { ClientConfig } from "@/config/client";
+import { HookConfig } from "@/config/hooks";
 
 import { editedFile, editsPath, reviewReason } from "./review";
 

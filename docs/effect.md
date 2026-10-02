@@ -15,18 +15,18 @@ Effect gives each of these one mechanism, checked by the compiler: failures in t
 
 ## What each part became
 
-| Part                                | Before                                       | Now                                                                                                                                                                  |
-| ----------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shapes (`src/domain.ts`, new)       | TS types spread over `db.ts` and `server.ts` | Schemas; types derived from them. Requests and SQL rows are decoded with them.                                                                                       |
-| Storage (`src/db.ts`)               | `Store` class on `bun:sqlite`                | `Store` service on `SqlClient` (`@effect/sql-sqlite-bun`); fails with `NoteNotFound`, `NoteExists`, `NoteChanged`, `RevisionNotFound`, `ViewNotFound`, `ViewExists`. |
-| Migrations                          | sync runner                                  | the same runner as an Effect; same table, ids and statements.                                                                                                        |
-| HTTP (`src/server.ts`, `routes.ts`) | `Bun.serve` route table                      | `HttpRouter` on `BunHttpServer`; Bun still serves the HTML import (`/`).                                                                                             |
-| Config (`src/config.ts`)            | `process.env` read at import                 | `Config`: `ServerConfig`, and a `ClientConfig` service.                                                                                                              |
-| Client (`src/client.ts`)            | class over `fetch`                           | `Client` service on `HttpClient`, failing with a typed `ApiError`.                                                                                                   |
-| CLI (`src/cli.ts`)                  | `node:util` `parseArgs` + `switch`           | `effect/cli` commands.                                                                                                                                               |
-| MCP (`src/mcp.ts`)                  | `@modelcontextprotocol/sdk` + zod            | `effect/ai` `McpServer` with Schema tools.                                                                                                                           |
-| Hooks                               | `withTimeout` + `process.exit`               | `Effect.timeout` + `Effect.ignoreCause` (`quietly`).                                                                                                                 |
-| Tests                               | `new Store(":memory:")`, `createServer`      | `test/support.ts`: the production layers in a `ManagedRuntime`, `TestClock` for time.                                                                                |
+| Part                                 | Before                                       | Now                                                                                                                                                                  |
+| ------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shapes (`src/shared/domain.ts`, new) | TS types spread over `db.ts` and `server.ts` | Schemas; types derived from them. Requests and SQL rows are decoded with them.                                                                                       |
+| Storage (`src/server/storage/`)      | `Store` class on `bun:sqlite`                | `Store` service on `SqlClient` (`@effect/sql-sqlite-bun`); fails with `NoteNotFound`, `NoteExists`, `NoteChanged`, `RevisionNotFound`, `ViewNotFound`, `ViewExists`. |
+| Migrations                           | sync runner                                  | the same runner as an Effect; same table, ids and statements.                                                                                                        |
+| HTTP (`src/server/`)                 | `Bun.serve` route table                      | `HttpRouter` on `BunHttpServer`; Bun still serves the HTML import (`/`).                                                                                             |
+| Config (`src/config/`)               | `process.env` read at import                 | `Config`: `ServerConfig`, and a `ClientConfig` service.                                                                                                              |
+| Client (`src/client/client.ts`)      | class over `fetch`                           | `Client` service on `HttpClient`, failing with a typed `ApiError`.                                                                                                   |
+| CLI (`src/cli.ts`)                   | `node:util` `parseArgs` + `switch`           | `effect/cli` commands.                                                                                                                                               |
+| MCP (`src/mcp.ts`)                   | `@modelcontextprotocol/sdk` + zod            | `effect/ai` `McpServer` with Schema tools.                                                                                                                           |
+| Hooks                                | `withTimeout` + `process.exit`               | `Effect.timeout` + `Effect.ignoreCause` (`quietly`).                                                                                                                 |
+| Tests                                | `new Store(":memory:")`, `createServer`      | `test/support.ts`: the production layers in a `ManagedRuntime`, `TestClock` for time.                                                                                |
 
 The HTTP contract did not change: the API tests pass with only their setup rewritten.
 
@@ -38,7 +38,7 @@ The HTTP contract did not change: the API tests pass with only their setup rewri
 
 **Our migrator, not `effect/sql`'s.** `Migrator` keeps numeric ids in its own table; the live database records string ids (`0001.notes`) in `schema_migrations`. Only the runner changed; no shipped migration was edited.
 
-**SQL failures are defects.** A `SqlError` means the database is broken, and no caller can do better than answer `internal`. The store turns them into defects (`run` in `db.ts`), so its signatures list only domain outcomes. The server logs a defect and answers `500 internal`, as it did for a thrown error.
+**SQL failures are defects.** A `SqlError` means the database is broken, and no caller can do better than answer `internal`. The store turns them into defects (`run` in `server/storage/sql.ts`), so its signatures list only domain outcomes. The server logs a defect and answers `500 internal`, as it did for a thrown error.
 
 **Transactions where the old code relied on being synchronous.** `bun:sqlite` calls were synchronous, so "check, then write" could not interleave with another request. Effect runs requests as concurrent fibers. If-Match, append and create-with-id now check and write in one `sql.withTransaction`, which holds the single connection. `test/api.test.ts` fires 25 parallel appends and two racing If-Match writes. Without the transaction, appends are lost and the test fails.
 
@@ -46,7 +46,7 @@ The HTTP contract did not change: the API tests pass with only their setup rewri
 
 **Validation messages kept.** Schema's own messages name the innermost failure (`Expected string at ["tags"][0]`). `inputProblem` maps a failure to the field's one-line rule (`tags must be an array of strings`), so API errors and `pad import` read as before.
 
-**The PWA stays as it is.** Its state is React's, and its offline outbox (`web/sync.ts`) is already explicit and tested. Effect would add to the bundle a browser has to download, for little gain. The browser imports domain types type-only, so no Effect code reaches it (the build is byte-identical). `test/architecture.test.ts` keeps it that way.
+**The PWA stays as it is.** Its state is React's, and its offline outbox (`web/lib/sync.ts`) is already explicit and tested. Effect would add to the bundle a browser has to download, for little gain. The browser imports domain types type-only, so no Effect code reaches it (the build is byte-identical). `test/architecture.test.ts` keeps it that way.
 
 **Modules by path, never a barrel.** `import { Effect } from "effect"` loads every module Effect has: Bun doesn't tree-shake at runtime. Measured on the SessionStart hook, that was 99 ms against 71 ms with `import * as Effect from "effect/Effect"`. The architecture test refuses barrel imports (`effect`, `effect/http`, `@effect/platform-bun`, …).
 
@@ -54,7 +54,7 @@ The HTTP contract did not change: the API tests pass with only their setup rewri
 
 ## Benefits
 
-- **Failures are in the types.** A handler that forgets a store outcome doesn't compile: `guard` in `routes.ts` lists every failure it maps to a response.
+- **Failures are in the types.** A handler that forgets a store outcome doesn't compile: `guard` in `server/resource.ts` lists every failure it maps to a response.
 - **One schema per shape.** The same `NoteInput` validates the API body, the import file and the derived TypeScript type. MCP tool inputs are Schemas too, so their JSON Schema is generated, not written again in zod.
 - **Dependencies are explicit and swappable.** Tests provide an in-memory store, a `TestClock` or a `ConfigProvider` instead of mutating `process.env` or passing `now` callbacks.
 - **Config fails loudly.** `PAD_PORT=abc` was `NaN`; now startup fails and says why. Tokens are `Redacted`, so a logged config shows `<redacted>`.
