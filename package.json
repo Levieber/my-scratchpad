@@ -2,6 +2,9 @@
   "name": "my-scratchpad",
   "version": "0.1.0",
   "private": true,
+  "description": "API-first scratchpad shared by a person and their AI agents",
+  "license": "MIT",
+  "repository": "github:Levieber/my-scratchpad",
   "bin": {
     "pad": "./src/cli.ts"
   },

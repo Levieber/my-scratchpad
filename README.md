@@ -33,6 +33,11 @@ API summary for agents: `GET /llms.txt`; full contract: `GET /openapi.json`.
 
 ## Docs
 
+- [docs/self-hosting.md](docs/self-hosting.md) — run it on your machine, a server or Railway, and connect clients.
 - [docs/architecture.md](docs/architecture.md) — the API-first rule and how it's enforced, routes, error codes, migrations, tooling.
 - [docs/deployment.md](docs/deployment.md) — configuration, running, Railway (IaC + Railpack).
 - [docs/claude-code.md](docs/claude-code.md) — `bun run setup:claude` and what it installs.
+
+## Contributing and license
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Released under the [MIT License](LICENSE).
