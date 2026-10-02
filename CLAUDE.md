@@ -1,6 +1,6 @@
 # Scratchpad
 
-API-first scratchpad shared by a person and their agents. Bun, React 19, SQLite (FTS5), MCP.
+API-first scratchpad shared by a person and their agents. Bun, React 19, SQLite (FTS5), MCP. The PWA is styled with Tailwind v4 utilities and shadcn components (Base UI): see "Styling the PWA" in `docs/architecture.md`.
 
 ## Commands
 

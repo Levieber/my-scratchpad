@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { View } from "@/web/lib/api";
+import { field, moreButton } from "@/web/lib/classes";
+import { cn } from "@/web/lib/utils";
+
+// WCAG 2.2 target size: every control here is at least 24 x 24 px (min-h-6).
+const pillButton = "min-h-6 border-0 bg-transparent py-0.5 text-xs text-muted-foreground";
 
 const sameQuery = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
@@ -41,11 +46,15 @@ export function SavedViews({
   };
 
   return (
-    <fieldset className="tags views" aria-label="Saved views">
+    <fieldset className="flex flex-wrap items-center gap-1.5" aria-label="Saved views">
       {views.map((v) => (
-        <span key={v.id} className="view" data-active={activeView?.id === v.id}>
+        <span
+          key={v.id}
+          className="inline-flex items-center rounded-full border border-border data-[active=true]:border-primary data-[active=true]:bg-accent"
+          data-active={activeView?.id === v.id}
+        >
           <button
-            className="apply"
+            className={cn(pillButton, "px-2 aria-pressed:text-foreground")}
             aria-pressed={activeView?.id === v.id}
             title={v.query}
             onClick={() => onFilter(activeView?.id === v.id ? "" : v.query)}
@@ -53,7 +62,7 @@ export function SavedViews({
             {v.name}
           </button>
           <button
-            className="remove"
+            className={cn(pillButton, "min-w-6 px-1")}
             aria-label={`Delete view ${v.name}`}
             onClick={() => onRemove(v)}
           >
@@ -63,7 +72,7 @@ export function SavedViews({
       ))}
       {q.trim() && !activeView && naming === null && (
         <button
-          className="more"
+          className={cn(moreButton, "min-h-6")}
           onClick={() => {
             setNameTaken(false);
             setNaming("");
@@ -74,6 +83,7 @@ export function SavedViews({
       )}
       {naming !== null && (
         <form
+          className="flex flex-wrap items-center gap-1"
           onSubmit={(e) => {
             e.preventDefault();
             if (naming.trim()) void save(naming.trim());
@@ -81,6 +91,7 @@ export function SavedViews({
         >
           <input
             ref={nameRef}
+            className={cn(field, "min-h-6 w-32 px-2 py-0.5")}
             aria-label="View name"
             aria-invalid={nameTaken}
             aria-describedby={nameTaken ? "view-name-error" : undefined}
@@ -92,9 +103,9 @@ export function SavedViews({
             }}
             onKeyDown={(e) => e.key === "Escape" && setNaming(null)}
           />
-          <button className="more">Save</button>
+          <button className={cn(moreButton, "min-h-6")}>Save</button>
           {nameTaken && (
-            <span id="view-name-error" role="alert" className="error">
+            <span id="view-name-error" role="alert" className="basis-full text-xs text-destructive">
               A view with this name already exists
             </span>
           )}

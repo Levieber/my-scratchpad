@@ -31,7 +31,8 @@ export function Splitter({
   };
   return (
     <hr
-      className="resize"
+      // Only beside the editor on a wide screen; a phone shows one column at a time.
+      className="m-0 hidden h-auto w-1.5 cursor-col-resize touch-none border-0 border-l border-border hover:border-l-2 hover:border-primary focus-visible:border-l-2 focus-visible:border-primary focus-visible:outline-none wide:block"
       aria-orientation="vertical"
       aria-label="Resize note list"
       aria-valuemin={MIN_WIDTH}

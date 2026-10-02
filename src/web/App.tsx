@@ -25,8 +25,10 @@ import {
   saveLabel,
   toDraft,
 } from "@/web/lib/draft";
+import { pinState } from "@/web/lib/pins";
 import { outbox, storedWidth, storeWidth, syncer } from "@/web/lib/storage";
 import { localNote, mergeFields, baseOf, fieldsOf, withPending } from "@/web/lib/sync";
+import { cn } from "@/web/lib/utils";
 
 const PAGE = 50;
 
@@ -34,6 +36,7 @@ export function App() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [views, setViews] = useState<View[]>([]);
+  const [pins, setPins] = useState<Note[]>([]);
   // Everything that narrows the list (kind, author, tags, words) is one query string, so a view
   // is just that string saved under a name.
   const [q, setQ] = useState("");
@@ -68,10 +71,16 @@ export function App() {
 
   const refreshList = useCallback(async () => {
     try {
-      const [n, t, v] = await Promise.all([api.list({ q, limit }), api.tags(), api.views()]);
+      const [n, t, v, p] = await Promise.all([
+        api.list({ q, limit }),
+        api.tags(),
+        api.views(),
+        api.pins(),
+      ]);
       setNotes(n);
       setTags(t);
       setViews(v);
+      setPins(p);
       return n;
     } catch (e) {
       handle(e);
@@ -198,16 +207,19 @@ export function App() {
     setSaveState("");
   };
 
-  const remove = () => {
-    if (current && !confirm(`Delete "${current.title}"?`)) return;
-    clearTimeout(timer.current);
-    latest.current.dirty = false;
-    if (current) {
-      outbox.delete(current.id);
+  // From the editor (the open note, or a new one never saved) or from the list (any note).
+  const remove = (note = latest.current.current) => {
+    if (note && !confirm(`Delete "${note.title}"?`)) return;
+    if (!note || note.id === latest.current.current?.id) {
+      clearTimeout(timer.current);
+      latest.current.dirty = false;
+      setCurrent(null);
+      setOpen(false);
+    }
+    if (note) {
+      outbox.delete(note.id);
       void sync();
     }
-    setCurrent(null);
-    setOpen(false);
   };
 
   const toggleHistory = async () => {
@@ -340,17 +352,37 @@ export function App() {
   };
 
   const shown = withPending(notes, pending, !q);
-  // History lives on the server, so a note it hasn't seen yet has none.
-  const unsynced = pending.some((p) => p.id === current?.id && p.op === "save" && !p.base);
+  const pinned = withPending(pins, pending, false);
+  // History and pins live on the server, so a note it hasn't seen yet has neither.
+  const unsyncedIds = new Set(pending.flatMap((p) => (p.op === "save" && !p.base ? [p.id] : [])));
+  const unsynced = current ? unsyncedIds.has(current.id) : false;
+  const pinnedIds = new Set(pinned.map((n) => n.id));
+  const pinOf = (id: string | undefined) => pinState(id, pinnedIds, unsyncedIds);
+
+  // Shown at once, then corrected by what the server says; a refusal puts the list back.
+  const togglePin = async (note: Note) => {
+    const unpin = pinnedIds.has(note.id);
+    setPins((p) => (unpin ? p.filter((n) => n.id !== note.id) : [...p, note]));
+    try {
+      await (unpin ? api.unpin(note.id) : api.pin(note.id));
+    } catch (e) {
+      handle(e);
+    }
+    await refreshList();
+  };
 
   return (
+    // No note open: the list is the whole page. A note open: list | resize handle | editor on a
+    // wide screen, the editor alone on a phone.
     <div
-      className="app"
-      data-view={open ? "editor" : "list"}
-      data-list={open && listHidden ? "hidden" : undefined}
+      className={cn(
+        "grid h-dvh grid-cols-[minmax(0,1fr)] pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]",
+        open && !listHidden && "wide:grid-cols-[var(--sidebar)_auto_minmax(0,1fr)]",
+      )}
       style={{ "--sidebar": `${width}px` } as React.CSSProperties}
     >
       <Sidebar
+        layout={open ? (listHidden ? "hidden" : "column") : "page"}
         q={q}
         onFilter={filter}
         searchRef={searchRef}
@@ -360,6 +392,10 @@ export function App() {
         onRemoveView={(v) => void removeView(v)}
         tags={tags}
         notes={shown}
+        pinned={pinned}
+        pinOf={pinOf}
+        onTogglePin={(n) => void togglePin(n)}
+        onDelete={remove}
         currentId={current?.id}
         canLoadMore={notes.length >= limit}
         onLoadMore={() => setLimit((l) => l + PAGE)}
@@ -380,6 +416,8 @@ export function App() {
           historyHint={
             unsynced ? "History starts once the note has synced" : "What changed, and when"
           }
+          pin={pinOf(current?.id)}
+          onTogglePin={() => current && void togglePin(current)}
           listHidden={listHidden}
           onToggleList={() => setListHidden(!listHidden)}
           onBack={() => {
@@ -387,7 +425,7 @@ export function App() {
             setOpen(false);
           }}
           onToggleHistory={() => void toggleHistory()}
-          onDelete={remove}
+          onDelete={() => remove()}
           onRestore={restore}
           bodyRef={bodyRef}
           saveLabel={activeSave}

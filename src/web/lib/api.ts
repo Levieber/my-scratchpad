@@ -102,6 +102,9 @@ export const api = {
   views: () => req<View[]>("GET", "/api/views"),
   createView: (name: string, query: string) => req<View>("POST", "/api/views", { name, query }),
   deleteView: (id: string) => req<void>("DELETE", `/api/views/${id}`),
+  pins: () => req<Note[]>("GET", "/api/pins"),
+  pin: (id: string) => req<void>("PUT", `/api/pins/${id}`),
+  unpin: (id: string) => req<void>("DELETE", `/api/pins/${id}`),
   revisions: (id: string) => req<Revision[]>("GET", `/api/notes/${id}/revisions?limit=100`),
   revision: (id: string, rev: number) =>
     req<FullRevision>("GET", `/api/notes/${id}/revisions/${rev}`),

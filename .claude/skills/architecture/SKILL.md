@@ -26,6 +26,10 @@ The HTTP API is the only way in. Each folder of `src/` is one responsibility: `s
 5. Test in `test/server/api.test.ts` (`testServer()` from `@test/support`: the real server on port 0; `server.run` reaches the Store and SQL).
 6. Then clients: `client/client.ts` (a method on the `Client` service) → a command in `cli/commands/` (`effect/cli`) / a tool in `mcp/tools.ts` with its handler in `mcp/handlers.ts`, and `web/lib/api.ts`.
 
+## PWA components
+
+Tailwind v4 utilities on the elements; no CSS classes of our own. Colors are the palette tokens (`bg-card`, `text-muted-foreground`, `border-border`, `text-primary`…, defined in `src/web/index.css`), never raw values. Repeated controls are class lists in `src/web/lib/classes.ts`, combined with `cn`. Layout splits at `wide:`/`max-wide:`; hide-until-hover only behind `desktop-mouse:`. Text sizes in rem, fields never below 1rem. For a component with real interaction (menu, dialog, popover…) add shadcn's with `bunx shadcn add <name>` into `src/web/components/ui/` (Base UI). Icons come from `lucide-react`. The details are in "Styling the PWA" in `docs/architecture.md`.
+
 ## Errors
 
 Codes live in `src/shared/errors.ts` (add new ones there); bodies are `{ error: code, message }`. Clients fail with `ApiError` (status, code, message) from `src/client/client.ts`; the PWA reads bodies with `readError()`.

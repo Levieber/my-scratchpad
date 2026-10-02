@@ -1,0 +1,103 @@
+/* The PWA's only stylesheet. Components style themselves with Tailwind utilities; this file holds
+   what they share: the palette, the breakpoint, and the few rules that are about elements rather
+   than components. */
+
+/* Only the PWA's sources: a full scan would also read repos/, thousands of vendored files. */
+@import "tailwindcss" source(none);
+@source "./";
+@import "tw-animate-css";
+
+/* The palette, named as shadcn names it so its components (components/ui/) follow it too. */
+:root {
+  --background: #f7f6f3;
+  --card: #ffffff;
+  --foreground: #1f1f1d;
+  --muted-foreground: #76746f;
+  --border: #e6e4df;
+  --primary: #c2410c;
+  --accent: #fdeee6;
+  --destructive: #b91c1c;
+  --success: #16a34a;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #1a1a19;
+    --card: #222220;
+    --foreground: #ecebe8;
+    --muted-foreground: #9b9994;
+    --border: #34332f;
+    --primary: #fb923c;
+    --accent: #3a2a1f;
+    --destructive: #f87171;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: #fff;
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-ring: var(--primary);
+}
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --radius-card: 10px;
+  /* Where the list and the editor sit side by side (`wide:`); below it, one at a time. */
+  --breakpoint-wide: 721px;
+  /* Small text keeps the page's line height, as it did before Tailwind: Tailwind's own, tighter
+     ones would shrink every chip and button below the 24 px tap target. */
+  --text-xs--line-height: 1.5;
+  --text-sm--line-height: 1.5;
+  --text-base--line-height: 1.5;
+  --text-lg--line-height: 1.5;
+  --text-xl--line-height: 1.5;
+}
+
+/* Where hovering is certain: a wide screen with a mouse. Anything that waits for a hover hides
+   behind it, so a phone (or a narrow window, or a phone that claims to hover) always shows it. */
+@custom-variant desktop-mouse (@media (hover: hover) and (pointer: fine) and (min-width: 721px));
+
+@layer base {
+  html {
+    /* iOS enlarges text on its own when the phone turns to landscape; the layout sets the sizes. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+  /* iOS Safari zooms the page into any field under 16px when it gets focus, and doesn't zoom
+     back. Fields are at least 1rem, in rem so the reader's text size still applies. */
+  input,
+  textarea {
+    font-size: max(1rem, 1em);
+  }
+  /* Preflight halves the text color; the browsers' own gray, which the app always had, reads
+     better on a field. */
+  ::placeholder {
+    color: var(--color-muted-foreground);
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+}

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 
 import { api, type FullRevision, type NoteDiff, Offline, type Revision } from "@/web/lib/api";
+import { button, outlineBadge } from "@/web/lib/classes";
 import { ago } from "@/web/lib/listing";
+import { cn } from "@/web/lib/utils";
 
 const describe = (e: unknown) =>
   e instanceof Offline ? "History needs a connection." : e instanceof Error ? e.message : String(e);
@@ -13,14 +15,23 @@ const diffRows = (diff: string) =>
     .filter((line, i) => line && !(i < 2 && /^(---|\+\+\+) /.test(line)))
     .map((line) => ({
       line,
-      kind: line.startsWith("@@")
+      kind: (line.startsWith("@@")
         ? "hunk"
         : line[0] === "+"
           ? "add"
           : line[0] === "-"
             ? "del"
-            : "ctx",
+            : "ctx") as keyof typeof ROW,
     }));
+
+const ROW = {
+  hunk: "mt-1.5 text-muted-foreground",
+  add: "bg-success/14",
+  del: "bg-destructive/14",
+  ctx: "",
+};
+
+const meta = "text-xs text-muted-foreground";
 
 // A changed title, kind or tag list as text.
 const show = (v: unknown): string => {
@@ -78,58 +89,71 @@ export function History({
     }
   };
 
-  if (error) return <p className="history m">{error}</p>;
-  if (!revisions) return <p className="history m">Loading history…</p>;
+  if (error) return <p className={cn("flex-1", meta)}>{error}</p>;
+  if (!revisions) return <p className={cn("flex-1", meta)}>Loading history…</p>;
 
   return (
-    <section className="history" aria-label="History">
-      <ol className="revisions">
+    // Revisions on the left, the selected change on the right; stacked on a narrow screen.
+    <section
+      className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,30%)_1fr] gap-3 wide:grid-cols-[minmax(160px,220px)_minmax(0,1fr)] wide:grid-rows-none"
+      aria-label="History"
+    >
+      <ol className="overflow-y-auto">
         {revisions.map((r, i) => (
           <li key={r.id}>
             <button
-              className="item"
+              className="block w-full rounded-card border border-transparent px-2.5 py-2 text-left hover:border-border hover:bg-card aria-[current=true]:border-border aria-[current=true]:bg-card"
               aria-current={r.id === selected}
               onClick={() => setSelected(r.id)}
             >
-              <span className="t">
+              <span className="block text-sm font-semibold">
                 {ago(r.updated_at)}
-                {i === 0 && <span className="badge kind">current</span>}
+                {i === 0 && <span className={outlineBadge}>current</span>}
               </span>
-              <span className="m">
-                {r.author} · <span className="add">+{r.added}</span>{" "}
-                <span className="del">−{r.removed}</span>
+              <span className={meta}>
+                {r.author} · <span className="text-success">+{r.added}</span>{" "}
+                <span className="text-destructive">−{r.removed}</span>
               </span>
             </button>
           </li>
         ))}
       </ol>
-      <div className="change">
+      <div className="flex min-h-0 min-w-0 flex-col gap-2">
         {diff?.to.id === selected && (
           <>
-            <header className="bar">
-              <span className="m">
+            <header className="flex items-center justify-between gap-2">
+              <span className={meta}>
                 {new Date(diff.to.updated_at).toLocaleString()} by {diff.to.author}
                 {!diff.from && " · created"}
               </span>
               {diff.to.id !== revisions[0]?.id && (
-                <button onClick={() => void restore()}>Restore this version</button>
+                <button className={button} onClick={() => void restore()}>
+                  Restore this version
+                </button>
               )}
             </header>
             {Object.entries(diff.changes).map(([field, c]) => (
-              <p key={field} className="m field">
-                {field}: <del>{show(c.from)}</del> → <ins>{show(c.to)}</ins>
+              <p key={field} className={meta}>
+                {field}: <del>{show(c.from)}</del> →{" "}
+                <ins className="text-success no-underline">{show(c.to)}</ins>
               </p>
             ))}
             {diff.diff ? (
-              <figure className="diff" aria-label="Changes to the text">
+              <figure
+                className="m-0 flex-1 overflow-auto rounded-lg border border-border bg-card py-2 font-mono text-[0.8125rem]"
+                aria-label="Changes to the text"
+              >
                 {diffRows(diff.diff).map((row, i) => (
-                  <div key={i} className={row.kind}>
+                  <div
+                    key={i}
+                    className={cn("px-3 whitespace-pre-wrap wrap-anywhere", ROW[row.kind])}
+                  >
                     {row.line}
                   </div>
                 ))}
               </figure>
             ) : (
-              <p className="m">The text didn't change.</p>
+              <p className={meta}>The text didn't change.</p>
             )}
           </>
         )}
