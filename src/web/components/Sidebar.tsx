@@ -75,7 +75,8 @@ export function Sidebar({
         ref={searchRef}
         className={field}
         type="search"
-        placeholder="Search…  (/)"
+        placeholder="Search…  (Ctrl+K)"
+        aria-keyshortcuts="Control+K Meta+K"
         value={q}
         onChange={(e) => onFilter(e.target.value)}
       />
