@@ -5,7 +5,7 @@ import { expect, test } from "bun:test";
 import {
   describeE2E,
   eventually,
-  holdNextList,
+  holdNext,
   LIST,
   openNote,
   poll,
@@ -21,7 +21,7 @@ describeE2E("a slow network", () => {
     await app.api.create({ body: "zeta two" });
     const page = await (await app.context()).newPage();
     // The first list (everything) is answered after the search's.
-    const first = await holdNextList(page);
+    const first = await holdNext(page);
     await page.goto("/");
     await first.started;
     await page.getByRole("searchbox").fill("zeta");
@@ -40,17 +40,18 @@ describeE2E("a slow network", () => {
     const body = page.getByPlaceholder("Write anything. Markdown welcome.");
     expect(await body.inputValue()).toBe("first draft");
 
-    // A refresh starts, and its answer (the note as it was) is slow to arrive.
-    const stale = await holdNextList(page);
+    // A refresh starts, and its answers (the note as it was) are slow to arrive.
+    const staleList = await holdNext(page);
+    const staleNote = await holdNext(page, new RegExp(`/api/notes/${note.id}$`));
     await poll(page);
-    await stale.started;
+    await Promise.all([staleList.started, staleNote.started]);
 
     await body.fill("second draft");
     await page.getByPlaceholder("Title").focus();
     await eventually(async () => expect((await app.api.get(note.id)).body).toBe("second draft"));
     await page.getByRole("status").filter({ hasText: "saved" }).waitFor();
 
-    await stale.release();
+    await Promise.all([staleList.release(), staleNote.release()]);
     await Bun.sleep(400);
     expect(await body.inputValue()).toBe("second draft");
   });

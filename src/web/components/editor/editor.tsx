@@ -1,7 +1,7 @@
 import { PinIcon, PinOffIcon, Trash2Icon } from "lucide-react";
 
 import { History } from "@/web/components/editor/history";
-import { removeNote, useEditor } from "@/web/hooks/editor.hook";
+import { removeNote, useEditor, useLiveOpenNote } from "@/web/hooks/editor.hook";
 import { bodyRef } from "@/web/hooks/focus";
 import { useUnsyncedIds } from "@/web/hooks/pending.hook";
 import { usePinOf, usePinToggle } from "@/web/hooks/pins.hook";
@@ -22,6 +22,7 @@ export function Editor({
   onToggleList: () => void;
 }) {
   const { draft, current, showHistory, saveState, saveError } = useEditor();
+  useLiveOpenNote();
   const pin = usePinOf()(current?.id);
   const togglePin = usePinToggle();
   // History and pins live on the server, so a note it hasn't seen yet has neither.
@@ -64,7 +65,7 @@ export function Editor({
           aria-pressed={pin.pinned}
           disabled={pin.disabled}
           title={pin.hint}
-          onClick={() => current && void togglePin(current)}
+          onClick={() => current && togglePin(current)}
         >
           {pin.pinned ? <PinOffIcon /> : <PinIcon />}
         </button>

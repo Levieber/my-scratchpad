@@ -1,7 +1,8 @@
 import { operatorValue } from "@/shared/query";
 import { NoteRow } from "@/web/components/notes/note-row";
-import { useNotes, usePins, useSearch } from "@/web/hooks/data.hook";
 import { useEditor } from "@/web/hooks/editor.hook";
+import { useNotes, usePins } from "@/web/hooks/notes.hook";
+import { useSearch } from "@/web/hooks/search.hook";
 import type { Note } from "@/web/lib/api";
 import { moreButton } from "@/web/lib/classes";
 import { groupNotes } from "@/web/lib/listing";
@@ -15,8 +16,8 @@ const heading =
  * aren't listed again below.
  */
 export function NoteList({ roomy }: { /** The list is the whole screen. */ roomy: boolean }) {
-  const { q, loadMore } = useSearch();
-  const { notes, canLoadMore } = useNotes();
+  const { q, asked, limit, loadMore } = useSearch();
+  const { notes, canLoadMore } = useNotes(asked, limit);
   const pinned = usePins();
   const currentId = useEditor().current?.id;
   const searching = q !== "";

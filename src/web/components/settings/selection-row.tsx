@@ -1,18 +1,20 @@
 import { XIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import type { HookSection } from "@/shared/domain";
-import { type HookName, scopeLocation } from "@/shared/hooks";
-import { refreshHooks } from "@/web/hooks/hooks-info.hook";
+import type { HookName } from "@/shared/hooks";
+import { useHookChoices, useHookSection } from "@/web/hooks/hooks-info.hook";
 import { useOnline } from "@/web/hooks/online.hook";
-import { api, type HookSelection, type HooksInfo } from "@/web/lib/api";
+import type { HookSelection, HooksInfo } from "@/web/lib/api";
 import { button, field, ghostButton, iconButton, primaryButton } from "@/web/lib/classes";
 import { refusal } from "@/web/lib/failures";
 import { scopeLabel } from "@/web/lib/hooks";
 import { ago } from "@/web/lib/listing";
 import { cn } from "@/web/lib/utils";
 
-/** What a hook shows in one place: the search and limit, and the notes they give. */
+/**
+ * What a hook shows in one place: the search and limit, and the notes they give. Keyed by what
+ * is stored, so a change (saved here or elsewhere) starts the form over from it.
+ */
 export function SelectionRow({
   hook,
   scope,
@@ -31,32 +33,14 @@ export function SelectionRow({
   const [limit, setLimit] = useState(initialLimit);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [shown, setShown] = useState<HookSection | null>(null);
-
-  // What is stored changed (saved here or elsewhere): the form and the preview follow it.
-  const version = stored?.updated_at ?? "default";
-  useEffect(() => {
-    setQuery(initialQuery);
-    setLimit(initialLimit);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version]);
-  useEffect(() => {
-    let live = true;
-    api
-      .hookNotes(hook, scopeLocation(scope))
-      .then((r) => live && setShown(r.sections.find((s) => s.scope === scope) ?? null))
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [hook, scope, version]);
+  const shown = useHookSection(hook, scope);
+  const choices = useHookChoices(hook);
 
   const act = async (change: () => Promise<unknown>) => {
     setBusy(true);
     setError("");
     try {
       await change();
-      await refreshHooks();
     } catch (e) {
       setError(refusal(e));
     } finally {
@@ -82,7 +66,7 @@ export function SelectionRow({
         onSubmit={(e) => {
           e.preventDefault();
           void act(() =>
-            api.saveHookSelection(hook, {
+            choices.save({
               scope,
               query: query.trim() || null,
               limit: Number(limit),
@@ -123,7 +107,7 @@ export function SelectionRow({
             type="button"
             className={button}
             disabled={!online || busy}
-            onClick={() => void act(() => api.deleteHookSelection(hook, scope))}
+            onClick={() => void act(() => choices.reset(scope))}
           >
             {scope ? "Remove" : "Reset to default"}
           </button>
@@ -151,7 +135,7 @@ export function SelectionRow({
                     className={cn(ghostButton, iconButton, "size-6 p-0")}
                     aria-label={`Stop hand-picking ${n.title}`}
                     disabled={!online || busy}
-                    onClick={() => void act(() => api.unpickHookNote(hook, n.id, scope))}
+                    onClick={() => void act(() => choices.unpick(n.id, scope))}
                   >
                     <XIcon />
                   </button>

@@ -3,8 +3,8 @@ import { ListFooter } from "@/web/components/notes/list-footer";
 import { NoteList } from "@/web/components/notes/note-list";
 import { TagChips } from "@/web/components/notes/tag-chips";
 import { SavedViews } from "@/web/components/views/saved-views";
-import { useSearch } from "@/web/hooks/data.hook";
 import { newNote, searchRef } from "@/web/hooks/focus";
+import { useSearch } from "@/web/hooks/search.hook";
 import { field, primaryButton } from "@/web/lib/classes";
 import { cn } from "@/web/lib/utils";
 

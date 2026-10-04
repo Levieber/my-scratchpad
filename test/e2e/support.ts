@@ -103,35 +103,36 @@ export function useApp(): App {
 export const LIST = /\/api\/notes\?/;
 
 /**
- * Holds the next list response: the server answers at once (so it is what the server had then),
- * and the page receives it only when `release` is called. Later requests go through.
+ * Holds the next response to a GET matching `url` (the list's, by default): the server answers at
+ * once (so it is what the server had then), and the page receives it only when `release` is
+ * called. Later requests go through.
  */
-export async function holdNextList(page: Page) {
+export async function holdNext(page: Page, url: RegExp = LIST) {
   let held: (() => Promise<void>) | null = null;
   let arrived!: () => void;
   const started = new Promise<void>((resolve) => (arrived = resolve));
   let taken = false;
   const handler = async (route: Route) => {
-    if (taken) return route.continue();
+    if (taken || route.request().method() !== "GET") return route.fallback();
     taken = true;
     const response = await route.fetch();
     held = () => route.fulfill({ response });
     arrived();
   };
-  await page.route(LIST, handler);
+  await page.route(url, handler);
   return {
     started,
     release: async () => {
       await started;
       await held!();
-      await page.unroute(LIST, handler);
+      await page.unroute(url, handler);
     },
   };
 }
 
-/** What the poll does every 5 s, now: the app refreshes when the page becomes visible. */
+/** What the poll does every 5 s, now: the app refreshes when the page becomes visible (the real event bubbles, and Query listens on window). */
 export const poll = (page: Page) =>
-  page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  page.evaluate(() => document.dispatchEvent(new Event("visibilitychange", { bubbles: true })));
 
 /** The note's row in the list. */
 export const row = (page: Page, title: string) =>

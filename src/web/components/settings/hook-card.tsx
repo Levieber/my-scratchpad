@@ -19,9 +19,21 @@ export function HookCard({ hook, name }: { hook: HooksInfo["hooks"][number]; nam
         <p className="text-sm text-muted-foreground">{hook.description}</p>
       </div>
       <ul className="flex flex-col gap-4">
-        <SelectionRow hook={name} scope="" stored={everywhere} info={hook} />
+        <SelectionRow
+          key={everywhere?.updated_at ?? "default"}
+          hook={name}
+          scope=""
+          stored={everywhere}
+          info={hook}
+        />
         {scoped.map((s) => (
-          <SelectionRow key={s.scope} hook={name} scope={s.scope} stored={s} info={hook} />
+          <SelectionRow
+            key={`${s.scope} ${s.updated_at}`}
+            hook={name}
+            scope={s.scope}
+            stored={s}
+            info={hook}
+          />
         ))}
       </ul>
       <AddScope hook={name} />

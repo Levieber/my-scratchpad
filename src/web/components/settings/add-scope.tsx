@@ -1,9 +1,8 @@
 import { useState } from "react";
 
 import { type HookName, normalizeScope } from "@/shared/hooks";
-import { refreshHooks } from "@/web/hooks/hooks-info.hook";
+import { useHookChoices } from "@/web/hooks/hooks-info.hook";
 import { useOnline } from "@/web/hooks/online.hook";
-import { api } from "@/web/lib/api";
 import { button, field } from "@/web/lib/classes";
 import { refusal } from "@/web/lib/failures";
 import { cn } from "@/web/lib/utils";
@@ -13,6 +12,7 @@ const addLabel = "flex flex-[1_1_12rem] flex-col gap-1 text-xs text-muted-foregr
 /** A choice for one more place: a repository, a folder in it, or a folder outside any. */
 export function AddScope({ hook }: { hook: HookName }) {
   const online = useOnline();
+  const choices = useHookChoices(hook);
   const [scope, setScope] = useState("");
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
@@ -30,11 +30,10 @@ export function AddScope({ hook }: { hook: HookName }) {
           return;
         }
         try {
-          await api.saveHookSelection(hook, { scope: normalized, query: query.trim() || null });
+          await choices.save({ scope: normalized, query: query.trim() || null });
           setScope("");
           setQuery("");
           setError("");
-          await refreshHooks();
         } catch (err) {
           setError(refusal(err));
         }

@@ -1,8 +1,11 @@
-import { useData, usePins } from "@/web/hooks/data.hook";
+import { useMutation } from "@tanstack/react-query";
+
+import { usePins } from "@/web/hooks/notes.hook";
 import { useUnsyncedIds } from "@/web/hooks/pending.hook";
 import { api, type Note } from "@/web/lib/api";
 import { handle } from "@/web/lib/failures";
 import { pinState } from "@/web/lib/pins";
+import { keys, queryClient } from "@/web/lib/queries";
 
 /** Whether a note can be pinned or unpinned right now (lib/pins.ts). */
 export function usePinOf() {
@@ -14,16 +17,23 @@ export function usePinOf() {
 
 /** Shown at once, then corrected by what the server says; a refusal puts the list back. */
 export function usePinToggle() {
-  const { setPins, refresh } = useData();
   const pinned = usePins();
-  return async (note: Note) => {
-    const unpin = pinned.some((n) => n.id === note.id);
-    setPins((p) => (unpin ? p.filter((n) => n.id !== note.id) : [...p, note]));
-    try {
-      await (unpin ? api.unpin(note.id) : api.pin(note.id));
-    } catch (e) {
+  const { mutate } = useMutation({
+    mutationFn: ({ note, unpin }: { note: Note; unpin: boolean }) =>
+      unpin ? api.unpin(note.id) : api.pin(note.id),
+    onMutate: async ({ note, unpin }) => {
+      await queryClient.cancelQueries({ queryKey: keys.pins });
+      const before = queryClient.getQueryData<Note[]>(keys.pins);
+      queryClient.setQueryData<Note[]>(keys.pins, (p = []) =>
+        unpin ? p.filter((n) => n.id !== note.id) : [...p, note],
+      );
+      return { before };
+    },
+    onError: (e, _, context) => {
+      queryClient.setQueryData(keys.pins, context?.before);
       handle(e);
-    }
-    await refresh();
-  };
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.pins }),
+  });
+  return (note: Note) => mutate({ note, unpin: pinned.some((n) => n.id === note.id) });
 }

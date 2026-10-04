@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { api, type FullRevision, type NoteDiff, Offline, type Revision } from "@/web/lib/api";
+import { loadRevision, useDiff, useRevisions } from "@/web/hooks/history.hook";
+import { type FullRevision, Offline } from "@/web/lib/api";
 import { button, outlineBadge } from "@/web/lib/classes";
 import { ago } from "@/web/lib/listing";
 import { cn } from "@/web/lib/utils";
@@ -47,49 +48,24 @@ export function History({
   noteId: string;
   onRestore: (revision: FullRevision) => void;
 }) {
-  const [revisions, setRevisions] = useState<Revision[] | null>(null);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [diff, setDiff] = useState<NoteDiff | null>(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let live = true;
-    api.revisions(noteId).then(
-      (r) => {
-        if (!live) return;
-        setRevisions(r);
-        setSelected(r[0]?.id ?? null);
-      },
-      (e) => live && setError(describe(e)),
-    );
-    return () => {
-      live = false;
-    };
-  }, [noteId]);
-
-  // Kept until the next one arrives; only shown while it is the selected revision's.
-  useEffect(() => {
-    if (selected === null) return;
-    let live = true;
-    api.diff(noteId, selected).then(
-      (d) => live && setDiff(d),
-      (e) => live && setError(describe(e)),
-    );
-    return () => {
-      live = false;
-    };
-  }, [noteId, selected]);
+  const { data: revisions, error: listError } = useRevisions(noteId);
+  // The latest revision until the person chooses another.
+  const [chosen, setChosen] = useState<number | null>(null);
+  const selected = chosen ?? revisions?.[0]?.id ?? null;
+  const { data: diff, error: diffError } = useDiff(noteId, selected);
+  const [restoreError, setRestoreError] = useState<unknown>(null);
 
   const restore = async () => {
     if (selected === null) return;
     try {
-      onRestore(await api.revision(noteId, selected));
+      onRestore(await loadRevision(noteId, selected));
     } catch (e) {
-      setError(describe(e));
+      setRestoreError(e);
     }
   };
 
-  if (error) return <p className={cn("flex-1", meta)}>{error}</p>;
+  const error = listError ?? diffError ?? restoreError;
+  if (error) return <p className={cn("flex-1", meta)}>{describe(error)}</p>;
   if (!revisions) return <p className={cn("flex-1", meta)}>Loading history…</p>;
 
   return (
@@ -104,7 +80,7 @@ export function History({
             <button
               className="block w-full rounded-card border border-transparent px-2.5 py-2 text-left hover:border-border hover:bg-card aria-current:border-border aria-current:bg-card"
               aria-current={r.id === selected}
-              onClick={() => setSelected(r.id)}
+              onClick={() => setChosen(r.id)}
             >
               <span className="block text-sm font-semibold">
                 {ago(r.updated_at)}

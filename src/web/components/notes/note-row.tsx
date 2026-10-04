@@ -14,7 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/web/components/ui/dropdown-menu";
-import { removeNote, useOpenNote } from "@/web/hooks/editor.hook";
+import { openNote, removeNote } from "@/web/hooks/editor.hook";
 import { useHookPicks } from "@/web/hooks/hooks-info.hook";
 import { usePinOf, usePinToggle } from "@/web/hooks/pins.hook";
 import type { Note } from "@/web/lib/api";
@@ -66,7 +66,6 @@ export function NoteRow({
   /** The list is the whole screen: previews get a line more. */
   roomy: boolean;
 }) {
-  const open = useOpenNote();
   const togglePin = usePinToggle();
   const picks = useHookPicks();
   const p = preview(n);
@@ -87,7 +86,7 @@ export function NoteRow({
       <button
         className="block min-w-0 flex-1 rounded-card p-2.5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
         aria-current={current}
-        onClick={() => void open(n.id)}
+        onClick={() => void openNote(n.id)}
       >
         <span className="line-clamp-2 font-semibold wrap-anywhere">{n.title}</span>
         {p && (
@@ -141,7 +140,7 @@ export function NoteRow({
           <EllipsisIcon className="size-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-44">
-          <DropdownMenuItem disabled={pin.disabled} onClick={() => void togglePin(n)}>
+          <DropdownMenuItem disabled={pin.disabled} onClick={() => togglePin(n)}>
             {pin.pinned ? <PinOffIcon /> : <PinIcon />}
             <span>
               {pin.pinned ? "Unpin" : "Pin"}
@@ -156,7 +155,7 @@ export function NoteRow({
               icon={<BotIcon />}
               pick="Show at session start"
               unpick="Stop showing at session start"
-              onToggle={() => void picks.toggle(n, "session-start")}
+              onToggle={() => picks.toggle(n, "session-start")}
             />
           )}
           {review && (
@@ -165,7 +164,7 @@ export function NoteRow({
               icon={<ClipboardCheckIcon />}
               pick="Use in reviews"
               unpick="Stop using in reviews"
-              onToggle={() => void picks.toggle(n, "review")}
+              onToggle={() => picks.toggle(n, "review")}
             />
           )}
           <DropdownMenuItem variant="destructive" onClick={() => removeNote(n)}>

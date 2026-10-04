@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import { useSearch, useViews } from "@/web/hooks/data.hook";
+import { useViews } from "@/web/hooks/notes.hook";
+import { useSearch } from "@/web/hooks/search.hook";
 import { useViewMutations } from "@/web/hooks/views.hook";
 import { field, moreButton } from "@/web/lib/classes";
 import { cn } from "@/web/lib/utils";
@@ -56,7 +57,7 @@ export function SavedViews() {
           <button
             className={cn(pillButton, "min-w-6 px-1")}
             aria-label={`Delete view ${v.name}`}
-            onClick={() => void remove(v)}
+            onClick={() => remove(v)}
           >
             ×
           </button>
