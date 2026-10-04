@@ -90,7 +90,7 @@ export const hookNotes = Effect.fnUntraced(function* (
   const applying: Omit<HookSection, "notes">[] = [
     ...stored
       .filter((s) => s.scope && scopeMatches(s.scope, at))
-      .toSorted((a, b) => bySpecificity(a.scope, b.scope))
+      .toSorted((a, b) => bySpecificity(at)(a.scope, b.scope))
       .map((s) => ({ ...s, source: "user" as const })),
     {
       scope: "",

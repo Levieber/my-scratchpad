@@ -78,13 +78,27 @@ describe("scopeMatches", () => {
 });
 
 describe("bySpecificity", () => {
-  test("the most specific scope comes first and everywhere comes last", () => {
-    const scopes = ["", "my-scratchpad", "/src/my-scratchpad/apps/web", "my-scratchpad/apps"];
-    expect(scopes.toSorted(bySpecificity)).toEqual([
-      "/src/my-scratchpad/apps/web",
-      "my-scratchpad/apps",
-      "my-scratchpad",
+  const inWork = { repo: "my-app", path: "src", dir: "/home/me/work/my-app/src" };
+
+  test("the place closest to where the agent works comes first, everywhere last", () => {
+    const scopes = ["", "my-app", "/home/me/work/my-app/src/deep", "my-app/src"];
+    expect(scopes.toSorted(bySpecificity(inWork))).toEqual([
+      "/home/me/work/my-app/src/deep",
+      "my-app/src",
+      "my-app",
       "",
+    ]);
+  });
+
+  test("a folder holding many projects is broader than any repository inside it", () => {
+    expect(["/home/me/work", "my-app"].toSorted(bySpecificity(inWork))).toEqual([
+      "my-app",
+      "/home/me/work",
+    ]);
+    // A folder inside the repository is narrower than the repository.
+    expect(["my-app", "/home/me/work/my-app/src"].toSorted(bySpecificity(inWork))).toEqual([
+      "/home/me/work/my-app/src",
+      "my-app",
     ]);
   });
 });

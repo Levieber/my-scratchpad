@@ -69,9 +69,21 @@ export function scopeMatches(scope: string, at: Location): boolean {
   return at.repo?.toLowerCase() === repo && within(path, segments(at.path));
 }
 
-/** Sorts scopes most specific first (the deepest folder), with everywhere last. */
-export const bySpecificity = (a: string, b: string) =>
-  segments(b).length - segments(a).length || a.localeCompare(b);
+/**
+ * Sorts scopes that apply at `at` most specific first, with everywhere last. Depth is measured
+ * in the folders on disk: a repository counts from where it is checked out, so a folder holding
+ * many projects (`/home/me/work`) is broader than a repository inside it, and a folder inside
+ * the repository is narrower.
+ */
+export const bySpecificity = (at: Location) => {
+  const repoDepth = Math.max(0, segments(at.dir).length - segments(at.path).length);
+  const depth = (scope: string) => {
+    if (!scope) return -1;
+    if (scope.startsWith("/")) return segments(scope).length;
+    return repoDepth + segments(scope).length - 1;
+  };
+  return (a: string, b: string) => depth(b) - depth(a) || a.localeCompare(b);
+};
 
 /** A place where `scope` (normalized) applies: what a client asks about to preview a selection. */
 export function scopeLocation(scope: string): Location {

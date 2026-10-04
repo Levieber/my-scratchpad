@@ -139,6 +139,23 @@ describe("hook selections", () => {
     ).toEqual(["/home/me/journal", ""]);
   });
 
+  test("a folder of projects applies to every project in it, after the project's own choice", async () => {
+    await note("work hours", { tags: ["work"] });
+    await note("app deploy steps", { tags: ["app"] });
+    await call("PUT", "/api/hooks/session-start", { scope: "/home/me/work", query: "#work" });
+    await call("PUT", "/api/hooks/session-start", { scope: "my-app", query: "#app" });
+
+    const inApp = "repo=my-app&path=src&dir=/home/me/work/my-app/src";
+    expect((await shown("session-start", inApp)).slice(0, 2)).toEqual([
+      ["my-app", ["app deploy steps"]],
+      ["/home/me/work", ["work hours"]],
+    ]);
+    // Any other project under the folder, in a repository or not, gets the folder's notes.
+    expect(
+      (await sections("session-start", "dir=/home/me/work/scripts/2026")).map((s) => s.scope),
+    ).toEqual(["/home/me/work", ""]);
+  });
+
   test("hand-picked notes come first, aren't cut by the limit, and vanish with their note", async () => {
     const old = await note("old checklist", { kind: "reference" });
     const extra = await note("extra rules", { kind: "reference" });

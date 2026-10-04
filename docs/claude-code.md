@@ -24,9 +24,9 @@ Each hook that reads notes shows a **selection**: a search in the language of th
 | _(empty)_                | everywhere                                                                                                                      |
 | `my-scratchpad`          | in that repository, named by its `origin` remote (else its folder), so the same on every machine and in every clone or worktree |
 | `my-scratchpad/apps/web` | in that folder of the repository, and below                                                                                     |
-| `/home/me/notes`         | in that folder outside any repository (one machine's path)                                                                      |
+| `/home/me/work`          | in that folder and every folder below it, repositories included: one choice for all the projects it holds (one machine's path)  |
 
-Where Claude works, a hook shows every selection that applies: the most specific first, then the one for everywhere (or the default), each as its own section, no note twice.
+Where Claude works, a hook shows every selection that applies: the closest to that folder first (a repository is narrower than a folder holding it, a folder inside the repository narrower still), then the one for everywhere (or the default), each as its own section, no note twice.
 
 ```sh
 pad hooks                                        # each hook's default, the stored choices, this machine's own search
