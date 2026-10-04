@@ -3,6 +3,9 @@ import { inflateSync } from "node:zlib";
 
 import { type TestServer, testServer } from "@test/support";
 
+import { contentSecurityPolicy } from "@/server/pages";
+import { PAGES } from "@/shared/pages";
+
 let server: TestServer;
 beforeAll(async () => {
   server = await testServer();
@@ -111,5 +114,50 @@ describe("PWA pages", () => {
       "text/html;charset=utf-8",
     ]);
     expect(await settings.text()).toBe(home);
+  });
+});
+
+describe("PWA Content-Security-Policy", () => {
+  const policy = async (path: string) => {
+    const header = (await get(path)).headers.get("content-security-policy") ?? "";
+    return Object.fromEntries(
+      header.split(";").map((d) => {
+        const [name = "", ...sources] = d.trim().split(/\s+/);
+        return [name, sources];
+      }),
+    );
+  };
+
+  test("every page is served under it: only this site's scripts, no plugins, no framing", async () => {
+    for (const path of Object.values(PAGES)) {
+      const csp = await policy(path);
+      expect([path, csp["script-src"]]).toEqual([path, ["'self'"]]);
+      expect(csp["object-src"]).toEqual(["'none'"]);
+      expect(csp["frame-ancestors"]).toEqual(["'none'"]);
+      expect(csp["connect-src"]).toEqual(["'self'"]);
+    }
+  });
+
+  test("what it must allow: the service worker, the manifest, the icons", async () => {
+    const csp = await policy("/");
+    expect(csp["worker-src"]).toEqual(["'self'"]);
+    expect(csp["manifest-src"]).toEqual(["'self'"]);
+    expect(csp["img-src"]).toContain("'self'");
+  });
+
+  test("the page needs nothing it forbids: no inline script, every script from this site", async () => {
+    const page = await (await get("/")).text();
+    const scripts = [...page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const [, attrs = "", body = ""] of scripts) {
+      expect(body.trim()).toBe("");
+      expect(/src="(\/[^/"][^"]*)"/.test(attrs)).toBe(true);
+    }
+  });
+
+  test("development allows the dev server's inline script and its WebSocket, production doesn't", () => {
+    expect(contentSecurityPolicy(true)).toContain("script-src 'self' 'unsafe-inline'");
+    expect(contentSecurityPolicy(true)).toContain("connect-src 'self' ws: wss:");
+    expect(contentSecurityPolicy(false)).toContain("script-src 'self';");
   });
 });
