@@ -152,8 +152,15 @@ describe("hover", () => {
     expect(variant).toContain("hover: hover");
     expect(variant).toContain("pointer: fine");
     expect(variant).toContain("min-width");
+    // A pseudo-element (`after:`, `before:`) is decoration, such as the tabs' underline, not
+    // content kept from a phone.
     const hidden = opacityClasses()
-      .filter(({ c }) => /(^|:)opacity-0$/.test(c) && !c.startsWith("desktop-mouse:"))
+      .filter(
+        ({ c }) =>
+          /(^|:)opacity-0$/.test(c) &&
+          !c.startsWith("desktop-mouse:") &&
+          !/(^|:)(after|before):/.test(c),
+      )
       .map(({ file, c }) => `${file}: ${c}`);
     expect(hidden).toEqual([]);
     expect(opacityClasses().some(({ c }) => c === "desktop-mouse:opacity-0")).toBe(true);

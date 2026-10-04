@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { progress } from "@/shared/checklist";
+import { progress, tasks } from "@/shared/checklist";
 
 describe("progress", () => {
   test("counts ticked and total checkboxes in any list style", () => {
@@ -19,5 +19,15 @@ describe("progress", () => {
 
   test("a note without checkboxes has none", () => {
     expect(progress("just text")).toEqual({ done: 0, total: 0 });
+  });
+});
+
+describe("tasks", () => {
+  test("each task's line, in order, skipping fences and empty placeholders", () => {
+    const body = "# Plan\n- [ ]\n- [x] one\n```\n- [ ] example\n```\n  - [ ] two";
+    expect(tasks(body)).toEqual([
+      { line: 2, done: true },
+      { line: 6, done: false },
+    ]);
   });
 });

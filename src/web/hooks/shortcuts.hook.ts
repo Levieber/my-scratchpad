@@ -7,8 +7,10 @@ import { session } from "@/web/lib/session";
 export function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Ctrl+K types nothing, so unlike "/" it works from inside a field too, the note being
-      // written included. Taken from the browser, whose own Ctrl+K searches the web.
+      // A field that used the key itself (the body: Ctrl+K makes a link there) has the last word.
+      if (e.defaultPrevented) return;
+      // Ctrl+K types nothing, so unlike "/" it works from inside a field too. Taken from the
+      // browser, whose own Ctrl+K searches the web.
       if (e.key.toLowerCase() === "k" && (e.ctrlKey || e.metaKey) && !e.altKey) {
         e.preventDefault();
         focusSearch();

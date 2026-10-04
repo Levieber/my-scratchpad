@@ -53,6 +53,7 @@ describeE2E("edits are never lost", () => {
     const note = await app.api.create({ body: "shared list\n- from the start" });
     const page = await app.open();
     await openNote(page, "shared list");
+    await page.getByRole("tab", { name: "Write" }).click();
 
     // The agent's append lands between the editor's read and its save.
     let appended = false;

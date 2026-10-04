@@ -7,6 +7,9 @@ import { baseOf, fieldsOf, type Outbox } from "@/web/lib/outbox";
 import { localNote } from "@/web/lib/pending";
 import { mergeFields, type Outcome, type SyncResult, type Syncer } from "@/web/lib/sync";
 
+/** How the body is shown: rendered, with boxes to tick, or as the markdown itself. */
+export type EditorMode = "read" | "write";
+
 export type EditorState = {
   /** Whether the editor is showing at all. */
   open: boolean;
@@ -17,6 +20,13 @@ export type EditorState = {
   saveState: SaveState;
   saveError: string;
   showHistory: boolean;
+  mode: EditorMode;
+  /**
+   * Counts the times the body was replaced from outside the editor (a newer copy from the server,
+   * a merge, a restored revision): an editor mode keeping its own copy of the body resets when
+   * it changes.
+   */
+  external: number;
 };
 
 type Deps = {
@@ -26,6 +36,8 @@ type Deps = {
   /** Called after each sync run: the app asks for a token, or refreshes what it shows. */
   onSynced?: (result: SyncResult) => void;
   autosaveMs?: number;
+  /** The mode an existing note opens in (a new one opens in Write), and where a choice is kept. */
+  modes?: { initial: () => EditorMode; chosen: (mode: EditorMode) => void };
 };
 
 export class EditorSession {
@@ -34,7 +46,14 @@ export class EditorSession {
    * waiting for a render. React gets a copy of it in the snapshot.
    */
   private latest = { current: null as Note | null, draft: emptyDraft, dirty: false };
-  private ui = { open: false, saveState: "" as SaveState, saveError: "", showHistory: false };
+  private ui = {
+    open: false,
+    saveState: "" as SaveState,
+    saveError: "",
+    showHistory: false,
+    mode: "write" as EditorMode,
+    external: 0,
+  };
   private snapshot: EditorState = this.state();
   private timer: ReturnType<typeof setTimeout> | undefined;
   private listeners = new Set<() => void>();
@@ -43,13 +62,15 @@ export class EditorSession {
   private newId: () => string;
   private onSynced: (result: SyncResult) => void;
   private autosaveMs: number;
+  private modes: NonNullable<Deps["modes"]>;
 
-  constructor({ outbox, syncer, newId, onSynced = () => {}, autosaveMs = 600 }: Deps) {
+  constructor({ outbox, syncer, newId, onSynced = () => {}, autosaveMs = 600, modes }: Deps) {
     this.outbox = outbox;
     this.syncer = syncer;
     this.newId = newId;
     this.onSynced = onSynced;
     this.autosaveMs = autosaveMs;
+    this.modes = modes ?? { initial: () => "read", chosen: () => {} };
     syncer.onSettled(this.settled);
   }
 
@@ -85,6 +106,7 @@ export class EditorSession {
         ? mergeFields(sent.fields, fromDraft(l.draft), note).fields
         : fieldsOf(note);
       l.draft = toDraft(next);
+      this.ui.external++;
     }
     l.current = note;
     if (!waiting)
@@ -127,6 +149,12 @@ export class EditorSession {
     this.emit();
   };
 
+  /** Read or Write; the choice is remembered for the next note opened. */
+  setMode = (mode: EditorMode) => {
+    this.modes.chosen(mode);
+    this.set({ mode });
+  };
+
   /** Leaving a note never waits for the network: the edit is safe in the outbox either way. */
   flush = () => {
     if (!this.latest.dirty) return;
@@ -165,6 +193,7 @@ export class EditorSession {
     this.latest.draft = draft;
     this.ui.showHistory = false;
     this.ui.open = true;
+    this.ui.mode = note ? this.modes.initial() : "write";
     this.emit();
   }
 
@@ -197,6 +226,7 @@ export class EditorSession {
 
   restore = (r: FullRevision) => {
     this.ui.showHistory = false;
+    this.ui.external++;
     this.edit({ title: r.title, body: r.body, tags: r.tags.join(", "), kind: r.kind });
   };
 
@@ -211,6 +241,7 @@ export class EditorSession {
     if (Date.parse(fresh.updated_at) <= Date.parse(current.updated_at)) return;
     this.latest.current = fresh;
     this.latest.draft = toDraft(fresh);
+    this.ui.external++;
     this.emit();
   };
 
