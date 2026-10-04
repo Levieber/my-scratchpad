@@ -9,10 +9,9 @@ import type * as Redacted from "effect/Redacted";
 
 import { ServerConfig } from "@/config/server";
 import { Store } from "@/server/storage/store";
-import { PAGES } from "@/shared/pages";
-import homepage from "@/web/index.html";
 
 import { logsLayer, requestLogging } from "./observability";
+import { pageRoutes } from "./pages";
 import { routes } from "./routes";
 
 type ServerOptions = {
@@ -40,8 +39,8 @@ export const serverLayer = ({
         // Served by Bun itself, ahead of the Effect router: Bun bundles the HTML import on the
         // fly in development (with HMR, and browser console logs streamed to the terminal); in
         // production it bundles once at startup. Every page's address serves it, so a reload or
-        // a bookmark opens that page.
-        routes: Object.fromEntries(Object.values(PAGES).map((path) => [path, homepage])),
+        // a bookmark opens that page, under the CSP (pages.ts).
+        routes: pageRoutes(development),
         development: development && { hmr: true, console: true },
       }),
     ),
