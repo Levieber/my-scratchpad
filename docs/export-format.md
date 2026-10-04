@@ -38,7 +38,9 @@ One JSON object:
       ]
     }
   ],
-  "views": [{ "id": "…", "name": "…", "query": "…", "created_at": "…" }],
+  "views": [
+    { "id": "…", "name": "…", "query": "…", "layout": "table", "options": {}, "created_at": "…" }
+  ],
   "pins": [{ "note_id": "…", "pinned_at": "…" }],
   "hook_selections": [
     {
@@ -57,6 +59,7 @@ One JSON object:
 - **Notes** carry everything a note has but `progress`, which is derived from the body on every read. Timestamps are what `toISOString()` writes.
 - **Revisions** are the note's history, **oldest first**. They are not given the database's own ids or the note's id: those mean nothing in another database, and the order of the list is the order of the history. `added` and `removed` (lines) may be left out; the importer counts them again.
 - **Authors** are display strings (`human`, `claude-code`), never accounts. An import keeps whatever the archive says, and writes as the sender where it says nothing, so an import can attribute a note to anyone. Identity is deliberately not part of the archive.
+- **Views** carry how they are shown: `layout` (null or left out: each device's own choice) and its `options` (see `src/shared/layouts.ts`), added to version 2 without a new version, since an older reader just leaves them out. A layout the importing server doesn't know is kept, as clients show it as the list; an option it can't read is left out alone.
 - **Pins** are in the order they were pinned. **Hook selections** are the notes each agent hook shows, per scope.
 - `GET /api/export?history=false` leaves `revisions` out. With the list's filters (`q`, `kind`, `author`, `tag`) it holds only the notes they match and the pins on those: views and hook selections are the user's own setup, not part of a subset, so they are `[]`.
 

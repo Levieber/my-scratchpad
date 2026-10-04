@@ -6,6 +6,7 @@ import * as Schema from "effect/Schema";
 
 import { ApiError } from "@/client/client";
 import { Kind } from "@/shared/domain";
+import { LAYOUT_KEYS } from "@/shared/layouts";
 
 const described = <S extends Schema.Top>(schema: S, description: string) =>
   schema.annotate({ description });
@@ -122,6 +123,34 @@ const Delete = tool(
   .annotate(Tool.Title, "Delete note")
   .annotate(Tool.Destructive, true);
 
+// Tool.make's default parameters: an empty Struct doesn't encode to the object schema MCP needs.
+const Views = Tool.make("scratchpad_views", {
+  description:
+    "The user's saved searches (views): each a name, the query it runs (pass it to scratchpad_search) and the layout the app shows it in.",
+  success: Schema.Unknown,
+  failure: ApiError,
+})
+  .annotate(Tool.Title, "Saved views")
+  .annotate(Tool.Readonly, true);
+
+const SaveView = tool(
+  "scratchpad_save_view",
+  "Save a search as a named view in the user's app. Only do this when the user asks.",
+  {
+    name: described(Schema.String, "Unique, ignoring case"),
+    query: described(
+      Schema.String,
+      "What goes in the search box: words plus `kind:`, `author:` and `#tag` operators",
+    ),
+    layout: Schema.optional(
+      described(
+        Schema.Literals(LAYOUT_KEYS),
+        `How the app shows it: ${LAYOUT_KEYS.join(", ")}; default: each device's own choice`,
+      ),
+    ),
+  },
+).annotate(Tool.Title, "Save view");
+
 // Read only: which notes an agent is shown is the user's choice (`pad hooks`, the PWA).
 const Hooks = tool(
   "scratchpad_hooks",
@@ -144,5 +173,7 @@ export const Scratchpad = Toolkit.make(
   History,
   Diff,
   Delete,
+  Views,
+  SaveView,
   Hooks,
 );

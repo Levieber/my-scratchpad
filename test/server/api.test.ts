@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import type { Note } from "@/shared/domain";
+import { LAYOUT_KEYS } from "@/shared/layouts";
 import { DIALECT, DIALECT_VERSION } from "@/shared/markdown";
 
 let server: TestServer | undefined;
@@ -170,6 +171,86 @@ describe("notes API", () => {
     }
     expect((await call("DELETE", `/api/views/${made.data.id}`)).status).toBe(204);
     expect((await call("GET", "/api/views")).data).toHaveLength(1);
+  });
+
+  test("a view saved without a layout leaves it to the device", async () => {
+    const made = await call("POST", "/api/views", { name: "Todo", query: "#todo" });
+    expect(made.data).toMatchObject({ layout: null, options: {} });
+  });
+
+  test("views keep options this server doesn't know, through creates and edits", async () => {
+    const made = await call("POST", "/api/views", {
+      name: "Work",
+      query: "#work",
+      layout: "table",
+      options: { sort: { by: "updated", desc: true, nulls: "last" }, groupBy: "status:" },
+    });
+    expect(made.status).toBe(201);
+    const path = `/api/views/${made.data.id}`;
+
+    // An older client changes only the name: nothing else is sent, so nothing else changes.
+    const renamed = await call("PATCH", path, { name: "Work items" });
+    expect(renamed.data).toMatchObject({
+      name: "Work items",
+      query: "#work",
+      layout: "table",
+      options: { sort: { by: "updated", desc: true, nulls: "last" }, groupBy: "status:" },
+    });
+
+    // Options merge (RFC 7396): sort.by changes, desc goes, what this server doesn't know stays.
+    const sorted = await call("PATCH", path, {
+      layout: "grid",
+      options: { sort: { by: "title", desc: null }, extra: 1 },
+    });
+    expect(sorted.data).toMatchObject({
+      layout: "grid",
+      options: { sort: { by: "title", nulls: "last" }, groupBy: "status:", extra: 1 },
+    });
+    const listed = (await call("GET", "/api/views")).data as { id: string }[];
+    expect(listed.find((v) => v.id === made.data.id)).toEqual(sorted.data);
+
+    const cleared = await call("PATCH", path, { layout: null, options: { extra: null } });
+    expect(cleared.data.layout).toBeNull();
+    expect(cleared.data.options).not.toHaveProperty("extra");
+  });
+
+  test("view edits refuse what no layout can show", async () => {
+    const { data: work } = await call("POST", "/api/views", { name: "Work", query: "#work" });
+    await call("POST", "/api/views", { name: "Home", query: "#home" });
+    const path = `/api/views/${work.id}`;
+    const cases: [string, string, unknown, number, string][] = [
+      ["POST", "/api/views", { name: "x", query: "x", layout: "calendar" }, 400, "invalidLayout"],
+      ["POST", "/api/views", { name: "x", query: "x", options: [] }, 400, "invalidViewOptions"],
+      [
+        "POST",
+        "/api/views",
+        { name: "x", query: "x", options: { sort: { by: "colour" } } },
+        400,
+        "invalidViewOptions",
+      ],
+      ["PATCH", path, { layout: 3 }, 400, "invalidLayout"],
+      ["PATCH", path, { options: { sort: "title" } }, 400, "invalidViewOptions"],
+      ["PATCH", path, { name: " " }, 400, "invalidBody"],
+      ["PATCH", path, { query: "" }, 400, "invalidBody"],
+      ["PATCH", path, [], 400, "invalidBody"],
+      ["PATCH", path, { name: "HOME" }, 409, "viewExists"],
+      ["PATCH", "/api/views/nope", { name: "y" }, 404, "viewNotFound"],
+    ];
+    for (const [method, path, body, status, code] of cases) {
+      const res = await call(method, path, body);
+      expect([method, body, res.status, res.data.error]).toEqual([method, body, status, code]);
+    }
+    // Only a case change of its own name: no other view has it.
+    expect((await call("PATCH", path, { name: "WORK" })).data.name).toBe("WORK");
+  });
+
+  test("the contract documents the view endpoints, layouts and errors", async () => {
+    const doc = (await call("GET", "/openapi.json")).data;
+    expect(Object.keys(doc.paths["/api/views/{id}"])).toEqual(["patch", "delete"]);
+    expect(doc.components.schemas.View.properties.layout.enum).toEqual([...LAYOUT_KEYS, null]);
+    expect(doc.components.schemas.Error.properties.error.enum).toEqual(
+      expect.arrayContaining(["invalidLayout", "invalidViewOptions"]),
+    );
   });
 
   test("pins: at most three, in the order pinned, without touching the note", async () => {

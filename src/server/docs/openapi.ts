@@ -2,6 +2,7 @@ import { ARCHIVE_FORMAT, ARCHIVE_VERSION } from "@/shared/archive";
 import { ERROR_CODES } from "@/shared/errors";
 import { HOOK_NAMES, MAX_INCLUDE } from "@/shared/hooks";
 import { KIND_NAMES, KINDS } from "@/shared/kinds";
+import { LAYOUT_KEYS, LAYOUTS_VERSION, TABLE_COLUMNS } from "@/shared/layouts";
 import { DIALECT } from "@/shared/markdown";
 import { MAX_PINS } from "@/shared/pins";
 
@@ -109,13 +110,36 @@ const Diff = {
   },
 };
 
+const layout = {
+  type: ["string", "null"],
+  enum: [...LAYOUT_KEYS, null],
+  description: `How the app shows the view's notes (layouts v${LAYOUTS_VERSION}); null leaves it to each device's preference. Read any other string as a layout from a newer server: show it as the list`,
+};
+
+const viewOptions = {
+  type: "object",
+  description:
+    "Each layout's options, in one object so a view keeps them while it shows another layout. Options this server doesn't know are kept as sent; known ones are checked",
+  properties: {
+    sort: {
+      type: "object",
+      description: "table: the column it is sorted by",
+      required: ["by"],
+      properties: { by: { type: "string", enum: TABLE_COLUMNS }, desc: { type: "boolean" } },
+    },
+  },
+  additionalProperties: true,
+};
+
 const View = {
   type: "object",
-  required: ["id", "name", "query", "created_at"],
+  required: ["id", "name", "query", "layout", "options", "created_at"],
   properties: {
     id: { type: "string" },
     name: { type: "string", description: "Unique, ignoring case" },
     query: { type: "string", description: "What goes in the search box, operators included" },
+    layout,
+    options: viewOptions,
     created_at: { type: "string", format: "date-time" },
   },
 };
@@ -561,19 +585,58 @@ export const openapi = {
               schema: {
                 type: "object",
                 required: ["name", "query"],
-                properties: { name: { type: "string" }, query: { type: "string" } },
+                properties: {
+                  name: { type: "string" },
+                  query: { type: "string" },
+                  layout,
+                  options: viewOptions,
+                },
               },
             },
           },
         },
         responses: {
           201: { description: "Created", ...json({ $ref: "#/components/schemas/View" }) },
-          400: error("Missing name or query"),
+          400: error("Missing name or query, an unknown layout, or options of the wrong shape"),
           409: error("A view with this name exists"),
         },
       },
     },
     "/api/views/{id}": {
+      patch: {
+        operationId: "updateView",
+        summary: "Change a view: send only the fields that change",
+        parameters: [idParam],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  query: { type: "string" },
+                  layout,
+                  options: {
+                    ...viewOptions,
+                    description:
+                      "A JSON Merge Patch (RFC 7396) on the view's options: keys merge, null removes one. Send only what changed, so options another client set survive",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "The view as changed",
+            ...json({ $ref: "#/components/schemas/View" }),
+          },
+          400: error("An empty name or query, an unknown layout, or options of the wrong shape"),
+          404: notFound,
+          409: error("Another view has this name"),
+        },
+      },
       delete: {
         operationId: "deleteView",
         summary: "Delete a saved search",

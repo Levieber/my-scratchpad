@@ -59,8 +59,10 @@ describe("MCP server", () => {
         "scratchpad_get",
         "scratchpad_history",
         "scratchpad_hooks",
+        "scratchpad_save_view",
         "scratchpad_search",
         "scratchpad_update",
+        "scratchpad_views",
       ].toSorted(),
     );
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
@@ -86,6 +88,19 @@ describe("MCP server", () => {
 
     const history = await call("scratchpad_history", { id: created.data.id });
     expect(history.data.map((r: { author: string }) => r.author)).toEqual(["claude-code"]);
+  });
+
+  test("saves a view with its layout, and lists it", async () => {
+    const saved = await call("scratchpad_save_view", {
+      name: "MCP table",
+      query: "#mcp",
+      layout: "table",
+    });
+    expect(saved.data).toMatchObject({ name: "MCP table", layout: "table", options: {} });
+    const views = await call("scratchpad_views", {});
+    expect(views.data.map((v: { name: string }) => v.name)).toContain("MCP table");
+    const unknown = await call("scratchpad_save_view", { name: "x", query: "x", layout: "nope" });
+    expect(unknown.isError).toBe(true);
   });
 
   test("scratchpad_hooks says what the hooks show in a folder, and why", async () => {

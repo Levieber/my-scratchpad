@@ -24,7 +24,6 @@ import {
   polled,
   readAppendText,
   readInput,
-  readJson,
   readListQuery,
   refuse,
   routeId,
@@ -34,6 +33,7 @@ import { noteDiff } from "./note-diff";
 import { pwaRoutes } from "./pwa";
 import { resourceWith } from "./resource";
 import { exportArchive, importArchive, importLimits } from "./transfer";
+import { readView } from "./views";
 
 /**
  * The API's routes, on the Store. With `token`, every route but the health check needs it;
@@ -129,23 +129,16 @@ export const routes = (
         resource("/api/views", {
           GET: polled(store.version, store.views),
           POST: Effect.gen(function* () {
-            const body = yield* readJson(yield* request);
-            const { name, query } = (body && typeof body === "object" ? body : {}) as Record<
-              string,
-              unknown
-            >;
-            if (
-              typeof name !== "string" ||
-              !name.trim() ||
-              typeof query !== "string" ||
-              !query.trim()
-            )
-              return yield* refuse("invalidBody", 400, "name and query must be non-empty strings");
-            return json(yield* store.createView(name.trim().slice(0, 64), query.trim()), 201);
+            const view = yield* readView(yield* request, { create: true });
+            return json(yield* store.createView(view), 201);
           }),
         }),
 
         resource("/api/views/:id", {
+          PATCH: Effect.gen(function* () {
+            const patch = yield* readView(yield* request, { create: false });
+            return json(yield* store.updateView(yield* routeId, patch));
+          }),
           DELETE: Effect.as(Effect.flatMap(routeId, store.deleteView), noContent),
         }),
 

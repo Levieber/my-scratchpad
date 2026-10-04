@@ -26,6 +26,11 @@ export class ViewNotFound extends Schema.TaggedError<ViewNotFound>()("ViewNotFou
 export class ViewExists extends Schema.TaggedError<ViewExists>()("ViewExists", {
   name: Schema.String,
 }) {}
+/** A view's options, as written or as an edit would leave them, that its layouts can't read. */
+export class InvalidViewOptions extends Schema.TaggedError<InvalidViewOptions>()(
+  "InvalidViewOptions",
+  { reason: Schema.String },
+) {}
 /** Pinning one more note would go past MAX_PINS. */
 export class PinLimit extends Schema.TaggedError<PinLimit>()("PinLimit", {
   max: Schema.Number,

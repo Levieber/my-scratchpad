@@ -133,6 +133,15 @@ export const MIGRATIONS: Migration[] = [
        )`,
     ],
   },
+  {
+    // How a view shows its notes (shared/layouts.ts). No layout means the device's preference,
+    // which is what views saved before this get. Options are a JSON object, kept as written.
+    id: "0010.view_layouts",
+    statements: [
+      "ALTER TABLE views ADD COLUMN layout TEXT",
+      "ALTER TABLE views ADD COLUMN options TEXT NOT NULL DEFAULT '{}'",
+    ],
+  },
 ];
 
 /**

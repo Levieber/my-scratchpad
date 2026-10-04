@@ -3,6 +3,7 @@
 import * as Schema from "effect/Schema";
 
 import { KIND_NAMES } from "./kinds";
+import { type Layout, TABLE_COLUMNS } from "./layouts";
 
 export const Kind = Schema.Literals(KIND_NAMES);
 
@@ -65,14 +66,62 @@ export const withoutBody = (full: FullRevision): Revision => {
   return revision;
 };
 
-/** A named search: `query` is what goes in the search box, operators included (shared/query.ts). */
+/**
+ * The options each layout (shared/layouts.ts) understands, all optional. They share one object on
+ * a view, so a view keeps a layout's options while it shows another; an option's name therefore
+ * means the same thing in every layout that declares it.
+ */
+export const LAYOUT_OPTIONS = {
+  list: {},
+  grid: {},
+  table: {
+    sort: Schema.optionalKey(
+      Schema.Struct({
+        by: Schema.Literals(TABLE_COLUMNS),
+        desc: Schema.optionalKey(Schema.Boolean),
+      }),
+    ),
+  },
+} satisfies Record<Layout, Schema.Struct.Fields>;
+
+/**
+ * A view's options as far as this version knows them. Only checks: options it doesn't know (a
+ * newer layout's, or a newer option) are kept as they came, never stripped.
+ */
+export const KnownViewOptions = Schema.Struct({
+  ...LAYOUT_OPTIONS.list,
+  ...LAYOUT_OPTIONS.grid,
+  ...LAYOUT_OPTIONS.table,
+});
+export type KnownViewOptions = typeof KnownViewOptions.Type;
+
+const ViewOptions = Schema.Record(Schema.String, Schema.Unknown);
+
+/**
+ * A named search and how to show it: `query` is what goes in the search box, operators included
+ * (shared/query.ts). `layout` is null when the view leaves it to the device's preference, and a
+ * string rather than a known layout because a newer app may have chosen one this version lacks.
+ */
 export const View = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   query: Schema.String,
+  layout: Schema.NullOr(Schema.String),
+  options: ViewOptions,
   created_at: Schema.String,
 });
 export type View = typeof View.Type;
+
+/** `PATCH /api/views/:id`: omitted fields are unchanged; `options` is a JSON Merge Patch. */
+export type ViewPatch = {
+  name?: string;
+  query?: string;
+  layout?: Layout | null;
+  options?: Record<string, unknown>;
+};
+
+/** `POST /api/views`: a name and a query, and optionally how to show it. */
+export type NewView = ViewPatch & { name: string; query: string };
 
 export type Tag = { tag: string; count: number };
 

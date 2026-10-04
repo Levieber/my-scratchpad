@@ -8,14 +8,27 @@ import type {
   Note,
   NoteDiff,
   NoteInput,
+  NewView,
   Revision,
   View,
+  ViewPatch,
 } from "@/shared/domain";
 import { readError } from "@/shared/errors";
 import type { Location } from "@/shared/hooks";
 import { exportPath } from "@/web/lib/transfer";
 
-export type { FullRevision, HookSelection, HooksInfo, Note, NoteDiff, NoteInput, Revision, View };
+export type {
+  FullRevision,
+  HookSelection,
+  HooksInfo,
+  NewView,
+  Note,
+  NoteDiff,
+  NoteInput,
+  Revision,
+  View,
+  ViewPatch,
+};
 export type Tag = { tag: string; count: number };
 
 export class Unauthorized extends Error {}
@@ -113,7 +126,9 @@ export const api = {
   delete: (id: string) => req<void>("DELETE", `/api/notes/${id}`),
   tags: () => req<Tag[]>("GET", "/api/tags"),
   views: () => req<View[]>("GET", "/api/views"),
-  createView: (name: string, query: string) => req<View>("POST", "/api/views", { name, query }),
+  createView: (view: NewView) => req<View>("POST", "/api/views", view),
+  /** Send only what changed: options merge into the view's, so others' survive. */
+  updateView: (id: string, patch: ViewPatch) => req<View>("PATCH", `/api/views/${id}`, patch),
   deleteView: (id: string) => req<void>("DELETE", `/api/views/${id}`),
   pins: () => req<Note[]>("GET", "/api/pins"),
   pin: (id: string) => req<void>("PUT", `/api/pins/${id}`),

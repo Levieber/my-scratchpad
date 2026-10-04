@@ -10,7 +10,7 @@ Each folder of `src/` is one responsibility, and what it may import is enforced 
 src/
   server.ts, cli.ts, mcp.ts   Entry points: `bun src/server.ts`, the `pad` executable, the MCP stdio server.
   shared/       Pure code every process uses, the PWA included. Imports no process, no node:/bun.
-    domain.ts     The API's shapes as Schemas (Note, NoteInput, Revision, View); every client shares the types.
+    domain.ts     The API's shapes as Schemas (Note, NoteInput, Revision, View and its layouts' options); every client shares the types.
     validation.ts The sentences for a note that didn't decode (the API's 400 and `pad import`).
     errors.ts     Error codes + messages.
     archive.ts    The export archive (docs/export-format.md): its schemas, versions, `parseArchive`; pure, so any client can read one.
@@ -22,6 +22,7 @@ src/
     ids.ts, title.ts   Note ids (the PWA mints them too, for notes written offline) and the title derived from a body.
     hooks.ts      The agent hooks that show notes (their defaults), and scopes: where a selection applies (everywhere, a repository, a folder).
     pages.ts      The PWA's pages and their addresses: the server serves the app at each, the app reads which one it is on.
+    layouts.ts    How a view shows its notes (list, grid, table…), declared once, additive only; the fallback for a layout a client doesn't know, and the merge patch a view's options are edited with. Each layout's options schema is `LAYOUT_OPTIONS` in domain.ts.
   server/       The HTTP API and the only code that touches the database.
     serve.ts      serverLayer and `main`: config, loopback/token check, BunHttpServer, JSON logs in production.
     routes.ts     The endpoints, one `resource` per path.
