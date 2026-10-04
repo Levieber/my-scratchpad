@@ -59,7 +59,7 @@ src/
     App.tsx       The state and effects that tie them together, and which page is open (it follows the address, shared/pages.ts); main.tsx mounts it.
 public/           Files that must live at the site root: service worker, manifest, icon.
 integrations/     Claude Code wiring: installer, hooks (run as `pad hook <name>`), skills.
-test/             Mirrors src/ (server/, shared/, cli/, client/, mcp/, web/, integrations/); support.ts has the fixtures: the production layers on an in-memory database, in a ManagedRuntime.
+test/             Mirrors src/ (server/, shared/, cli/, client/, mcp/, web/, integrations/), plus e2e/ (the PWA in a real browser); support.ts has the fixtures: the production layers on an in-memory database, in a ManagedRuntime.
 ```
 
 ## Boundaries, enforced
@@ -152,7 +152,7 @@ Tailwind v4, utilities on the elements themselves; menus and other components wi
 - Grid columns are `minmax(0, 1fr)`, never a bare `1fr`, which can't shrink below its content and pushes the page wider than the screen. Rows of controls wrap.
 - Tap targets are at least 24×24 CSS px (WCAG 2.2). `env(safe-area-inset-*)` keeps the app out of a notch and the home indicator.
 
-Measured in a browser at 320, 360 and 390 px, and at 150 % and 200 % text size on 320 px, in the list, the editor and the history: no horizontal scroll, no target under 24 px, no field under 16 px. Bun's dev server gives assets stable URLs, which the service worker's cache-first rule then serves stale: unregister it, or test against `NODE_ENV=production`, which hashes asset names.
+`test/e2e/layout.test.ts` measures the rendered page at 320, 390 and 1280 px, in the list, a menu, the editor, the history and Settings: no horizontal scroll, no target under 24 px, no field under 16 px; and goes from the list to the editor to deleting a note with the keyboard alone. Text size at 150 % and 200 % on 320 px is still a manual check. Bun's dev server gives assets stable URLs, which the service worker's cache-first rule then serves stale: unregister it, or test against `NODE_ENV=production`, which hashes asset names.
 
 ## Tooling
 
@@ -160,4 +160,5 @@ Measured in a browser at 320, 360 and 390 px, and at 150 % and 200 % text size o
 - Change a lint rule with a scoped override and a comment giving the reason.
 - `bunfig.toml`: dependencies are added with exact versions, and packages published less than a day ago are refused (`minimumReleaseAge`).
 - `repos/` vendors upstream source for reference (Effect): `bun test` runs only `test/`, and every linter ignores it (oxlint also with `--disable-nested-config`, as `repos/effect` brings its own config).
+- `test/e2e/` drives the PWA in a real browser: `playwright-core` (no Node runner, no browser download) launches the Chrome already installed, from `bun:test`, against `testServer()`. It covers what a fake DOM can't: going offline, a tab closed mid-edit (`beforeunload`), answers arriving late or out of order (`page.route`), real layout. With no Chrome found (`CHROME`, or `google-chrome`/`chromium` on the PATH) those tests are skipped, not failed. The logic itself stays tested as plain classes and functions in `test/web/`.
 - Tests build the production layers with `test/support.ts` (`testServer`, `testStore` with a `TestClock`) and run effects through the fixture's `run`.
