@@ -190,6 +190,28 @@ const noteResponse = (description: string) => ({
   },
   ...json({ $ref: "#/components/schemas/Note" }),
 });
+// The collections a client polls answer 304 to the ETag it already holds.
+const ifNoneMatch = {
+  name: "If-None-Match",
+  in: "header",
+  schema: { type: "string" },
+  description:
+    "The ETag of the last answer: if nothing was written since, the answer is 304 with no body",
+};
+const polledResponses = (description: string, schema: object) => ({
+  200: {
+    description,
+    headers: {
+      ETag: {
+        description:
+          "Changes whenever anything is written, not only this collection; send it back in If-None-Match",
+        schema: { type: "string" },
+      },
+    },
+    ...json(schema),
+  },
+  304: { description: "Nothing was written since the ETag in If-None-Match" },
+});
 const error = (description: string) => ({
   description,
   ...json({ $ref: "#/components/schemas/Error" }),
@@ -256,13 +278,12 @@ export const openapi = {
           },
           { name: "limit", in: "query", schema: { type: "integer", default: 50, maximum: 500 } },
           { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
+          ifNoneMatch,
         ],
-        responses: {
-          200: {
-            description: "Notes",
-            ...json({ type: "array", items: { $ref: "#/components/schemas/Note" } }),
-          },
-        },
+        responses: polledResponses("Notes", {
+          type: "array",
+          items: { $ref: "#/components/schemas/Note" },
+        }),
       },
       post: {
         operationId: "createNote",
@@ -404,30 +425,25 @@ export const openapi = {
       get: {
         operationId: "listTags",
         summary: "All tags with usage counts",
-        responses: {
-          200: {
-            description: "Tags",
-            ...json({
-              type: "array",
-              items: {
-                type: "object",
-                properties: { tag: { type: "string" }, count: { type: "integer" } },
-              },
-            }),
+        parameters: [ifNoneMatch],
+        responses: polledResponses("Tags", {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { tag: { type: "string" }, count: { type: "integer" } },
           },
-        },
+        }),
       },
     },
     "/api/views": {
       get: {
         operationId: "listViews",
         summary: "Saved searches, by name",
-        responses: {
-          200: {
-            description: "Views",
-            ...json({ type: "array", items: { $ref: "#/components/schemas/View" } }),
-          },
-        },
+        parameters: [ifNoneMatch],
+        responses: polledResponses("Views", {
+          type: "array",
+          items: { $ref: "#/components/schemas/View" },
+        }),
       },
       post: {
         operationId: "createView",
@@ -463,12 +479,11 @@ export const openapi = {
       get: {
         operationId: "listPins",
         summary: `The pinned notes (at most ${MAX_PINS}), in the order they were pinned`,
-        responses: {
-          200: {
-            description: "Pinned notes",
-            ...json({ type: "array", items: { $ref: "#/components/schemas/Note" } }),
-          },
-        },
+        parameters: [ifNoneMatch],
+        responses: polledResponses("Pinned notes", {
+          type: "array",
+          items: { $ref: "#/components/schemas/Note" },
+        }),
       },
     },
     "/api/pins/{id}": {
