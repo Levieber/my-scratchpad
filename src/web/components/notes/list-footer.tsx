@@ -1,4 +1,5 @@
 import { PAGES } from "@/shared/pages";
+import { Button } from "@/web/components/ui/button";
 import { useOnline } from "@/web/hooks/online.hook";
 import { go } from "@/web/hooks/page.hook";
 import { usePending } from "@/web/hooks/pending.hook";
@@ -28,14 +29,15 @@ export function ListFooter() {
       <span className="flex gap-1">
         {canExport && (
           // What the list shows, as a file: the search in force, or everything without one.
-          <button
-            type="button"
-            className="inline-flex min-h-6 min-w-6 items-center px-1 underline disabled:cursor-not-allowed disabled:no-underline"
+          <Button
+            variant="link"
+            size="xs"
+            className="px-1 font-normal text-muted-foreground underline"
             disabled={!online || exporting}
             onClick={() => exportNotes(asked, true)}
           >
             {asked.trim() ? "Export these" : "Export all"}
-          </button>
+          </Button>
         )}
         {/* A real link, so it opens in a new tab too; a plain click stays in the app. */}
         <a
