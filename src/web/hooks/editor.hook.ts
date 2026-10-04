@@ -9,6 +9,7 @@ import { handle } from "@/web/lib/failures";
 import { keys, POLL_MS, queryClient } from "@/web/lib/queries";
 import { session } from "@/web/lib/session";
 import { outbox } from "@/web/lib/storage";
+import { Store } from "@/web/lib/store";
 import { localNote } from "@/web/lib/sync";
 
 /** The open note and its form, as the editor session has them (lib/editor-session.ts). */
@@ -33,11 +34,17 @@ export const openNote = (id: string) =>
     })
     .catch(handle);
 
-/** Deletes a note from the list, or the open one (which may be a new note never saved). */
+/** The note waiting for the person to confirm its deletion (delete-dialog.tsx). */
+export const deleting = new Store<Note | null>(null);
+
+/**
+ * Deletes a note from the list, or the open one, once the person confirms. A new note never
+ * saved has nothing to lose: it goes at once.
+ */
 export function removeNote(note?: Note) {
   const target = note ?? session.getSnapshot().current;
-  if (target && !confirm(`Delete "${target.title}"?`)) return;
-  session.remove(target ?? undefined);
+  if (target) deleting.set(target);
+  else session.remove();
 }
 
 /**

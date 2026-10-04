@@ -5,17 +5,19 @@ import { join } from "node:path";
 import { ROOT } from "@test/support";
 import tailwind from "bun-plugin-tailwind";
 
-// What a phone and its owner's settings need from the styling. Measuring the rendered layout
-// (overflow at 320 px, tap target sizes) takes a browser; these are the rules that keep that
-// measurement passing, checked on the CSS the page actually gets (Tailwind compiled from the
-// components) and on the class lists of the components themselves.
+// What a phone and its owner's settings need from the styling, checked on the CSS the page
+// actually gets (Tailwind compiled from the components) and on the class lists of the components
+// themselves, shadcn's (components/ui/) included: its variants are where most controls get their
+// size. test/e2e/layout.test.ts measures the rendered page in a browser.
 const WEB = join(ROOT, "src/web");
 const html = readFileSync(join(WEB, "index.html"), "utf8");
 
-/** Every .tsx and .ts file of the PWA, by path, except shadcn's (components/ui/). */
+/** Every .tsx and .ts file of the PWA, by path. */
 const sources = readdirSync(WEB, { recursive: true, encoding: "utf8" })
-  .filter((f) => /\.tsx?$/.test(f) && !f.startsWith(join("components", "ui")))
+  .filter((f) => /\.tsx?$/.test(f))
   .map((f) => ({ file: f, text: readFileSync(join(WEB, f), "utf8") }));
+
+const source = (file: string) => sources.find((s) => s.file === file)?.text ?? "";
 
 let css = "";
 beforeAll(async () => {
@@ -64,17 +66,18 @@ describe("text size", () => {
         r.declarations["font-size"],
     );
     expect(base?.declarations["font-size"]).toBe("max(1rem, 1em)");
-    // No field, nor the class list they share (`field` in lib/classes.ts), sets a smaller size.
-    const small = /(^|[\s"])text-(xs|sm|\[0?\.\d+rem\]|\[\d+px\])(?=[\s"]|$)/;
+    // No field sets a smaller size, at any breakpoint: neither shadcn's Input and Textarea (whose
+    // own classes shrink them from `md:`) nor any use of them.
+    // (`file:` styles the file picker's button, not what is typed.)
+    const small =
+      /(^|[\s"])(?!file:)([\w[\]=-]+:)*text-(xs|sm|\[0?\.\d+rem\]|\[\d+px\])(?=[\s"]|$)/;
     const fields = sources.flatMap(({ file, text }) =>
-      [...text.matchAll(/<(input|textarea)\b[\s\S]*?\/>/g)].map(([el]) => ({ file, el })),
+      [...text.matchAll(/<(input|textarea|Input|Textarea|InputPrimitive)\b[\s\S]*?\/>/g)].map(
+        ([el]) => ({ file, el }),
+      ),
     );
-    expect(fields.length).toBeGreaterThan(0);
-    const shared = /export const field =\s*"([^"]*)"/.exec(
-      sources.find((s) => s.file.endsWith("classes.ts"))?.text ?? "",
-    )?.[1];
-    expect(shared).toBeDefined();
-    expect(small.test(shared ?? "")).toBe(false);
+    for (const ui of ["input.tsx", "textarea.tsx"])
+      expect(fields.some(({ file }) => file === join("components", "ui", ui))).toBe(true);
     expect(fields.filter(({ el }) => small.test(el)).map(({ file }) => file)).toEqual([]);
   });
 
@@ -82,6 +85,50 @@ describe("text size", () => {
     const viewport = /<meta name="viewport" content="([^"]*)"/.exec(html)?.[1] ?? "";
     expect(viewport).toContain("width=device-width");
     expect(viewport).not.toMatch(/maximum-scale|user-scalable/);
+  });
+});
+
+/** Tailwind's spacing scale: `h-6` is 6 x 0.25rem = 24 px. */
+const px = (n: string) => Number(n) * 4;
+
+/** The height a class list gives (`h-N`, `size-N`, `min-h-N`), in px; 0 when it sets none. */
+const height = (classes: string) =>
+  Math.max(
+    0,
+    ...[...classes.matchAll(/(?:^|\s)(?:h|size|min-h)-(\d+(?:\.\d+)?)(?=\s|$)/g)].map(
+      ([, n = ""]) => px(n),
+    ),
+  );
+
+describe("tap targets (WCAG 2.2: 24 x 24 px)", () => {
+  // Each `size` of a shadcn control, as its cva lists it.
+  const sizes = (file: string) => {
+    const block = /size:\s*\{([\s\S]*?)\n\s{6}\},/.exec(source(file))?.[1] ?? "";
+    return [...block.matchAll(/^\s*"?([\w-]+)"?:\s*"([^"]*)"/gm)].map(
+      ([, name = "", classes = ""]) => ({
+        name,
+        classes,
+      }),
+    );
+  };
+
+  for (const file of [
+    join("components", "ui", "button.tsx"),
+    join("components", "ui", "toggle.tsx"),
+  ])
+    test(`every size of ${file} is at least 24 px tall`, () => {
+      const all = sizes(file);
+      expect(all.length).toBeGreaterThan(2);
+      expect(all.filter(({ classes }) => height(classes) < 24).map(({ name }) => name)).toEqual([]);
+    });
+
+  test("no Button, Toggle or toggle group item is made smaller where it is used", () => {
+    const shrunk = sources.flatMap(({ file, text }) =>
+      [...text.matchAll(/<(Button|Toggle|ToggleGroupItem)\b(?:[^<>]|=>)*?className="([^"]*)"/g)]
+        .filter(([, , classes = ""]) => height(classes) > 0 && height(classes) < 24)
+        .map(([, el, classes]) => `${file}: <${el} className="${classes}">`),
+    );
+    expect(shrunk).toEqual([]);
   });
 });
 

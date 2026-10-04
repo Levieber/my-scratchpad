@@ -66,6 +66,12 @@ describeE2E("layout", () => {
       await page.getByPlaceholder("Title").waitFor();
       screens.editor = await violations(page);
 
+      await page.getByRole("button", { name: "Delete" }).click();
+      await page.getByRole("alertdialog").waitFor();
+      screens["delete dialog"] = await violations(page);
+      await page.getByRole("button", { name: "Cancel" }).click();
+      await page.getByRole("alertdialog").waitFor({ state: "detached" });
+
       await page.getByRole("button", { name: "History" }).click();
       await page.getByRole("region", { name: "History" }).waitFor();
       screens.history = await violations(page);
@@ -80,6 +86,7 @@ describeE2E("layout", () => {
         "naming a view": [],
         menu: [],
         editor: [],
+        "delete dialog": [],
         history: [],
         settings: [],
       });
@@ -110,7 +117,13 @@ describeE2E("layout", () => {
     );
 
     await tabTo((name) => name === "Delete");
-    page.once("dialog", (dialog) => void dialog.accept());
+    await page.keyboard.press("Enter");
+    // A dialog of the page (not the browser's confirm): focus moves into it and stays there.
+    const dialog = page.getByRole("alertdialog");
+    await dialog.waitFor();
+    expect(await dialog.evaluate((d) => d.contains(document.activeElement))).toBe(true);
+    await tabTo((name) => name === "Delete");
+    expect(await dialog.evaluate((d) => d.contains(document.activeElement))).toBe(true);
     await page.keyboard.press("Enter");
     await page.getByPlaceholder("Title").waitFor({ state: "detached" });
     await eventually(() => expect(app.api.get(note.id)).rejects.toThrow(/404/));

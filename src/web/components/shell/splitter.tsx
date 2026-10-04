@@ -1,7 +1,8 @@
 import { clampWidth, MAX_WIDTH, MIN_WIDTH } from "@/web/lib/storage";
 
-// WAI-ARIA's window splitter is a focusable separator carrying a value, so keyboard and screen
-// reader users can resize the list too; jsx-a11y treats every separator as non-interactive.
+// WAI-ARIA's window splitter is a focusable separator (an <hr>'s own role) carrying a value, so
+// keyboard and screen reader users can resize the list too; jsx-a11y treats every separator as
+// non-interactive.
 /* oxlint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */
 export function Splitter({
   width,
@@ -22,11 +23,17 @@ export function Splitter({
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", up);
   };
+  // Arrows move it a step; Home and End to either end (WAI-ARIA window splitter).
   const key = (e: React.KeyboardEvent) => {
-    const step = { ArrowLeft: -20, ArrowRight: 20 }[e.key];
-    if (step) {
+    const next = {
+      ArrowLeft: width - 20,
+      ArrowRight: width + 20,
+      Home: MIN_WIDTH,
+      End: MAX_WIDTH,
+    }[e.key];
+    if (next !== undefined) {
       e.preventDefault();
-      onChange(clampWidth(width + step));
+      onChange(clampWidth(next));
     }
   };
   return (

@@ -4,7 +4,6 @@ import { Editor } from "@/web/components/editor/editor";
 import { Sidebar } from "@/web/components/notes/sidebar";
 import { Settings } from "@/web/components/settings/settings";
 import { Splitter } from "@/web/components/shell/splitter";
-import { TokenDialog } from "@/web/components/shell/token-dialog";
 import { useBackgroundSync } from "@/web/hooks/background-sync.hook";
 import { useEditor } from "@/web/hooks/editor.hook";
 import { usePage } from "@/web/hooks/page.hook";
@@ -43,7 +42,6 @@ export function Shell() {
           )}
         </>
       )}
-      <TokenDialog />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 
+import { Badge } from "@/web/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +19,6 @@ import { openNote, removeNote } from "@/web/hooks/editor.hook";
 import { useHookPicks } from "@/web/hooks/hooks-info.hook";
 import { usePinOf, usePinToggle } from "@/web/hooks/pins.hook";
 import type { Note } from "@/web/lib/api";
-import { badge, outlineBadge } from "@/web/lib/classes";
 import type { PickState } from "@/web/lib/hooks";
 import { ago, preview } from "@/web/lib/listing";
 import { cn } from "@/web/lib/utils";
@@ -124,9 +124,18 @@ export function NoteRow({
           )}
           {ago(n.updated_at)}
           {n.kind === "reference" && kind !== "reference" && (
-            <span className={outlineBadge}>reference</span>
+            <Badge
+              variant="outline"
+              className="ml-1.5 h-4 px-1.5 text-[0.6875rem] text-muted-foreground"
+            >
+              reference
+            </Badge>
           )}
-          {n.author !== "human" && <span className={badge}>{n.author}</span>}
+          {n.author !== "human" && (
+            <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[0.6875rem]">
+              {n.author}
+            </Badge>
+          )}
           {n.tags.length > 0 && <span> · #{n.tags.join(" #")}</span>}
         </span>
       </button>

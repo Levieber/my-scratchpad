@@ -63,3 +63,7 @@ export function visibleTags(tags: Tag[], selected: string[], limit: number): Tag
   const top = tags.slice(0, limit);
   return [...top, ...tags.slice(limit).filter((t) => selected.includes(t.tag))];
 }
+
+/** The one value a toggle group's change pressed or released: in one list and not the other. */
+export const toggled = <T>(before: readonly T[], after: readonly T[]): T | undefined =>
+  after.find((v) => !before.includes(v)) ?? before.find((v) => !after.includes(v));
