@@ -8,10 +8,10 @@ import { App } from "./App";
 for (const [rel, href] of [
   ["manifest", "/manifest.webmanifest"],
   ["icon", "/icon.svg"],
-]) {
+] as const) {
   const link = document.createElement("link");
-  link.rel = rel!;
-  link.href = href!;
+  link.rel = rel;
+  link.href = href;
   document.head.append(link);
 }
 

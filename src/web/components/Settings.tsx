@@ -44,7 +44,7 @@ export function Settings({
   }, []);
 
   return (
-    <main className="mx-auto flex min-h-0 w-full max-w-[820px] flex-col gap-4 overflow-y-auto px-5 py-3.5 max-wide:px-4 max-wide:py-3">
+    <main className="mx-auto flex min-h-0 w-full max-w-205 flex-col gap-4 overflow-y-auto px-5 py-3.5 max-wide:px-4 max-wide:py-3">
       <header className="flex items-center gap-2">
         <button className={ghostButton} aria-label="Back to notes" onClick={onBack}>
           ←
@@ -335,7 +335,7 @@ function AddScope({ hook, online, onChanged, onError }: Shared & { hook: HookNam
           onChange={(e) => setQuery(e.target.value)}
         />
       </label>
-      <button className={button} disabled={!online || !scope.trim()}>
+      <button className={cn(button, "h-10.5")} disabled={!online || !scope.trim()}>
         Add
       </button>
       {error && (

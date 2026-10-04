@@ -102,7 +102,7 @@ export function History({
         {revisions.map((r, i) => (
           <li key={r.id}>
             <button
-              className="block w-full rounded-card border border-transparent px-2.5 py-2 text-left hover:border-border hover:bg-card aria-[current=true]:border-border aria-[current=true]:bg-card"
+              className="block w-full rounded-card border border-transparent px-2.5 py-2 text-left hover:border-border hover:bg-card aria-current:border-border aria-current:bg-card"
               aria-current={r.id === selected}
               onClick={() => setSelected(r.id)}
             >
