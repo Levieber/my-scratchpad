@@ -1,5 +1,5 @@
 import { XIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { HookSection } from "@/shared/domain";
 import { type HookName, isHookName, normalizeScope, scopeLocation } from "@/shared/hooks";
@@ -31,13 +31,31 @@ export function Settings({
   onBack,
   ...shared
 }: Shared & { info: HooksInfo | null; supported: boolean; onBack: () => void }) {
+  // A page of its own: its title names it, and focus lands on its heading, so a screen reader
+  // announces where the person arrived.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const before = document.title;
+    document.title = `Settings · ${before}`;
+    headingRef.current?.focus();
+    return () => {
+      document.title = before;
+    };
+  }, []);
+
   return (
     <main className="mx-auto flex min-h-0 w-full max-w-[820px] flex-col gap-4 overflow-y-auto px-5 py-3.5 max-wide:px-4 max-wide:py-3">
       <header className="flex items-center gap-2">
         <button className={ghostButton} aria-label="Back to notes" onClick={onBack}>
           ←
         </button>
-        <h1 className="flex-1 text-[1.0625rem] font-bold tracking-[-0.01em]">Settings</h1>
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          className="flex-1 text-[1.0625rem] font-bold tracking-[-0.01em] outline-none"
+        >
+          Settings
+        </h1>
       </header>
 
       <section aria-labelledby="agents-heading" className="flex flex-col gap-3">
@@ -186,15 +204,19 @@ function SelectionRow({
           );
         }}
       >
-        <input
-          className={cn(field, "flex-[1_1_14rem]")}
-          aria-label={`Search for ${label}`}
-          aria-describedby={error ? errorId : undefined}
-          placeholder="hand-picked notes only"
-          value={query}
-          disabled={!online}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+        {/* Visible "Search" leads the name; the place, hidden, tells the rows apart. */}
+        <label className="flex flex-[1_1_16rem] items-center gap-1.5 text-sm text-muted-foreground">
+          Search<span className="sr-only"> for {label}</span>
+          <input
+            className={cn(field, "min-w-0 flex-1 text-foreground")}
+            aria-describedby={error ? errorId : undefined}
+            aria-invalid={Boolean(error)}
+            placeholder="hand-picked notes only"
+            value={query}
+            disabled={!online}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>
         <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
           Limit
           <input
@@ -257,6 +279,8 @@ function SelectionRow({
   );
 }
 
+const addLabel = "flex flex-[1_1_12rem] flex-col gap-1 text-xs text-muted-foreground";
+
 /** A choice for one more place: a repository, a folder in it, or a folder outside any. */
 function AddScope({ hook, online, onChanged, onError }: Shared & { hook: HookName }) {
   const [scope, setScope] = useState("");
@@ -266,7 +290,7 @@ function AddScope({ hook, online, onChanged, onError }: Shared & { hook: HookNam
 
   return (
     <form
-      className="flex flex-wrap items-center gap-2 border-t border-border pt-3"
+      className="flex flex-wrap items-end gap-2 border-t border-border pt-3"
       aria-label={`Choose notes for a repository or folder (${hook})`}
       onSubmit={async (e) => {
         e.preventDefault();
@@ -286,27 +310,31 @@ function AddScope({ hook, online, onChanged, onError }: Shared & { hook: HookNam
         }
       }}
     >
-      <input
-        className={cn(field, "flex-[1_1_12rem]")}
-        aria-label="Repository or folder"
-        aria-describedby={error ? errorId : undefined}
-        aria-invalid={Boolean(error)}
-        placeholder="my-repo, my-repo/folder or /absolute/folder"
-        value={scope}
-        disabled={!online}
-        onChange={(e) => {
-          setError("");
-          setScope(e.target.value);
-        }}
-      />
-      <input
-        className={cn(field, "flex-[1_1_12rem]")}
-        aria-label="Search for it"
-        placeholder="search, e.g. #my-repo"
-        value={query}
-        disabled={!online}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      <label className={addLabel}>
+        Repository or folder
+        <input
+          className={cn(field, "text-base text-foreground")}
+          aria-describedby={error ? errorId : undefined}
+          aria-invalid={Boolean(error)}
+          placeholder="my-repo, my-repo/folder or /absolute/folder"
+          value={scope}
+          disabled={!online}
+          onChange={(e) => {
+            setError("");
+            setScope(e.target.value);
+          }}
+        />
+      </label>
+      <label className={addLabel}>
+        Search
+        <input
+          className={cn(field, "text-base text-foreground")}
+          placeholder="e.g. #my-repo"
+          value={query}
+          disabled={!online}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </label>
       <button className={button} disabled={!online || !scope.trim()}>
         Add
       </button>
