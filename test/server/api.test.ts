@@ -524,6 +524,14 @@ describe("conditional reads of the polled collections", () => {
       ["/api/tags", () => call("PATCH", `/api/notes/${created.id}`, { tags: ["b"] })],
       ["/api/pins", () => call("PUT", `/api/pins/${created.id}`)],
       ["/api/views", () => call("POST", "/api/views", { name: "mine", query: "#b" })],
+      // Editing a view writes no new row, and a poll must still see the new layout.
+      [
+        "/api/views",
+        async () => {
+          const [view] = (await call("GET", "/api/views")).data as { id: string }[];
+          return call("PATCH", `/api/views/${view!.id}`, { layout: "table" });
+        },
+      ],
       ["/api/notes", () => call("DELETE", `/api/notes/${created.id}`)],
     ];
     for (const [path, write] of writes) {
