@@ -6,6 +6,12 @@
 // Bun bundles the app from the HTML import and serves it itself, ahead of the Effect router, with
 // no way to add a header. So the bundle answers at an address of its own, unguessable and new on
 // each start, and every page's address fetches it from there over loopback and adds the policy.
+//
+// Given an app built ahead of time (pwa-build.ts), none of that is needed: its page is read once
+// and served under the policy, and each file it names is served from disk.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import type { Server } from "bun";
 
 import { PAGES } from "@/shared/pages";
@@ -41,10 +47,42 @@ export const contentSecurityPolicy = (development: boolean) =>
     .map(([directive, sources]) => `${directive} ${sources.join(" ")}`)
     .join("; ");
 
-/** Bun's `routes`: the bundle at its own address, and each page's address serving it with the policy. */
-export function pageRoutes(development: boolean) {
-  const bundle = `/_app/${crypto.randomUUID()}`;
+const HASHED = { "cache-control": "public, max-age=31536000, immutable" };
+
+/**
+ * The built page under the policy, and one route per file it names. Only those: the folder may
+ * hold more (the compiled `pad` was built into it once), and none of that is ours to serve.
+ */
+function builtRoutes(dir: string, csp: string) {
+  const html = readFileSync(join(dir, "index.html"), "utf8");
+  const page = () =>
+    new Response(html, {
+      headers: {
+        "content-type": "text/html;charset=utf-8",
+        "content-security-policy": csp,
+        "cache-control": "no-cache",
+      },
+    });
+  const files = [...html.matchAll(/(?:src|href)="\/([^"?#/][^"?#]*)"/g)].map((m) => m[1]!);
+  return {
+    ...Object.fromEntries(
+      files.map((name) => [
+        `/${name}`,
+        () => new Response(Bun.file(join(dir, name)), { headers: HASHED }),
+      ]),
+    ),
+    ...Object.fromEntries(Object.values(PAGES).map((path) => [path, page])),
+  };
+}
+
+/**
+ * Bun's `routes`: with `prebuilt` (the folder of a build), its files; otherwise the bundle at its
+ * own address, and each page's address serving it with the policy.
+ */
+export function pageRoutes(development: boolean, prebuilt?: string) {
   const csp = contentSecurityPolicy(development);
+  if (prebuilt) return builtRoutes(prebuilt, csp);
+  const bundle = `/_app/${crypto.randomUUID()}`;
   // Only the server's address is read, so any Bun server will do.
   const page = async (_: Request, server: Pick<Server<unknown>, "url">) => {
     const res = await fetch(new URL(bundle, server.url));

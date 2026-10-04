@@ -3,7 +3,7 @@
 // bunfig's [serve.static] plugins, and without bun-plugin-tailwind the PWA's CSS doesn't compile.
 //
 //   bun scripts/build.ts pad [--outfile=path]   `pad`, one executable with bytecode (dist/pad)
-//   bun scripts/build.ts web                    the PWA alone, to inspect its output (dist/)
+//   bun scripts/build.ts web                    the PWA alone (dist/web), which the server serves in production
 import { parseArgs } from "node:util";
 
 import tailwind from "bun-plugin-tailwind";
@@ -17,7 +17,9 @@ const result =
   positionals[0] === "web"
     ? await Bun.build({
         entrypoints: ["src/web/index.html"],
-        outdir: "dist",
+        outdir: "dist/web",
+        // Absolute, so a page's address never changes where its files are looked for.
+        publicPath: "/",
         minify: true,
         plugins: [tailwind],
         define: { "process.env.NODE_ENV": '"production"' },

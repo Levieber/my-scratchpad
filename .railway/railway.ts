@@ -8,7 +8,8 @@ export default defineRailway(() => {
     // Deploys on every push to main (needs the Railway GitHub app to have access to the repo).
     source: github("Levieber/my-scratchpad", { branch: "main" }),
     // No Dockerfile, so Railpack builds it and picks Bun up from bun.lock. There is no server
-    // build step: `start` runs src/server.ts, and Bun bundles the PWA from its HTML import at startup.
+    // build step: `start` runs src/server.ts, which builds the PWA itself before serving it
+    // (src/server/pwa-build.ts), so nothing here depends on what Railpack's build does.
     build: { builder: "RAILPACK" },
     start: "bun run start",
     healthcheck: "/api/health",

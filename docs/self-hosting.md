@@ -37,6 +37,10 @@ bun run start        # http://127.0.0.1:7777; the database is ~/.local/share/scr
 
 Back up by copying `pad.db` (with its `-wal` file, or after stopping the server). Schema changes ship as migrations that run on startup, so updating is `git pull && bun install` and a restart.
 
+## On a small machine
+
+One process: about 67 MB at start and 96 MB with a thousand notes served to a browser (see [Memory and egress](deployment.md#memory-and-egress)). Starting builds the PWA for about half a second in a separate process, which needs the clone to be writable at `dist/web`; if it isn't, the server logs a warning and works, using ~80 MB more. Polling tabs cost almost no traffic: unchanged collections answer `304`.
+
 ## On Railway
 
 The repo declares its Railway service in `.railway/railway.ts`. Before applying it, point `github("…")` at your own fork; it names the repository to deploy from. [deployment.md](deployment.md) has the steps.

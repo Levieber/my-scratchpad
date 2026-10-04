@@ -1,9 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { inflateSync } from "node:zlib";
 
-import { type TestServer, testServer } from "@test/support";
+import { ROOT, type TestServer, testServer } from "@test/support";
+import * as Effect from "effect/Effect";
 
 import { contentSecurityPolicy } from "@/server/pages";
+import { buildPwa } from "@/server/pwa-build";
 import { PAGES } from "@/shared/pages";
 
 let server: TestServer;
@@ -160,4 +165,96 @@ describe("PWA Content-Security-Policy", () => {
     expect(contentSecurityPolicy(true)).toContain("connect-src 'self' ws: wss:");
     expect(contentSecurityPolicy(false)).toContain("script-src 'self';");
   });
+});
+
+// The app built ahead of time (scripts/build.ts web) and served from files, so the server never
+// loads Bun's bundler and Tailwind's compiler: that costs ~80 MB of RSS for as long as it runs.
+describe("a prebuilt PWA", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pad-prebuilt-"));
+  const HTML = `<!doctype html><html><head><title>Prebuilt</title>
+<link rel="apple-touch-icon" href="/icon-1a2b.png"><link rel="stylesheet" href="/chunk-c3d4.css">
+<script type="module" src="/chunk-e5f6.js"></script></head><body><div id="root"></div></body></html>`;
+  let prebuilt: TestServer;
+  const fetchPrebuilt = (path: string) => fetch(new URL(path, prebuilt.url));
+
+  beforeAll(async () => {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "index.html"), HTML);
+    writeFileSync(join(dir, "chunk-e5f6.js"), "console.log('app')");
+    writeFileSync(join(dir, "chunk-c3d4.css"), "body{margin:0}");
+    writeFileSync(join(dir, "icon-1a2b.png"), PNG);
+    // Not named by the page: whatever else lies in the folder (the compiled `pad` once did) is not ours to serve.
+    writeFileSync(join(dir, "pad"), "an executable");
+    prebuilt = await testServer({ prebuilt: dir });
+  });
+  afterAll(async () => {
+    await prebuilt.stop();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("every page's address serves the built page, under the policy", async () => {
+    for (const path of Object.values(PAGES)) {
+      const res = await fetchPrebuilt(path);
+      expect([path, res.status, res.headers.get("content-type")]).toEqual([
+        path,
+        200,
+        "text/html;charset=utf-8",
+      ]);
+      expect(await res.text()).toBe(HTML);
+      expect(res.headers.get("content-security-policy")).toBe(contentSecurityPolicy(false));
+      // The page names hashed files; the page itself is what changes with a deploy.
+      expect(res.headers.get("cache-control")).toBe("no-cache");
+    }
+  });
+
+  test("what the page names is served for good, under its hashed name", async () => {
+    const wanted: [string, string][] = [
+      ["/chunk-e5f6.js", "text/javascript"],
+      ["/chunk-c3d4.css", "text/css"],
+      ["/icon-1a2b.png", "image/png"],
+    ];
+    for (const [path, type] of wanted) {
+      const res = await fetchPrebuilt(path);
+      expect([path, res.status, res.headers.get("content-type")?.split(";")[0]]).toEqual([
+        path,
+        200,
+        type,
+      ]);
+      expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+    }
+    expect(await (await fetchPrebuilt("/chunk-e5f6.js")).text()).toBe("console.log('app')");
+  });
+
+  test("a file the page doesn't name is not served", async () => {
+    const res = await fetchPrebuilt("/pad");
+    expect([res.status, ((await res.json()) as { error: string }).error]).toEqual([
+      404,
+      "notFound",
+    ]);
+  });
+
+  test("the API and the PWA's own files are untouched", async () => {
+    expect((await fetchPrebuilt("/api/health")).status).toBe(200);
+    expect((await fetchPrebuilt("/sw.js")).headers.get("cache-control")).toBe("no-cache");
+  });
+});
+
+describe("building the PWA before serving it", () => {
+  test("bundles it into dist/web and says where, and what it built is what a server serves", async () => {
+    const built = await Effect.runPromise(buildPwa);
+    expect(built).toBe(join(ROOT, "dist", "web"));
+    const server = await testServer({ prebuilt: built });
+    try {
+      const page = await (await fetch(new URL("/", server.url))).text();
+      const script = /<script[^>]*src="(\/[^"]+)"/.exec(page)?.[1];
+      expect(script).toBeDefined();
+      const res = await fetch(new URL(script!, server.url));
+      expect([res.status, res.headers.get("cache-control")]).toEqual([
+        200,
+        "public, max-age=31536000, immutable",
+      ]);
+    } finally {
+      await server.stop();
+    }
+  }, 60_000);
 });
