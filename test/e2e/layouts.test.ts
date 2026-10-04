@@ -127,6 +127,27 @@ describeE2E("layouts", () => {
     await shownAs(other, "table");
   }, 20_000);
 
+  test("a view saved after choosing a board's columns keeps them", async () => {
+    await app.api.create({ title: "Columns kept", body: "x", tags: ["colskept", "urgent"] });
+    const page = await app.open(1280, "/?q=%23colskept&layout=board");
+    await shownAs(page, "board");
+    await page.getByRole("button", { name: "Columns:" }).click();
+    await page.getByRole("button", { name: "Tags", exact: true }).click();
+    await page.getByLabel("A column per tag, in order").fill("urgent, later");
+    await page.getByRole("button", { name: "Show" }).click();
+    await page.getByRole("region", { name: "urgent" }).waitFor();
+
+    await page.getByRole("button", { name: "Save this search" }).click();
+    await page.getByPlaceholder("Name this view").fill("Columns");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await eventually(async () =>
+      expect((await views()).find((v) => v.name === "Columns")).toMatchObject({
+        layout: "board",
+        options: { groupBy: { by: "tags", tags: ["urgent", "later"] } },
+      }),
+    );
+  }, 20_000);
+
   test("board: the keyboard moves a note with Move to, which lands in its history", async () => {
     const note = await app.api.create({
       title: "Board keys",

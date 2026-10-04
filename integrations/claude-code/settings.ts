@@ -21,7 +21,7 @@ export const HOOKS = {
 } as const satisfies Record<string, { name: HookName; timeout: number; matcher?: string }>;
 
 export const ALLOW = [
-  ...["search", "get", "create", "append", "update", "history", "diff", "hooks"].map(
+  ...["search", "get", "create", "append", "update", "history", "diff", "views", "hooks"].map(
     (t) => `mcp__scratchpad__scratchpad_${t}`,
   ),
   ...[

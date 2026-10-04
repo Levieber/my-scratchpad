@@ -9,7 +9,7 @@ An API-first scratchpad the user reads and writes from a PWA and the `pad` CLI; 
 
 ## How to access it (in order of preference)
 
-1. **MCP tools** `scratchpad_search`, `scratchpad_get`, `scratchpad_create`, `scratchpad_append`, `scratchpad_update`, `scratchpad_history`, `scratchpad_diff`, `scratchpad_delete`.
+1. **MCP tools** `scratchpad_search`, `scratchpad_get`, `scratchpad_create`, `scratchpad_append`, `scratchpad_update`, `scratchpad_history`, `scratchpad_diff`, `scratchpad_delete`; `scratchpad_views` lists the user's saved searches (pass a view's `query` to `scratchpad_search`) and `scratchpad_save_view` saves one, only when the user asks.
 2. **CLI** via Bash when MCP is unavailable: `pad ls [query] --json`, `pad show <id> --json`, `pad add "text" --tag x`, `echo "text" | pad append <id>`, `pad set <id> --kind reference`. Writes from Claude Code are attributed as `claude-code` automatically.
 3. **HTTP** as a last resort: see `pad status` for the base URL, `GET <url>/llms.txt` for the API summary.
 

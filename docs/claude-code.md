@@ -6,12 +6,12 @@ bun run setup:claude                  # --no-service: skip the local server · -
 
 Run it from the main checkout: it records the paths of the folder it runs in. It is idempotent and backs up `~/.claude/settings.json` to `settings.json.bak-scratchpad`. It installs, at user scope:
 
-- **MCP server** `scratchpad` (`src/mcp.ts`) → tools `scratchpad_search|get|create|append|update|history|diff|delete`, attributed as `claude-code`, and `scratchpad_hooks`, read-only: what the hooks show where Claude works, and why.
+- **MCP server** `scratchpad` (`src/mcp.ts`) → tools `scratchpad_search|get|create|append|update|history|diff|delete`, attributed as `claude-code`; `scratchpad_views`, read-only: the saved searches and the layout each is shown in, and `scratchpad_save_view`, which saves one only when you ask; and `scratchpad_hooks`, read-only: what the hooks show where Claude works, and why.
 - **Skill** `~/.claude/skills/scratchpad` → symlink to `integrations/claude-code/skill/`: when to use the scratchpad, kinds, tagging and logging conventions.
 - **Skill** `~/.claude/skills/pad-review` → symlink to `integrations/claude-code/review-skill/`: how to check edits against reference notes (also `/pad-review` by hand).
 - **SessionStart hook** (`pad hook session-start`) → injects the titles of the notes chosen for where the session works (by default the 8 most recently changed that aren't references, plus whatever you chose for that repository or folder); silent and fast when the server is unreachable.
 - **Review hooks** → reference notes load on demand, not at session start. `pad hook record-edit` (PostToolUse on Edit/Write/MultiEdit/NotebookEdit) records edited paths in `~/.cache/scratchpad/edits/<session>.txt`; `pad hook review` (Stop) then blocks the turn once, listing those files and the reference notes' titles, and Claude follows `pad-review`. It stays silent when nothing was edited, on the turn that answers the review, when the server is unreachable, or with `PAD_REVIEW=off`. The hooks live in `hooks.ts` and the review's wording in `review.ts`; which settings entries are ours, in `settings.ts`.
-- **Permissions** → the non-destructive MCP tools and read-only `pad` commands run without prompts; delete still asks.
+- **Permissions** → the non-destructive MCP tools and read-only `pad` commands run without prompts; delete still asks, and so does saving a view (it changes what the app shows you).
 - **`~/.claude/CLAUDE.md`** → a managed block (`integrations/claude-code/CLAUDE.snippet.md`) between `<!-- scratchpad:start/end -->` markers.
 - **`pad`** on the PATH (`~/.local/bin/pad` → `dist/pad`, built by `bun run build:pad`) and, unless `--no-service`, a `scratchpad.service` systemd user unit on `127.0.0.1:7777`.
 

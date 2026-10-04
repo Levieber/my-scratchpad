@@ -53,7 +53,8 @@ export const tags = Command.make(
 ).pipe(Command.withDescription("List tags"));
 
 // The terminal shows every view as a list (`pad ls @name`); the layout is said, not drawn.
-const viewLine = (v: View) => `@${v.name}  ${v.query}${v.layout ? `  [${v.layout}]` : ""}`;
+const shownAs = (v: View) => (v.layout ? `  [${v.layout}]` : "");
+const viewLine = (v: View) => `@${v.name}  ${v.query}${shownAs(v)}`;
 
 const layout = Flag.Literals("layout", LAYOUT_KEYS).pipe(
   Flag.withDescription("How the app shows it; default: each device's own choice"),
@@ -83,7 +84,7 @@ export const views = Command.make(
           query: a.query.join(" "),
           layout: Option.getOrUndefined(a.layout),
         });
-        yield* out(v, () => `saved ${viewLine(v).slice(1)}`);
+        yield* out(v, () => `saved ${v.name}: ${v.query}${shownAs(v)}`);
       }, reported),
     ).pipe(Command.withDescription("Save a search")),
     Command.make(
