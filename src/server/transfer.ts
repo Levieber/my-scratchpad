@@ -8,6 +8,7 @@ import {
   ARCHIVE_FORMAT,
   ARCHIVE_VERSION,
   type ExportArchive,
+  type ImportLimits,
   parseArchive,
 } from "@/shared/archive";
 
@@ -46,7 +47,10 @@ export const exportArchive = (store: Store["Service"], req: Request) =>
 
 /** What a client may ask before importing: the versions this server reads, and the most it takes. */
 export const importLimits = (maxBytes: number) =>
-  json({ formats: Array.from({ length: ARCHIVE_VERSION }, (_, i) => i + 1), max_bytes: maxBytes });
+  json({
+    formats: Array.from({ length: ARCHIVE_VERSION }, (_, i) => i + 1),
+    max_bytes: maxBytes,
+  } satisfies ImportLimits);
 
 const tooLarge = (maxBytes: number) =>
   refuse(

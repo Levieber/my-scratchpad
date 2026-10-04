@@ -2,13 +2,14 @@ import { ArrowLeftIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { isHookName } from "@/shared/hooks";
+import { DataSection } from "@/web/components/settings/data-section";
 import { HookCard } from "@/web/components/settings/hook-card";
 import { Button } from "@/web/components/ui/button";
 import { useHooksInfo } from "@/web/hooks/hooks-info.hook";
 import { useOnline } from "@/web/hooks/online.hook";
 import { go } from "@/web/hooks/page.hook";
 
-/** The settings page. Its one section for now: which notes the agent hooks show. */
+/** The settings page: which notes the agent hooks show, and taking the notes out or in. */
 export function Settings() {
   const { info, supported } = useHooksInfo();
   const online = useOnline();
@@ -66,6 +67,8 @@ export function Settings() {
           )
         )}
       </section>
+
+      <DataSection />
     </main>
   );
 }

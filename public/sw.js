@@ -35,6 +35,9 @@ self.addEventListener("fetch", (e) => {
   const req = e.request;
   const url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== location.origin) return;
+  // An export is every note, made to be saved, never to be read back from here: a copy kept in the
+  // cache would sit there as a second dump of the notes, and offline it would pass for a fresh one.
+  if (url.pathname === "/api/export") return;
 
   if (req.mode === "navigate") {
     e.respondWith(

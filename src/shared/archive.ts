@@ -90,6 +90,13 @@ export type ExportArchive = {
   hook_selections: HookSelection[];
 };
 
+/** `GET /api/import`: what a client may send, and that this server imports at all. */
+export type ImportLimits = {
+  /** The archive versions it reads. */
+  formats: number[];
+  max_bytes: number;
+};
+
 /** How a part of an import went: what was written, and what was left as it was. */
 export type ImportTally = { created: number; skipped: number };
 

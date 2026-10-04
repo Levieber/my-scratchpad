@@ -24,6 +24,8 @@ export const keys = {
   views: [server, "views"] as const,
   pins: [server, "pins"] as const,
   hooks: [server, "hooks"] as const,
+  /** What an import may send; absent from a server that can't import. */
+  importLimits: [server, "import"] as const,
   /** What a hook shows where `scope` applies. */
   hookNotes: (hook: string, scope: string) => [server, "hooks", hook, scope] as const,
 };

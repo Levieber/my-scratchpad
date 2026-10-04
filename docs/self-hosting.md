@@ -53,3 +53,12 @@ bun run setup:claude                         # optional: wire up Claude Code (se
 ```
 
 Agents attribute their writes with `X-Pad-Author: <name>`; the PWA asks for the token the first time it gets a 401.
+
+## Back up, or move to another server
+
+```sh
+pad export backup.json         # every note with its history, saved searches, pins and hook choices
+pad import backup.json         # into whichever server `pad login` points at; notes that exist are left as they are
+```
+
+Settings → Data in the app does the same. The file is the same whichever way a server is run, so it is also how you move between a self-hosted server and a hosted one, in either direction. [export-format.md](export-format.md) specifies it.

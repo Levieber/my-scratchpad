@@ -1,4 +1,5 @@
 // Browser client for the same HTTP API the CLI and agents use.
+import type { ExportArchive, ImportLimits, ImportResult } from "@/shared/archive";
 import type {
   FullRevision,
   HookNotes,
@@ -12,6 +13,7 @@ import type {
 } from "@/shared/domain";
 import { readError } from "@/shared/errors";
 import type { Location } from "@/shared/hooks";
+import { exportPath } from "@/web/lib/transfer";
 
 export type { FullRevision, HookSelection, HooksInfo, Note, NoteDiff, NoteInput, Revision, View };
 export type Tag = { tag: string; count: number };
@@ -120,6 +122,10 @@ export const api = {
   revision: (id: string, rev: number) =>
     req<FullRevision>("GET", `/api/notes/${id}/revisions/${rev}`),
   diff: (id: string, to: number) => req<NoteDiff>("GET", `/api/notes/${id}/diff?to=${to}`),
+  /** Every note a search lists (all, for none), with their history unless off. */
+  exportArchive: (q: string, history: boolean) => req<ExportArchive>("GET", exportPath(q, history)),
+  importLimits: () => req<ImportLimits>("GET", "/api/import"),
+  importArchive: (archive: unknown) => req<ImportResult>("POST", "/api/import", archive),
   hooks: () => req<HooksInfo>("GET", "/api/hooks"),
   hookNotes: (hook: string, at: Location) => {
     const p = new URLSearchParams();
