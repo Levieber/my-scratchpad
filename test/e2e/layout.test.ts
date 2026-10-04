@@ -21,6 +21,9 @@ const violations = (page: Page) =>
       found.push(`scrolls sideways: ${root.scrollWidth} > ${root.clientWidth}`);
     for (const el of document.querySelectorAll<HTMLElement>(targets)) {
       if (!el.checkVisibility({ visibilityProperty: true })) continue;
+      // Base UI's checkbox mirrors its state into a hidden native input (1 px, aria-hidden, out
+      // of the tab order) for forms; nobody aims at it.
+      if (el.closest("[aria-hidden=true]")) continue;
       const box = el.getBoundingClientRect();
       const name = `${el.tagName.toLowerCase()} "${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 30) ?? ""}"`;
       if (box.width < 24 || box.height < 24)
@@ -112,9 +115,8 @@ describeE2E("layout", () => {
     await tabTo((name) => name.startsWith("keyboard only"));
     await page.keyboard.press("Enter");
     await page.getByPlaceholder("Title").waitFor();
-    expect(await page.getByPlaceholder("Write anything. Markdown welcome.").inputValue()).toBe(
-      "keyboard only",
-    );
+    // An existing note opens in Read.
+    await page.getByRole("tabpanel").getByText("keyboard only").waitFor();
 
     await tabTo((name) => name === "Delete");
     await page.keyboard.press("Enter");

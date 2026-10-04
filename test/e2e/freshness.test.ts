@@ -37,6 +37,7 @@ describeE2E("a slow network", () => {
     const note = await app.api.create({ body: "first draft" });
     const page = await app.open();
     await openNote(page, "first draft");
+    await page.getByRole("tab", { name: "Write" }).click();
     const body = page.getByPlaceholder("Write anything. Markdown welcome.");
     expect(await body.inputValue()).toBe("first draft");
 
@@ -56,7 +57,7 @@ describeE2E("a slow network", () => {
     expect(await body.inputValue()).toBe("second draft");
   });
 
-  test("ticking a checklist box: the n/m counter never goes back", async () => {
+  test("ticking a box in the Read view: the n/m counter never goes back", async () => {
     await app.api.create({ title: "Chores", body: "- [ ] dishes\n- [ ] laundry" });
     const page = await app.open();
     const counter = row(page, "Chores");
@@ -84,10 +85,7 @@ describeE2E("a slow network", () => {
       await route.fulfill({ response });
     });
     await openNote(page, "Chores");
-    await page
-      .getByPlaceholder("Write anything. Markdown welcome.")
-      .fill("- [x] dishes\n- [ ] laundry");
-    await page.getByPlaceholder("Title").focus();
+    await page.getByRole("checkbox", { name: "dishes" }).click();
     for (let i = 0; i < 4; i++) {
       await Bun.sleep(500);
       await poll(page);

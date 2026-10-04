@@ -2,6 +2,7 @@
 // what it sends settles into the read cache (queries.ts).
 import { newId } from "@/shared/ids";
 import { token } from "@/web/lib/api";
+import { editorModes } from "@/web/lib/editor-prefs";
 import { EditorSession } from "@/web/lib/editor-session";
 import { needsToken } from "@/web/lib/failures";
 import { queryClient, refetchNotes, settle } from "@/web/lib/queries";
@@ -13,6 +14,7 @@ export const session = new EditorSession({
   outbox,
   syncer,
   newId,
+  modes: editorModes,
   onSynced: (result) => {
     if (result.status === "unauthorized") needsToken.set(true);
     if (result.status === "done" || result.status === "error") void refetchNotes();

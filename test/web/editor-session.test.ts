@@ -7,11 +7,12 @@ import { EditorSession } from "@/web/lib/editor-session";
 import { Outbox } from "@/web/lib/outbox";
 import { type SyncResult, Syncer } from "@/web/lib/sync";
 
-function setup() {
+function setup(initialMode: "read" | "write" = "read") {
   const server = fakeServer();
   const outbox = new Outbox(memoryStorage());
   const syncer = new Syncer(outbox, server.remote);
   const results: SyncResult[] = [];
+  const chosen: string[] = [];
   let ids = 0;
   const session = new EditorSession({
     outbox,
@@ -19,11 +20,12 @@ function setup() {
     newId: () => `n${++ids}`,
     onSynced: (r) => void results.push(r),
     autosaveMs: 5,
+    modes: { initial: () => initialMode, chosen: (m) => void chosen.push(m) },
   });
   /** A note the server already has, as the list would hand it over. */
   const seed = async (body: string) =>
     server.remote.create({ id: `s${++ids}`, ...fields({ body }) });
-  return { server, outbox, session, results, seed, state: session.getSnapshot };
+  return { server, outbox, session, results, chosen, seed, state: session.getSnapshot };
 }
 
 const settle = () => Bun.sleep(30);
@@ -188,5 +190,46 @@ describe("EditorSession", () => {
     expect(state()).toBe(before);
     session.create("x");
     expect(state()).not.toBe(before);
+  });
+
+  describe("Read and Write", () => {
+    test("an existing note opens in Read, a new one in Write", async () => {
+      const { session, seed, state } = setup();
+      await session.open(async () => seed("- [ ] a"));
+      expect(state().mode).toBe("read");
+      session.create();
+      expect(state().mode).toBe("write");
+    });
+
+    test("the choice is kept, and the next note opens as this device last chose", async () => {
+      const { session, seed, state, chosen } = setup("write");
+      await session.open(async () => seed("text"));
+      expect(state().mode).toBe("write");
+      session.setMode("read");
+      expect([state().mode, chosen]).toEqual(["read", ["read"]]);
+    });
+
+    test("a tick is an edit like typing: queued in the outbox, saved, one line changed", async () => {
+      const { server, session, seed } = setup();
+      const note = await seed("- [ ] a\n- [ ] b");
+      await session.open(async () => note);
+      session.edit({ body: "- [ ] a\n- [x] b" });
+      session.commit();
+      await session.sync();
+      expect(server.notes.get(note.id)?.body).toBe("- [ ] a\n- [x] b");
+    });
+
+    test("counts the times the body is replaced from outside, not typing", async () => {
+      const { server, session, seed, state } = setup();
+      const note = await seed("first");
+      await session.open(async () => note);
+      const before = state().external;
+      session.edit({ body: "typed" });
+      expect(state().external).toBe(before);
+      await settle();
+      server.edit(note.id, { body: "from an agent" });
+      session.receive(server.notes.get(note.id)!);
+      expect([state().draft.body, state().external]).toEqual(["from an agent", before + 1]);
+    });
   });
 });
