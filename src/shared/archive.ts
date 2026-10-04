@@ -63,6 +63,10 @@ export const ArchiveView = Schema.Struct({
   id: Schema.optionalKey(Schema.String),
   name: NonEmpty,
   query: NonEmpty,
+  /** How it is shown (shared/layouts.ts); left out or null, each device's own choice. */
+  layout: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  /** Its layouts' options, kept as written. */
+  options: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
   created_at: Schema.optionalKey(Timestamp),
 });
 export type ArchiveView = typeof ArchiveView.Type;

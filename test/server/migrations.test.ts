@@ -130,6 +130,18 @@ describe("migrations", () => {
     expect(found).toHaveLength(1);
   });
 
+  test("views saved before layouts leave theirs to the device, with no options", async () => {
+    const rows = await onFreshDb((sql) =>
+      Effect.gen(function* () {
+        yield* before("0010");
+        yield* sql`INSERT INTO views (id, name, query, created_at) VALUES ('v', 'Todo', '#todo', 'x')`;
+        yield* migrate;
+        return yield* sql`SELECT layout, options FROM views`;
+      }),
+    );
+    expect(rows).toEqual([{ layout: null, options: "{}" }]);
+  });
+
   test("a failing migration rolls back the whole batch", async () => {
     const broken = [
       ...MIGRATIONS,

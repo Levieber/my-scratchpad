@@ -280,6 +280,41 @@ describe("POST /api/import", () => {
     });
   });
 
+  test("a view keeps its layout and options; one a newer server wrote keeps what it can", async () => {
+    const from = await boot();
+    await from.call("POST", "/api/views", {
+      name: "Work",
+      query: "#work",
+      layout: "table",
+      options: { sort: { by: "title", desc: true }, swimlanes: "status:" },
+    });
+    const archive = (await from.call("GET", "/api/export")).data;
+    archive.views.push({
+      name: "From later",
+      query: "#later",
+      layout: "calendar",
+      options: { sort: { by: "colour" }, swimlanes: "x" },
+    });
+    const to = await boot();
+    expect((await to.call("POST", "/api/import", archive)).data.views).toEqual({
+      created: 2,
+      skipped: 0,
+    });
+    const views = (await to.call("GET", "/api/views")).data as {
+      name: string;
+      layout: string | null;
+      options: unknown;
+    }[];
+    expect(views.map(({ name, layout, options }) => ({ name, layout, options }))).toEqual([
+      { name: "From later", layout: "calendar", options: { swimlanes: "x" } },
+      {
+        name: "Work",
+        layout: "table",
+        options: { sort: { by: "title", desc: true }, swimlanes: "status:" },
+      },
+    ]);
+  });
+
   test("importing the same archive twice changes nothing the second time", async () => {
     const { call } = await boot();
     const archive = JSON.parse(await fixture("export-v2.json"));

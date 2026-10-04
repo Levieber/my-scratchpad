@@ -1,6 +1,7 @@
 // Finding notes: search, tags and saved searches.
 import * as Argument from "effect/cli/Argument";
 import * as Command from "effect/cli/Command";
+import * as Flag from "effect/cli/Flag";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
@@ -8,6 +9,8 @@ import { author, kind, limit, tag, words } from "@/cli/flags";
 import { line } from "@/cli/format";
 import { out, reported } from "@/cli/root";
 import { ApiError, Client } from "@/client/client";
+import type { View } from "@/shared/domain";
+import { LAYOUT_KEYS } from "@/shared/layouts";
 
 const findView = Effect.fn(function* (name: string) {
   const views = yield* (yield* Client).views();
@@ -49,22 +52,38 @@ export const tags = Command.make(
   }, reported),
 ).pipe(Command.withDescription("List tags"));
 
+// The terminal shows every view as a list (`pad ls @name`); the layout is said, not drawn.
+const viewLine = (v: View) => `@${v.name}  ${v.query}${v.layout ? `  [${v.layout}]` : ""}`;
+
+const layout = Flag.Literals("layout", LAYOUT_KEYS).pipe(
+  Flag.withDescription("How the app shows it; default: each device's own choice"),
+  Flag.optional,
+);
+
 export const views = Command.make(
   "views",
   {},
   Effect.fn(function* () {
     const all = yield* (yield* Client).views();
-    yield* out(all, () => all.map((v) => `@${v.name}  ${v.query}`).join("\n") || "(no views)");
+    yield* out(all, () => all.map(viewLine).join("\n") || "(no views)");
   }, reported),
 ).pipe(
   Command.withDescription("List, save or delete saved searches"),
   Command.withSubcommands([
     Command.make(
       "add",
-      { name: Argument.String("name"), query: Argument.String("query").pipe(Argument.atLeast(1)) },
+      {
+        name: Argument.String("name"),
+        query: Argument.String("query").pipe(Argument.atLeast(1)),
+        layout,
+      },
       Effect.fn(function* (a) {
-        const v = yield* (yield* Client).createView(a.name, a.query.join(" "));
-        yield* out(v, () => `saved ${v.name}: ${v.query}`);
+        const v = yield* (yield* Client).createView({
+          name: a.name,
+          query: a.query.join(" "),
+          layout: Option.getOrUndefined(a.layout),
+        });
+        yield* out(v, () => `saved ${viewLine(v).slice(1)}`);
       }, reported),
     ).pipe(Command.withDescription("Save a search")),
     Command.make(

@@ -21,8 +21,10 @@ import type {
   NoteDiff,
   NoteInput,
   Revision,
+  NewView,
   Tag,
   View,
+  ViewPatch,
 } from "@/shared/domain";
 import { readError } from "@/shared/errors";
 import type { Location } from "@/shared/hooks";
@@ -105,7 +107,10 @@ const make = Effect.fnUntraced(function* ({
     delete: (id: string) => req<void>("DELETE", note(id)),
     tags: () => req<Tag[]>("GET", "/api/tags"),
     views: () => req<View[]>("GET", "/api/views"),
-    createView: (name: string, query: string) => req<View>("POST", "/api/views", { name, query }),
+    createView: (view: NewView) => req<View>("POST", "/api/views", view),
+    /** Send only what changed: options merge into the view's, so others' survive. */
+    updateView: (id: string, patch: ViewPatch) =>
+      req<View>("PATCH", `/api/views/${encodeURIComponent(id)}`, patch),
     deleteView: (id: string) => req<void>("DELETE", `/api/views/${encodeURIComponent(id)}`),
     /** The pinned notes, in the order they were pinned. */
     pins: () => req<Note[]>("GET", "/api/pins"),

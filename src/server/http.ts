@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import type {
   DatabaseUnavailable,
   HookLimit,
+  InvalidViewOptions,
   NoteChanged,
   NoteExists,
   NoteNotFound,
@@ -42,6 +43,7 @@ export type Failure =
   | RevisionNotFound
   | ViewNotFound
   | ViewExists
+  | InvalidViewOptions
   | PinLimit
   | HookLimit
   | DatabaseUnavailable;

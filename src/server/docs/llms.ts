@@ -25,7 +25,7 @@ Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 - GET    /api/notes/{id}/revisions/{rev}   one revision with its body
 - GET    /api/notes/{id}/diff?from=&to=&since=   unified diff; default the latest change
 - GET    /api/tags
-- GET    /api/views, POST /api/views {name, query}, DELETE /api/views/{id}   saved searches
+- GET    /api/views, POST /api/views {name, query, layout?}, PATCH /api/views/{id}, DELETE /api/views/{id}   saved searches and how the app shows them
 - GET    /api/hooks   the notes agent hooks show (session start, end-of-turn review), as the user chose them
 - GET    /api/hooks/{name}/notes?repo=&path=&dir=&home=   what a hook shows an agent working there, by section
 - GET    /api/export?q=&kind=&author=&tag=&history=   the user's notes with their history, views and pins, as one JSON archive (a backup; how to move between deployments)

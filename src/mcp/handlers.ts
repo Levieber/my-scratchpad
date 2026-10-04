@@ -63,6 +63,8 @@ export const Handlers = Scratchpad.toLayer(
       scratchpad_history: ({ id, limit }) => client.revisions(id, { limit: limit ?? 20 }),
       scratchpad_diff: ({ id, ...q }) => client.diff(id, q),
       scratchpad_delete: ({ id }) => Effect.as(client.delete(id), { deleted: id }),
+      scratchpad_views: () => client.views(),
+      scratchpad_save_view: (view) => client.createView(view),
       scratchpad_hooks: ({ cwd }) => hooks(cwd ?? process.cwd()),
     });
   }),

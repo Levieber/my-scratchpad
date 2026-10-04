@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 
 import { useSearch } from "@/web/hooks/search.hook";
-import { api, isApiError, type View } from "@/web/lib/api";
+import { api, isApiError, type NewView, type View } from "@/web/lib/api";
 import { handle } from "@/web/lib/failures";
 import { keys, queryClient } from "@/web/lib/queries";
 
@@ -26,11 +26,17 @@ const refetch = () => queryClient.invalidateQueries({ queryKey: keys.views });
 export function useViewMutations() {
   const { q } = useSearch();
   const create = useMutation({
-    mutationFn: (view: { name: string; query: string }) => api.createView(view.name, view.query),
+    mutationFn: (view: NewView) => api.createView(view),
     onMutate: (view) =>
       optimistic((v) => [
         ...v,
-        { ...view, id: `${SAVING}${view.name}`, created_at: new Date().toISOString() },
+        {
+          layout: null,
+          options: {},
+          ...view,
+          id: `${SAVING}${view.name}`,
+          created_at: new Date().toISOString(),
+        },
       ]),
     onError: rollback,
     onSettled: refetch,
