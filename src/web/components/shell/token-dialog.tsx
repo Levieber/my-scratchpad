@@ -1,29 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 
-import { useData } from "@/web/hooks/data.hook";
-import { refreshHooks } from "@/web/hooks/hooks-info.hook";
 import { useStore } from "@/web/hooks/store.hook";
-import { token } from "@/web/lib/api";
 import { field, primaryButton } from "@/web/lib/classes";
 import { needsToken } from "@/web/lib/failures";
-import { session } from "@/web/lib/session";
+import { provideToken } from "@/web/lib/session";
 
 /** Asks for the access token when the server refuses the one this browser has (or has none). */
 export function TokenDialog() {
   const shown = useStore(needsToken);
-  const { refresh } = useData();
-  if (!shown) return null;
-  return (
-    <TokenForm
-      onSave={(t) => {
-        token.set(t);
-        needsToken.set(false);
-        void refresh();
-        void refreshHooks();
-        void session.sync();
-      }}
-    />
-  );
+  return shown ? <TokenForm onSave={provideToken} /> : null;
 }
 
 function TokenForm({ onSave }: { onSave: (token: string) => void }) {

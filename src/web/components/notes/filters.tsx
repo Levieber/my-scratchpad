@@ -1,5 +1,5 @@
 import { operatorValue, setOperator } from "@/shared/query";
-import { useSearch } from "@/web/hooks/data.hook";
+import { useSearch } from "@/web/hooks/search.hook";
 import { chip } from "@/web/lib/classes";
 import { cn } from "@/web/lib/utils";
 

@@ -39,3 +39,29 @@ export function pickState(
 /** Where a choice applies, for people. */
 export const scopeLabel = (scope: string) =>
   !scope ? "Everywhere" : scope.startsWith("/") ? `Folder ${scope}` : scope;
+
+/** `info` with `id` hand-picked for `hook` everywhere (or no longer), as the server will have it. */
+export function withPick(info: HooksInfo, hook: HookName, id: string, pick: boolean): HooksInfo {
+  return {
+    ...info,
+    hooks: info.hooks.map((h) => {
+      if (h.name !== hook) return h;
+      const everywhere = h.selections.find((s) => s.scope === "") ?? {
+        hook,
+        scope: "",
+        query: h.default.query,
+        include: [],
+        limit: h.default.limit,
+        updated_at: new Date().toISOString(),
+        updated_by: "human",
+      };
+      const include = pick
+        ? [...everywhere.include.filter((i) => i !== id), id]
+        : everywhere.include.filter((i) => i !== id);
+      return {
+        ...h,
+        selections: [{ ...everywhere, include }, ...h.selections.filter((s) => s.scope !== "")],
+      };
+    }),
+  };
+}

@@ -1,7 +1,8 @@
 import { useState } from "react";
 
 import { hasToken, parseQuery, toggleToken } from "@/shared/query";
-import { useSearch, useTags } from "@/web/hooks/data.hook";
+import { useTags } from "@/web/hooks/notes.hook";
+import { useSearch } from "@/web/hooks/search.hook";
 import { chip, moreButton } from "@/web/lib/classes";
 import { visibleTags } from "@/web/lib/listing";
 import { cn } from "@/web/lib/utils";
