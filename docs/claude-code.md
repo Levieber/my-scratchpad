@@ -19,12 +19,15 @@ Run it from the main checkout: it records the paths of the folder it runs in. It
 
 Each hook that reads notes shows a **selection**: a search in the language of the search box (`kind:x author:x #tag words`, see [architecture](architecture.md)), notes you **hand-picked** (listed first, never cut by the limit), and a limit. Selections are kept on the server (`/api/hooks`), so every machine, the PWA and agents see the same ones, and they apply to a **scope**. Choose them with `pad hooks` (below) or in the PWA: **Settings → Agents** (`/settings`) edits every scope and previews what agents see, and a note's menu has "Show at session start" (and, for references, "Use in reviews") to hand-pick it for everywhere.
 
-| Scope                    | Applies                                                                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| _(empty)_                | everywhere                                                                                                                      |
-| `my-scratchpad`          | in that repository, named by its `origin` remote (else its folder), so the same on every machine and in every clone or worktree |
-| `my-scratchpad/apps/web` | in that folder of the repository, and below                                                                                     |
-| `/home/me/work`          | in that folder and every folder below it, repositories included: one choice for all the projects it holds (one machine's path)  |
+| Scope                    | Applies                                                                                                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _(empty)_                | everywhere                                                                                                                                                                               |
+| `my-scratchpad`          | in that repository, named by its `origin` remote (else its folder), so the same on every machine and in every clone or worktree                                                          |
+| `my-scratchpad/apps/web` | in that folder of the repository, and below                                                                                                                                              |
+| `~/work`                 | in that folder of the home directory and every folder below it, repositories included: one choice for all the projects it holds, the same on every machine (`/home/you` or `/Users/you`) |
+| `/srv/notes`             | an absolute folder and below it, for places outside the home directory (one machine's path)                                                                                              |
+
+`pad hooks … --here` picks the repository you are in, or else this folder, written from `~` when it is in your home directory.
 
 Where Claude works, a hook shows every selection that applies: the closest to that folder first (a repository is narrower than a folder holding it, a folder inside the repository narrower still), then the one for everywhere (or the default), each as its own section, no note twice.
 

@@ -8,7 +8,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { ROOT, type TestServer, testServer } from "@test/support";
@@ -158,6 +158,23 @@ describe("choosing the notes the hooks use", () => {
     expect(await sessionContext()).toContain("## Recent notes");
     await pad("hooks", "reset", "--local");
     expect(JSON.parse(readFileSync(hooksFile(), "utf8"))).toEqual({});
+  });
+
+  test("a folder in the home directory is kept from ~, even when the shell expanded it", async () => {
+    await boot();
+    // What `--scope ~/work` reaches pad as, unquoted.
+    const expanded = await pad(
+      "hooks",
+      "set",
+      "session-start",
+      "#pinned",
+      "--scope",
+      `${homedir()}/work`,
+    );
+    expect(expanded).toContain("session-start (~/work): #pinned");
+    expect(await pad("hooks", "set", "review", "#seo", "--scope", "~/work")).toContain(
+      "review (~/work): #seo",
+    );
   });
 
   test("a repository's choice shows only inside it, as its own section", async () => {

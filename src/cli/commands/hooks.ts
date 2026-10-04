@@ -2,6 +2,7 @@
 // runs. A choice is kept on the server, for every machine and per place (everywhere, a
 // repository, a folder); `--local` keeps a search on this machine only, in hooks.json.
 import { mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname } from "node:path";
 
 import { HOOK_RUNNERS, sectionsText } from "@integrations/claude-code/hooks";
@@ -19,17 +20,24 @@ import { hookSections } from "@/client/hook-notes";
 import { locate } from "@/client/location";
 import { HookConfig } from "@/config/hooks";
 import type { HookSection, HookSelection } from "@/shared/domain";
-import { HOOK_NAMES, HOOKS, type HookName, normalizeScope, scopeLocation } from "@/shared/hooks";
+import {
+  HOOK_NAMES,
+  HOOKS,
+  type HookName,
+  hereScope,
+  normalizeScope,
+  scopeLocation,
+} from "@/shared/hooks";
 
 const hookArg = Argument.Literals("hook", HOOK_NAMES);
 const scope = Flag.String("scope").pipe(
   Flag.withDescription(
-    "Where it applies: a repository's name, name/folder, or an absolute folder (default: everywhere)",
+    "Where it applies: a repository's name, name/folder, a folder from ~ (~/work), or an absolute folder (default: everywhere)",
   ),
   Flag.optional,
 );
 const here = Flag.Boolean("here").pipe(
-  Flag.withDescription("This repository (or this folder, outside one)"),
+  Flag.withDescription("This repository (or this folder, from ~ when in the home directory)"),
   Flag.withDefault(false),
 );
 const local = Flag.Boolean("local").pipe(
@@ -37,10 +45,12 @@ const local = Flag.Boolean("local").pipe(
   Flag.withDefault(false),
 );
 
+// A folder in the home directory is kept from `~`, so it means the same on every machine, even
+// when the shell expanded an unquoted `~/work` before pad saw it.
 const scopeOf = (a: { scope: Option.Option<string>; here: boolean }) => {
-  if (!a.here) return Option.getOrElse(a.scope, () => "");
-  const at = locate(process.cwd());
-  return at.repo ?? at.dir ?? "";
+  if (a.here) return hereScope(locate(process.cwd()));
+  const given = Option.getOrElse(a.scope, () => "");
+  return given.startsWith("/") ? hereScope({ dir: given, home: homedir() }) : given;
 };
 
 const saveChosen = (path: string, chosen: Partial<Record<HookName, string>>) =>

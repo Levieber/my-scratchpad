@@ -81,6 +81,7 @@ export const hookNotes = Effect.fnUntraced(function* (
     repo: params.get("repo") || undefined,
     path: params.get("path") ?? undefined,
     dir: params.get("dir") || undefined,
+    home: params.get("home") || undefined,
   };
   const override = params.get("query")?.trim();
   const stored = (yield* store.hookSelections).filter((s) => s.hook === hook);

@@ -19,12 +19,18 @@ describe("locate", () => {
     mkdirSync(join(repo, "apps", "web"), { recursive: true });
     git(repo, "init", "-q");
     git(repo, "remote", "add", "origin", "git@github.com:me/My-App.git");
-    expect(locate(join(repo, "apps", "web"))).toEqual({
+    expect(locate(join(repo, "apps", "web"), "/home/me")).toEqual({
       repo: "my-app",
       path: "apps/web",
       dir: join(repo, "apps", "web"),
+      home: "/home/me",
     });
-    expect(locate(repo)).toEqual({ repo: "my-app", path: "", dir: repo });
+    expect(locate(repo, "/home/me")).toEqual({
+      repo: "my-app",
+      path: "",
+      dir: repo,
+      home: "/home/me",
+    });
   });
 
   test("a repository without a remote is named by its folder", () => {
@@ -34,9 +40,9 @@ describe("locate", () => {
     expect(locate(repo)).toMatchObject({ repo: "scratch", path: "" });
   });
 
-  test("outside any repository, only the folder", () => {
+  test("outside any repository, only the folder and the home directory", () => {
     const plain = join(base, "plain");
     mkdirSync(plain);
-    expect(locate(plain)).toEqual({ dir: plain });
+    expect(locate(plain, "/home/me")).toEqual({ dir: plain, home: "/home/me" });
   });
 });

@@ -121,7 +121,7 @@ const View = {
 const scope = {
   type: "string",
   description:
-    "Where a selection applies: empty for everywhere, a repository's name (`my-scratchpad`) or a folder inside it (`my-scratchpad/apps/web`), or an absolute folder outside any repository (`/home/me/notes`)",
+    "Where a selection applies: empty for everywhere, a repository's name (`my-scratchpad`) or a folder inside it (`my-scratchpad/apps/web`), a folder in the home directory (`~/work`, the same on every machine), or an absolute folder (`/srv/notes`). A folder covers every folder below it, repositories included",
 };
 
 const HookSelection = {
@@ -585,6 +585,12 @@ export const openapi = {
             in: "query",
             schema: { type: "string" },
             description: "The folder inside the repository",
+          },
+          {
+            name: "home",
+            in: "query",
+            schema: { type: "string" },
+            description: "The home directory, which `~/` scopes are relative to",
           },
           {
             name: "dir",

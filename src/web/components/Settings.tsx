@@ -296,7 +296,7 @@ function AddScope({ hook, online, onChanged, onError }: Shared & { hook: HookNam
         e.preventDefault();
         const normalized = normalizeScope(scope);
         if (!normalized) {
-          setError("Name a repository, a repository/folder, or an /absolute/folder.");
+          setError("Name a repository, a repository/folder, a ~/folder or an /absolute/folder.");
           return;
         }
         try {
@@ -316,7 +316,7 @@ function AddScope({ hook, online, onChanged, onError }: Shared & { hook: HookNam
           className={cn(field, "text-base text-foreground")}
           aria-describedby={error ? errorId : undefined}
           aria-invalid={Boolean(error)}
-          placeholder="my-repo, my-repo/folder or /absolute/folder"
+          placeholder="my-repo, my-repo/folder, ~/work or /absolute/folder"
           value={scope}
           disabled={!online}
           onChange={(e) => {

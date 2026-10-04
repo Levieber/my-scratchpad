@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   bySpecificity,
   HOOK_NAMES,
+  hereScope,
   HOOKS,
   isHookName,
   normalizeScope,
@@ -40,10 +41,19 @@ describe("normalizeScope", () => {
     expect(normalizeScope("/home/Me/notes/")).toBe("/home/Me/notes");
   });
 
+  test("a folder in the home directory is written from ~, keeping its case", () => {
+    expect(normalizeScope(" ~/Work/ ")).toBe("~/Work");
+    expect(normalizeScope("~//work//clients")).toBe("~/work/clients");
+  });
+
   test("refuses scopes that climb or that would mean every folder", () => {
     expect(normalizeScope("my-scratchpad/../other")).toBeUndefined();
     expect(normalizeScope("./my-scratchpad")).toBeUndefined();
     expect(normalizeScope("/")).toBeUndefined();
+    expect(normalizeScope("~")).toBeUndefined();
+    expect(normalizeScope("~/../etc")).toBeUndefined();
+    // Another user's home isn't something a hook knows.
+    expect(normalizeScope("~bob/work")).toBeUndefined();
   });
 });
 
@@ -75,6 +85,14 @@ describe("scopeMatches", () => {
     expect(scopeMatches("/home/me/notes", { dir: "/home/me/notes/2026" })).toBe(true);
     expect(scopeMatches("/home/me/notes", {})).toBe(false);
   });
+
+  test("a folder from ~ matches in each machine's home, wherever that is", () => {
+    expect(scopeMatches("~/work", { home: "/home/me", dir: "/home/me/work/app/src" })).toBe(true);
+    expect(scopeMatches("~/work", { home: "/Users/me", dir: "/Users/me/work" })).toBe(true);
+    expect(scopeMatches("~/work", { home: "/home/me", dir: "/home/me/workshop" })).toBe(false);
+    // A client that doesn't say where its home is can't be in it.
+    expect(scopeMatches("~/work", { dir: "/home/me/work" })).toBe(false);
+  });
 });
 
 describe("bySpecificity", () => {
@@ -95,6 +113,10 @@ describe("bySpecificity", () => {
       "my-app",
       "/home/me/work",
     ]);
+    expect(["~/work", "my-app"].toSorted(bySpecificity({ ...inWork, home: "/home/me" }))).toEqual([
+      "my-app",
+      "~/work",
+    ]);
     // A folder inside the repository is narrower than the repository.
     expect(["my-app", "/home/me/work/my-app/src"].toSorted(bySpecificity(inWork))).toEqual([
       "/home/me/work/my-app/src",
@@ -105,7 +127,7 @@ describe("bySpecificity", () => {
 
 describe("scopeLocation", () => {
   test("is a place the scope applies to, so a selection can be previewed from anywhere", () => {
-    for (const scope of ["", "my-scratchpad", "my-scratchpad/apps/web", "/home/me/notes"])
+    for (const scope of ["", "my-scratchpad", "my-scratchpad/apps/web", "/home/me/notes", "~/work"])
       expect(scopeMatches(scope, scopeLocation(scope))).toBe(true);
     expect(scopeLocation("my-scratchpad/apps/web")).toEqual({
       repo: "my-scratchpad",
@@ -113,6 +135,18 @@ describe("scopeLocation", () => {
     });
     expect(scopeLocation("/home/me/notes")).toEqual({ dir: "/home/me/notes" });
     expect(scopeLocation("")).toEqual({});
+  });
+});
+
+describe("hereScope", () => {
+  test("names the repository, else the folder from ~ when it's in the home directory", () => {
+    expect(hereScope({ repo: "my-app", path: "src", dir: "/home/me/work/my-app/src" })).toBe(
+      "my-app",
+    );
+    expect(hereScope({ dir: "/home/me/work/notes", home: "/home/me" })).toBe("~/work/notes");
+    expect(hereScope({ dir: "/srv/notes", home: "/home/me" })).toBe("/srv/notes");
+    // The home directory itself would mean nearly everywhere: named in full instead.
+    expect(hereScope({ dir: "/home/me", home: "/home/me" })).toBe("/home/me");
   });
 });
 

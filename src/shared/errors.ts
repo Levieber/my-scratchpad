@@ -22,7 +22,7 @@ export const ERROR_MESSAGES = {
   pinLimit: `At most ${MAX_PINS} notes can be pinned; unpin one first`,
   unknownHook: "No such hook",
   invalidScope:
-    "A scope is empty (everywhere), a repository's name with an optional folder, or an absolute folder",
+    "A scope is empty (everywhere), a repository's name with an optional folder, a folder from ~ (~/work), or an absolute folder",
   hookLimit: "Too many hand-picked notes, or a limit above the hook's maximum",
   notFound: "No such endpoint",
   methodNotAllowed: "Method not allowed",

@@ -156,6 +156,22 @@ describe("hook selections", () => {
     ).toEqual(["/home/me/work", ""]);
   });
 
+  test("a folder from ~ applies in each machine's home directory", async () => {
+    await note("work hours", { tags: ["work"] });
+    const saved = await call("PUT", "/api/hooks/session-start", {
+      scope: "~/work/",
+      query: "#work",
+    });
+    expect(saved.data.scope).toBe("~/work");
+    for (const home of ["/home/me", "/Users/me"])
+      expect(
+        (await sections("session-start", `home=${home}&dir=${home}/work/app`)).map((s) => s.scope),
+      ).toEqual(["~/work", ""]);
+    expect(
+      (await sections("session-start", "home=/home/me&dir=/home/me/play")).map((s) => s.scope),
+    ).toEqual([""]);
+  });
+
   test("hand-picked notes come first, aren't cut by the limit, and vanish with their note", async () => {
     const old = await note("old checklist", { kind: "reference" });
     const extra = await note("extra rules", { kind: "reference" });

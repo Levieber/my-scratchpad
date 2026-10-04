@@ -104,7 +104,12 @@ describe("MCP server", () => {
       });
 
       const { data } = await call("scratchpad_hooks", { cwd: repo });
-      expect(data.here).toEqual({ repo: "demo-app", path: "", dir: repo });
+      expect(data.here).toEqual({
+        repo: "demo-app",
+        path: "",
+        dir: repo,
+        home: expect.any(String),
+      });
       const sessionStart = data.hooks.find((h: { name: string }) => h.name === "session-start");
       expect(sessionStart.shown_here[0]).toEqual({
         scope: "demo-app",
