@@ -8,6 +8,7 @@ import * as Schema from "effect/Schema";
 
 import type {
   DatabaseUnavailable,
+  HookLimit,
   NoteChanged,
   NoteExists,
   NoteNotFound,
@@ -42,6 +43,7 @@ export type Failure =
   | ViewNotFound
   | ViewExists
   | PinLimit
+  | HookLimit
   | DatabaseUnavailable;
 
 export const refuse = (code: ErrorCode, status: number, detail?: string) =>

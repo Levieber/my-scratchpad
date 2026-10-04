@@ -11,6 +11,7 @@ import { Store } from "@/server/storage/store";
 
 import { llmsTxt } from "./docs/llms";
 import { openapi } from "./docs/openapi";
+import { hookNotes, hooksInfo, readScope, readSelection, routeHook } from "./hook-notes";
 import {
   authorOf,
   errorJson,
@@ -142,6 +143,47 @@ export const routes = (token: Redacted.Redacted | undefined) =>
         resource("/api/pins/:id", {
           PUT: Effect.as(Effect.flatMap(routeId, store.pin), noContent),
           DELETE: Effect.as(Effect.flatMap(routeId, store.unpin), noContent),
+        }),
+
+        resource("/api/hooks", { GET: Effect.map(hooksInfo(store), (info) => json(info)) }),
+
+        resource("/api/hooks/:name", {
+          PUT: Effect.gen(function* () {
+            const req = yield* request;
+            const hook = yield* routeHook;
+            const { scope, patch } = yield* readSelection(req);
+            return json(yield* store.saveHookSelection(hook, scope, patch, authorOf(req)));
+          }),
+          DELETE: Effect.gen(function* () {
+            const hook = yield* routeHook;
+            const scope = yield* readScope(searchParams(yield* request).get("scope"));
+            return yield* Effect.as(store.deleteHookSelection(hook, scope), noContent);
+          }),
+        }),
+
+        resource("/api/hooks/:name/notes", {
+          GET: Effect.gen(function* () {
+            const hook = yield* routeHook;
+            return json(yield* hookNotes(store, hook, searchParams(yield* request)));
+          }),
+        }),
+
+        // Like pins: PUT and DELETE are idempotent, so a client can retry either blindly.
+        resource("/api/hooks/:name/include/:id", {
+          PUT: Effect.gen(function* () {
+            const req = yield* request;
+            const hook = yield* routeHook;
+            const scope = yield* readScope(searchParams(req).get("scope"));
+            yield* store.pickHookNote(hook, scope, yield* routeId, authorOf(req));
+            return noContent;
+          }),
+          DELETE: Effect.gen(function* () {
+            const req = yield* request;
+            const hook = yield* routeHook;
+            const scope = yield* readScope(searchParams(req).get("scope"));
+            yield* store.unpickHookNote(hook, scope, yield* routeId, authorOf(req));
+            return noContent;
+          }),
         }),
 
         HttpRouter.route("GET", "/openapi.json", json(openapi)),

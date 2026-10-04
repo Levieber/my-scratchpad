@@ -30,3 +30,7 @@ export class ViewExists extends Schema.TaggedError<ViewExists>()("ViewExists", {
 export class PinLimit extends Schema.TaggedError<PinLimit>()("PinLimit", {
   max: Schema.Number,
 }) {}
+/** A hook selection past MAX_INCLUDE hand-picked notes, or with a limit above its hook's. */
+export class HookLimit extends Schema.TaggedError<HookLimit>()("HookLimit", {
+  reason: Schema.String,
+}) {}

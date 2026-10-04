@@ -20,6 +20,10 @@ export const ERROR_MESSAGES = {
   viewNotFound: "View not found",
   viewExists: "A view with this name already exists",
   pinLimit: `At most ${MAX_PINS} notes can be pinned; unpin one first`,
+  unknownHook: "No such hook",
+  invalidScope:
+    "A scope is empty (everywhere), a repository's name with an optional folder, or an absolute folder",
+  hookLimit: "Too many hand-picked notes, or a limit above the hook's maximum",
   notFound: "No such endpoint",
   methodNotAllowed: "Method not allowed",
   internal: "Internal error",

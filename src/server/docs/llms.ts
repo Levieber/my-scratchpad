@@ -25,6 +25,8 @@ Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 - GET    /api/notes/{id}/diff?from=&to=&since=   unified diff; default the latest change
 - GET    /api/tags
 - GET    /api/views, POST /api/views {name, query}, DELETE /api/views/{id}   saved searches
+- GET    /api/hooks   the notes agent hooks show (session start, end-of-turn review), as the user chose them
+- GET    /api/hooks/{name}/notes?repo=&path=&dir=   what a hook shows an agent working there, by section
 - GET    /api/pins, PUT /api/pins/{id}, DELETE /api/pins/{id}   the user's pinned notes (at most ${MAX_PINS}): what matters most right now
 
 Every note carries \`progress: {done, total}\`, counted from its markdown checkboxes.

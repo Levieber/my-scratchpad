@@ -84,3 +84,47 @@ export type NoteDiff = {
   changes: Partial<Record<"title" | "tags" | "kind", { from: unknown; to: unknown }>>;
   diff: string;
 };
+
+/**
+ * The notes a hook shows where `scope` applies (shared/hooks.ts): `include` (hand-picked ids)
+ * first, then the search `query` (null: hand-picked only), up to `limit` notes in all.
+ */
+export const HookSelection = Schema.Struct({
+  hook: Schema.String,
+  scope: Schema.String,
+  query: Schema.NullOr(Schema.String),
+  include: Schema.mutable(Schema.Array(Schema.String)),
+  limit: Schema.Number,
+  updated_at: Schema.String,
+  updated_by: Schema.String,
+});
+export type HookSelection = typeof HookSelection.Type;
+
+/** `GET /api/hooks`: each hook with its default and the selections the user stored. */
+export type HooksInfo = {
+  max_include: number;
+  hooks: {
+    name: string;
+    description: string;
+    default: { query: string; limit: number };
+    max_limit: number;
+    selections: HookSelection[];
+  }[];
+};
+
+/**
+ * One block of what a hook shows: a selection that applies where the agent is, with its notes
+ * already resolved. `source` says whose choice it is: the hook's default, the user's (stored), or
+ * this machine's override of the search for everywhere.
+ */
+export type HookSection = {
+  scope: string;
+  query: string | null;
+  source: "default" | "user" | "machine";
+  limit: number;
+  include: string[];
+  notes: Note[];
+};
+
+/** `GET /api/hooks/:name/notes`: the sections, most specific first, no note shown twice. */
+export type HookNotes = { hook: string; sections: HookSection[] };

@@ -18,18 +18,20 @@ src/
     checklist.ts  Markdown checkboxes → `progress` on every note.
     diff/         lines.ts (Myers line diff, stats), unified.ts (`git diff` text), merge.ts (three-way merge).
     ids.ts, title.ts   Note ids (the PWA mints them too, for notes written offline) and the title derived from a body.
+    hooks.ts      The agent hooks that show notes (their defaults), and scopes: where a selection applies (everywhere, a repository, a folder).
   server/       The HTTP API and the only code that touches the database.
     serve.ts      serverLayer and `main`: config, loopback/token check, BunHttpServer, JSON logs in production.
     routes.ts     The endpoints, one `resource` per path.
     resource.ts   How a path becomes a route: one handler per method, bearer check, error mapping (`guard`), 405 + Allow.
     http.ts       Reading a request (body, If-Match, query, paging) and writing a response or a refusal.
     note-diff.ts  What `GET /api/notes/:id/diff` computes.
+    hook-notes.ts What the hook endpoints read, and the notes a hook shows an agent where it works.
     pwa.ts        The PWA files that live at the site root (service worker, manifest, the icons).
     observability.ts  A request id on every request and response, one log line per request, the JSON logger.
     docs/         openapi.ts (the contract at /openapi.json), llms.ts (the agent quick-start at /llms.txt).
     storage/      SQLite + FTS5 through effect/sql; knows nothing about HTTP.
-      store.ts      The `Store` service and its layers: composes the four below, plus the health `ping`.
-      notes.ts, revisions.ts, views.ts, pins.ts   The queries, one file per area.
+      store.ts      The `Store` service and its layers: composes the five below, plus the health `ping`.
+      notes.ts, revisions.ts, views.ts, pins.ts, hooks.ts   The queries, one file per area.
       errors.ts     What the store fails with besides a defect (NoteNotFound, NoteChanged, …).
       rows.ts       A row of SQLite → the API's shapes.
       sql.ts        What every query shares: SQL failures as defects, the clock.
@@ -85,7 +87,7 @@ Type-only imports are always fine: sharing `Note` couples nothing at runtime.
 Every non-2xx body is `{ "error": "<code>", "message": "<english>" }`. The code (from `shared/errors.ts`, also an enum in `/openapi.json`) is the contract; the message is for people and agents reading raw responses.
 
 - A handler refuses a request with `yield* refuse(code, status, detail?)`, an `HttpError`.
-- The store fails with tagged errors (`NoteNotFound`, `NoteExists`, `NoteChanged`, `RevisionNotFound`, `ViewNotFound`, `ViewExists`, `PinLimit`, and `DatabaseUnavailable`, which only `ping` raises); `guard` maps each to its code and status, and the `Failure` type lists everything a handler may fail with.
+- The store fails with tagged errors (`NoteNotFound`, `NoteExists`, `NoteChanged`, `RevisionNotFound`, `ViewNotFound`, `ViewExists`, `PinLimit`, `HookLimit`, and `DatabaseUnavailable`, which only `ping` raises); `guard` maps each to its code and status, and the `Failure` type lists everything a handler may fail with.
 - A defect (a bug, a broken database) is logged and answered with `500 internal`.
 
 Clients get `ApiError` (`client/client.ts`) carrying the status and code.

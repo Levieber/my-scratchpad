@@ -5,6 +5,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as SqlError from "effect/sql/SqlError";
 
 import { DatabaseUnavailable } from "./errors";
+import { makeHooks } from "./hooks";
 import { makeNotes } from "./notes";
 import { makePins } from "./pins";
 import { makeRevisions } from "./revisions";
@@ -20,6 +21,7 @@ const make = Effect.gen(function* () {
     ...history,
     ...makeViews(sql),
     ...makePins(sql),
+    ...makeHooks(sql),
 
     /**
      * Reads a row of the notes table: fails when the file can't be read at all, not just when a
@@ -32,7 +34,7 @@ const make = Effect.gen(function* () {
   };
 });
 
-/** Notes, saved views and pins in SQLite + FTS5. Only the server uses it. */
+/** Notes, saved views, pins and hook selections in SQLite + FTS5. Only the server uses it. */
 export class Store extends Context.Service<Store, Effect.Success<typeof make>>()("pad/Store") {
   /** On whatever SqlClient is provided; the database must already be migrated. */
   static readonly layerNoDeps = Layer.effect(Store, make);

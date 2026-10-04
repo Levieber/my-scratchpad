@@ -1,4 +1,5 @@
 import { ERROR_CODES } from "@/shared/errors";
+import { HOOK_NAMES, MAX_INCLUDE } from "@/shared/hooks";
 import { KIND_NAMES, KINDS } from "@/shared/kinds";
 import { MAX_PINS } from "@/shared/pins";
 
@@ -117,6 +118,64 @@ const View = {
   },
 };
 
+const scope = {
+  type: "string",
+  description:
+    "Where a selection applies: empty for everywhere, a repository's name (`my-scratchpad`) or a folder inside it (`my-scratchpad/apps/web`), or an absolute folder outside any repository (`/home/me/notes`)",
+};
+
+const HookSelection = {
+  type: "object",
+  required: ["hook", "scope", "query", "include", "limit", "updated_at", "updated_by"],
+  properties: {
+    hook: { type: "string", enum: HOOK_NAMES },
+    scope,
+    query: {
+      type: ["string", "null"],
+      description: "A search in the search box's language; null for hand-picked notes only",
+    },
+    include: {
+      type: "array",
+      items: { type: "string" },
+      description: `Hand-picked note ids (at most ${MAX_INCLUDE}), shown first and never cut`,
+    },
+    limit: { type: "integer", description: "How many notes in all, hand-picked ones included" },
+    updated_at: { type: "string", format: "date-time" },
+    updated_by: { type: "string", description: "X-Pad-Author of the last change" },
+  },
+};
+
+const HookSection = {
+  type: "object",
+  required: ["scope", "query", "source", "limit", "include", "notes"],
+  properties: {
+    scope,
+    query: { type: ["string", "null"] },
+    source: {
+      type: "string",
+      enum: ["default", "user", "machine"],
+      description:
+        "The hook's default, the user's stored selection, or the caller's own search for everywhere (?query=)",
+    },
+    limit: { type: "integer" },
+    include: { type: "array", items: { type: "string" }, description: "Hand-picked notes found" },
+    notes: { type: "array", items: { $ref: "#/components/schemas/Note" } },
+  },
+};
+
+const hookParam = {
+  name: "name",
+  in: "path",
+  required: true,
+  schema: { type: "string", enum: HOOK_NAMES },
+};
+const scopeParam = {
+  name: "scope",
+  in: "query",
+  schema: scope,
+  description: "Default: everywhere",
+};
+
 const idParam = { name: "id", in: "path", required: true, schema: { type: "string" } };
 const json = (schema: object) => ({ content: { "application/json": { schema } } });
 const notFound = { description: "Not found", ...json({ $ref: "#/components/schemas/Error" }) };
@@ -153,6 +212,8 @@ export const openapi = {
       FullRevision,
       Diff,
       View,
+      HookSelection,
+      HookSection,
       Error: {
         type: "object",
         required: ["error", "message"],
@@ -425,6 +486,155 @@ export const openapi = {
         operationId: "unpinNote",
         summary: "Unpin a note",
         responses: { 204: { description: "Unpinned (or wasn't pinned)" }, 404: notFound },
+      },
+    },
+    "/api/hooks": {
+      get: {
+        operationId: "listHooks",
+        summary:
+          "The agent hooks that show notes (session start, end-of-turn review): each one's default search and the selections the user stored",
+        responses: {
+          200: {
+            description: "Hooks",
+            ...json({
+              type: "object",
+              required: ["max_include", "hooks"],
+              properties: {
+                max_include: { type: "integer" },
+                hooks: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["name", "description", "default", "max_limit", "selections"],
+                    properties: {
+                      name: { type: "string" },
+                      description: { type: "string" },
+                      default: {
+                        type: "object",
+                        properties: { query: { type: "string" }, limit: { type: "integer" } },
+                      },
+                      max_limit: { type: "integer" },
+                      selections: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/HookSelection" },
+                      },
+                    },
+                  },
+                },
+              },
+            }),
+          },
+        },
+      },
+    },
+    "/api/hooks/{name}": {
+      parameters: [hookParam],
+      put: {
+        operationId: "saveHookSelection",
+        summary:
+          "Choose the notes a hook shows where `scope` applies. Fields left out keep their value (or the default: the hook's search for everywhere, hand-picked notes only elsewhere)",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  scope,
+                  query: { type: ["string", "null"] },
+                  include: { type: "array", items: { type: "string" } },
+                  limit: { type: "integer", minimum: 1 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Saved", ...json({ $ref: "#/components/schemas/HookSelection" }) },
+          400: error("A field has the wrong shape, or the scope can't be one (invalidScope)"),
+          404: error("No such hook (unknownHook), or a picked note doesn't exist"),
+          409: error("Too many hand-picked notes, or a limit above the hook's (hookLimit)"),
+        },
+      },
+      delete: {
+        operationId: "deleteHookSelection",
+        summary: "Go back to the default where `scope` applies",
+        parameters: [scopeParam],
+        responses: {
+          204: { description: "Deleted (or wasn't stored)" },
+          400: error("invalidScope"),
+          404: error("unknownHook"),
+        },
+      },
+    },
+    "/api/hooks/{name}/notes": {
+      get: {
+        operationId: "hookNotes",
+        summary:
+          "What a hook shows an agent working at a place: every selection that applies there, most specific first, each with its notes; no note twice",
+        parameters: [
+          hookParam,
+          {
+            name: "repo",
+            in: "query",
+            schema: { type: "string" },
+            description: "The repository's name",
+          },
+          {
+            name: "path",
+            in: "query",
+            schema: { type: "string" },
+            description: "The folder inside the repository",
+          },
+          {
+            name: "dir",
+            in: "query",
+            schema: { type: "string" },
+            description: "The absolute folder",
+          },
+          {
+            name: "query",
+            in: "query",
+            schema: { type: "string" },
+            description: "A machine's own search, replacing the one for everywhere",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Sections",
+            ...json({
+              type: "object",
+              required: ["hook", "sections"],
+              properties: {
+                hook: { type: "string" },
+                sections: { type: "array", items: { $ref: "#/components/schemas/HookSection" } },
+              },
+            }),
+          },
+          404: error("unknownHook"),
+        },
+      },
+    },
+    "/api/hooks/{name}/include/{id}": {
+      parameters: [hookParam, idParam, scopeParam],
+      put: {
+        operationId: "pickHookNote",
+        summary: "Hand-pick a note for a hook where `scope` applies",
+        responses: {
+          204: { description: "Picked (or already was)" },
+          400: error("invalidScope"),
+          404: error("No such hook or note"),
+          409: error(`${MAX_INCLUDE} notes are hand-picked already (hookLimit)`),
+        },
+      },
+      delete: {
+        operationId: "unpickHookNote",
+        summary: "Stop hand-picking a note",
+        responses: {
+          204: { description: "Unpicked (or wasn't picked)" },
+          400: error("invalidScope"),
+          404: error("unknownHook"),
+        },
       },
     },
     "/api/health": {

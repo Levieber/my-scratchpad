@@ -115,6 +115,24 @@ export const MIGRATIONS: Migration[] = [
        )`,
     ],
   },
+  {
+    // Which notes an agent hook shows, per hook and per scope (shared/hooks.ts). Hand-picked ids
+    // are a JSON list rather than rows: a deleted note is skipped when read and dropped on the
+    // next write, so deleting a note needs no hook bookkeeping.
+    id: "0009.hook_selections",
+    statements: [
+      `CREATE TABLE hook_selections (
+         hook TEXT NOT NULL,
+         scope TEXT NOT NULL,
+         query TEXT,
+         include TEXT NOT NULL DEFAULT '[]',
+         note_limit INTEGER NOT NULL,
+         updated_at TEXT NOT NULL,
+         updated_by TEXT NOT NULL,
+         PRIMARY KEY (hook, scope)
+       )`,
+    ],
+  },
 ];
 
 /**
