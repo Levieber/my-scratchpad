@@ -1,5 +1,14 @@
-import { EllipsisIcon, PinIcon, PinOffIcon, Trash2Icon } from "lucide-react";
+import {
+  BotIcon,
+  BotOffIcon,
+  ClipboardCheckIcon,
+  EllipsisIcon,
+  PinIcon,
+  PinOffIcon,
+  Trash2Icon,
+} from "lucide-react";
 
+import type { HookName } from "@/shared/hooks";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,9 +17,35 @@ import {
 } from "@/web/components/ui/dropdown-menu";
 import type { Note } from "@/web/lib/api";
 import { badge, moreButton, outlineBadge } from "@/web/lib/classes";
+import type { PickState } from "@/web/lib/hooks";
 import { ago, groupNotes, preview } from "@/web/lib/listing";
 import type { PinState } from "@/web/lib/pins";
 import { cn } from "@/web/lib/utils";
+
+/** A menu entry hand-picking a note for a hook, for everywhere; why it's refused, if it is. */
+function PickItem({
+  state,
+  icon,
+  pick,
+  unpick,
+  onToggle,
+}: {
+  state: PickState;
+  icon: React.ReactNode;
+  pick: string;
+  unpick: string;
+  onToggle: () => void;
+}) {
+  return (
+    <DropdownMenuItem disabled={state.disabled} onClick={onToggle}>
+      {state.picked ? <BotOffIcon /> : icon}
+      <span>
+        {state.picked ? unpick : pick}
+        <span className="block text-xs text-muted-foreground">{state.hint}</span>
+      </span>
+    </DropdownMenuItem>
+  );
+}
 
 const heading =
   "mx-2.5 mt-3 mb-1 text-[0.6875rem] font-semibold tracking-wider text-muted-foreground uppercase group-first/section:mt-0";
@@ -24,6 +59,8 @@ export function NoteList({
   pinned,
   pinOf,
   onTogglePin,
+  pickOf,
+  onTogglePick,
   onDelete,
   currentId,
   kind,
@@ -37,6 +74,9 @@ export function NoteList({
   pinned: Note[];
   pinOf: (id: string) => PinState;
   onTogglePin: (note: Note) => void;
+  /** Undefined when the server keeps no hook choices: the menu then offers none. */
+  pickOf: ((id: string, hook: HookName) => PickState) | undefined;
+  onTogglePick: (note: Note, hook: HookName) => void;
   onDelete: (note: Note) => void;
   currentId: string | undefined;
   kind: string;
@@ -50,6 +90,9 @@ export function NoteList({
   const item = (n: Note, inPinned = false) => {
     const p = preview(n);
     const pin = pinOf(n.id);
+    const session = pickOf?.(n.id, "session-start");
+    // A reference is what a review checks edits against; offered for those only.
+    const review = n.kind === "reference" ? pickOf?.(n.id, "review") : undefined;
     return (
       // The row is the card, holding the note (a button) and its menu trigger at the right edge:
       // one button can't hold another.
@@ -94,6 +137,12 @@ export function NoteList({
             {pin.pinned && !inPinned && (
               <PinIcon className="mr-1 inline size-3 align-[-1px]" aria-label="Pinned" />
             )}
+            {session?.picked && (
+              <BotIcon
+                className="mr-1 inline size-3 align-[-1px]"
+                aria-label="Shown at session start"
+              />
+            )}
             {ago(n.updated_at)}
             {n.kind === "reference" && kind !== "reference" && (
               <span className={outlineBadge}>reference</span>
@@ -121,6 +170,24 @@ export function NoteList({
                 )}
               </span>
             </DropdownMenuItem>
+            {session && (
+              <PickItem
+                state={session}
+                icon={<BotIcon />}
+                pick="Show at session start"
+                unpick="Stop showing at session start"
+                onToggle={() => onTogglePick(n, "session-start")}
+              />
+            )}
+            {review && (
+              <PickItem
+                state={review}
+                icon={<ClipboardCheckIcon />}
+                pick="Use in reviews"
+                unpick="Stop using in reviews"
+                onToggle={() => onTogglePick(n, "review")}
+              />
+            )}
             <DropdownMenuItem variant="destructive" onClick={() => onDelete(n)}>
               <Trash2Icon />
               Delete

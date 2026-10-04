@@ -17,7 +17,7 @@ Run it from the main checkout: it records the paths of the folder it runs in. It
 
 ## Choosing the notes the hooks use
 
-Each hook that reads notes shows a **selection**: a search in the language of the search box (`kind:x author:x #tag words`, see [architecture](architecture.md)), notes you **hand-picked** (listed first, never cut by the limit), and a limit. Selections are kept on the server (`/api/hooks`), so every machine, the PWA and agents see the same ones, and they apply to a **scope**:
+Each hook that reads notes shows a **selection**: a search in the language of the search box (`kind:x author:x #tag words`, see [architecture](architecture.md)), notes you **hand-picked** (listed first, never cut by the limit), and a limit. Selections are kept on the server (`/api/hooks`), so every machine, the PWA and agents see the same ones, and they apply to a **scope**. Choose them with `pad hooks` (below) or in the PWA: **Settings → Agents** (`/settings`) edits every scope and previews what agents see, and a note's menu has "Show at session start" (and, for references, "Use in reviews") to hand-pick it for everywhere.
 
 | Scope                    | Applies                                                                                                                         |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |

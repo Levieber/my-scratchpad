@@ -19,6 +19,7 @@ src/
     diff/         lines.ts (Myers line diff, stats), unified.ts (`git diff` text), merge.ts (three-way merge).
     ids.ts, title.ts   Note ids (the PWA mints them too, for notes written offline) and the title derived from a body.
     hooks.ts      The agent hooks that show notes (their defaults), and scopes: where a selection applies (everywhere, a repository, a folder).
+    pages.ts      The PWA's pages and their addresses: the server serves the app at each, the app reads which one it is on.
   server/       The HTTP API and the only code that touches the database.
     serve.ts      serverLayer and `main`: config, loopback/token check, BunHttpServer, JSON logs in production.
     routes.ts     The endpoints, one `resource` per path.
@@ -52,10 +53,10 @@ src/
   mcp/          tools.ts (names, descriptions, shapes), handlers.ts (what each does), server.ts (protocol, instructions); mcp.ts wires it.
   web/          React PWA, bundled by Bun from the web/index.html import.
     index.css     The only stylesheet: Tailwind, the palette (light and dark), the breakpoint, base rules.
-    lib/          api.ts (the API from a browser), sync.ts (the offline outbox and syncer), listing.ts, draft.ts, pins.ts (when a note can be pinned), storage.ts (localStorage), classes.ts (the repeated controls' class lists), utils.ts (shadcn's `cn`).
-    components/   Sidebar (Filters, SavedViews, TagChips, NoteList), Editor, History, Splitter, TokenDialog.
+    lib/          api.ts (the API from a browser), sync.ts (the offline outbox and syncer), listing.ts, draft.ts, pins.ts (when a note can be pinned), hooks.ts (when a note can be hand-picked for an agent hook), storage.ts (localStorage), classes.ts (the repeated controls' class lists), utils.ts (shadcn's `cn`).
+    components/   Sidebar (Filters, SavedViews, TagChips, NoteList), Editor, History, Splitter, TokenDialog, Settings (at /settings: which notes the agent hooks show).
       ui/           shadcn components, as `bunx shadcn add <name>` writes them (components.json).
-    App.tsx       The state and effects that tie them together; main.tsx mounts it.
+    App.tsx       The state and effects that tie them together, and which page is open (it follows the address, shared/pages.ts); main.tsx mounts it.
 public/           Files that must live at the site root: service worker, manifest, icon.
 integrations/     Claude Code wiring: installer, hooks (run as `pad hook <name>`), skills.
 test/             Mirrors src/ (server/, shared/, cli/, client/, mcp/, web/, integrations/); support.ts has the fixtures: the production layers on an in-memory database, in a ManagedRuntime.

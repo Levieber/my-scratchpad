@@ -1,3 +1,5 @@
+import type { HookName } from "@/shared/hooks";
+import { PAGES } from "@/shared/pages";
 import { operatorValue } from "@/shared/query";
 import { Filters } from "@/web/components/Filters";
 import { NoteList } from "@/web/components/NoteList";
@@ -5,6 +7,7 @@ import { SavedViews } from "@/web/components/SavedViews";
 import { TagChips } from "@/web/components/TagChips";
 import type { Note, Tag, View } from "@/web/lib/api";
 import { field, footer, primaryButton } from "@/web/lib/classes";
+import type { PickState } from "@/web/lib/hooks";
 import type { PinState } from "@/web/lib/pins";
 import { cn } from "@/web/lib/utils";
 
@@ -23,11 +26,14 @@ export function Sidebar({
   pinned,
   pinOf,
   onTogglePin,
+  pickOf,
+  onTogglePick,
   onDelete,
   currentId,
   canLoadMore,
   onLoadMore,
   onOpen,
+  onSettings,
   online,
   pendingChanges,
 }: {
@@ -48,11 +54,14 @@ export function Sidebar({
   pinned: Note[];
   pinOf: (id: string) => PinState;
   onTogglePin: (note: Note) => void;
+  pickOf: ((id: string, hook: HookName) => PickState) | undefined;
+  onTogglePick: (note: Note, hook: HookName) => void;
   onDelete: (note: Note) => void;
   currentId: string | undefined;
   canLoadMore: boolean;
   onLoadMore: () => void;
   onOpen: (id: string) => void;
+  onSettings: () => void;
   online: boolean;
   pendingChanges: number;
 }) {
@@ -94,6 +103,8 @@ export function Sidebar({
         pinned={pinned}
         pinOf={pinOf}
         onTogglePin={onTogglePin}
+        pickOf={pickOf}
+        onTogglePick={onTogglePick}
         onDelete={onDelete}
         currentId={currentId}
         kind={operatorValue(q, "kind")}
@@ -115,13 +126,27 @@ export function Sidebar({
           {pendingChanges > 0 &&
             ` · ${pendingChanges} ${pendingChanges === 1 ? "change" : "changes"} to sync`}
         </output>
-        <a
-          className="inline-flex min-h-6 min-w-6 items-center px-1 underline"
-          href="/openapi.json"
-          target="_blank"
-        >
-          API
-        </a>
+        <span className="flex gap-1">
+          {/* A real link, so it opens in a new tab too; a plain click stays in the app. */}
+          <a
+            className="inline-flex min-h-6 min-w-6 items-center px-1 underline"
+            href={PAGES.settings}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+              e.preventDefault();
+              onSettings();
+            }}
+          >
+            Settings
+          </a>
+          <a
+            className="inline-flex min-h-6 min-w-6 items-center px-1 underline"
+            href="/openapi.json"
+            target="_blank"
+          >
+            API
+          </a>
+        </span>
       </footer>
     </aside>
   );

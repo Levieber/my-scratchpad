@@ -1,8 +1,19 @@
 // Browser client for the same HTTP API the CLI and agents use.
-import type { FullRevision, Note, NoteDiff, NoteInput, Revision, View } from "@/shared/domain";
+import type {
+  FullRevision,
+  HookNotes,
+  HookSelection,
+  HooksInfo,
+  Note,
+  NoteDiff,
+  NoteInput,
+  Revision,
+  View,
+} from "@/shared/domain";
 import { readError } from "@/shared/errors";
+import type { Location } from "@/shared/hooks";
 
-export type { FullRevision, Note, NoteDiff, NoteInput, Revision, View };
+export type { FullRevision, HookSelection, HooksInfo, Note, NoteDiff, NoteInput, Revision, View };
 export type Tag = { tag: string; count: number };
 
 export class Unauthorized extends Error {}
@@ -109,4 +120,20 @@ export const api = {
   revision: (id: string, rev: number) =>
     req<FullRevision>("GET", `/api/notes/${id}/revisions/${rev}`),
   diff: (id: string, to: number) => req<NoteDiff>("GET", `/api/notes/${id}/diff?to=${to}`),
+  hooks: () => req<HooksInfo>("GET", "/api/hooks"),
+  hookNotes: (hook: string, at: Location) => {
+    const p = new URLSearchParams();
+    for (const [k, v] of Object.entries(at)) if (v) p.set(k, v);
+    return req<HookNotes>("GET", `/api/hooks/${hook}/notes?${p}`);
+  },
+  saveHookSelection: (
+    hook: string,
+    selection: { scope: string; query?: string | null; limit?: number },
+  ) => req<HookSelection>("PUT", `/api/hooks/${hook}`, selection),
+  deleteHookSelection: (hook: string, scope: string) =>
+    req<void>("DELETE", `/api/hooks/${hook}?${new URLSearchParams({ scope })}`),
+  pickHookNote: (hook: string, id: string, scope = "") =>
+    req<void>("PUT", `/api/hooks/${hook}/include/${id}?${new URLSearchParams({ scope })}`),
+  unpickHookNote: (hook: string, id: string, scope = "") =>
+    req<void>("DELETE", `/api/hooks/${hook}/include/${id}?${new URLSearchParams({ scope })}`),
 };

@@ -101,3 +101,15 @@ describe("PWA icons", () => {
     expect([width, height]).toEqual([180, 180]);
   });
 });
+
+describe("PWA pages", () => {
+  test("each page's address serves the app, so a reload or a bookmark opens it", async () => {
+    const home = await (await get("/")).text();
+    const settings = await get("/settings");
+    expect([settings.status, settings.headers.get("content-type")]).toEqual([
+      200,
+      "text/html;charset=utf-8",
+    ]);
+    expect(await settings.text()).toBe(home);
+  });
+});

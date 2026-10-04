@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { HookName } from "@/shared/hooks";
 import { newId } from "@/shared/ids";
+import { type Page, pageOf, PAGES } from "@/shared/pages";
 import { Editor } from "@/web/components/Editor";
+import { Settings } from "@/web/components/Settings";
 import { Sidebar } from "@/web/components/Sidebar";
 import { Splitter } from "@/web/components/Splitter";
 import { TokenDialog } from "@/web/components/TokenDialog";
 import {
   api,
   type FullRevision,
+  type HooksInfo,
   isApiError,
   Offline,
   onConnectivity,
@@ -25,6 +29,7 @@ import {
   saveLabel,
   toDraft,
 } from "@/web/lib/draft";
+import { pickState } from "@/web/lib/hooks";
 import { pinState } from "@/web/lib/pins";
 import { outbox, storedWidth, storeWidth, syncer } from "@/web/lib/storage";
 import { localNote, mergeFields, baseOf, fieldsOf, withPending } from "@/web/lib/sync";
@@ -68,6 +73,30 @@ export function App() {
 
   useEffect(() => onConnectivity(setOnline), []);
   useEffect(() => outbox.subscribe(() => setPending(outbox.all())), []);
+
+  // Which page is open follows the address, so back and forward move between them.
+  const [page, setPage] = useState<Page>(() => pageOf(location.pathname));
+  useEffect(() => {
+    const follow = () => setPage(pageOf(location.pathname));
+    window.addEventListener("popstate", follow);
+    return () => window.removeEventListener("popstate", follow);
+  }, []);
+
+  // The agent hooks' choices: loaded once and after each change, not polled, since only this
+  // page and `pad hooks` change them. A server without them answers `notFound`; the app then
+  // offers no hook choices at all.
+  const [hooksInfo, setHooksInfo] = useState<HooksInfo | null>(null);
+  const [hooksSupported, setHooksSupported] = useState(true);
+  const refreshHooks = useCallback(async () => {
+    try {
+      setHooksInfo(await api.hooks());
+      setHooksSupported(true);
+    } catch (e) {
+      if (isApiError(e, "notFound")) setHooksSupported(false);
+      else handle(e);
+    }
+  }, [handle]);
+  useEffect(() => void refreshHooks(), [refreshHooks]);
 
   const refreshList = useCallback(async () => {
     try {
@@ -371,65 +400,106 @@ export function App() {
     await refreshList();
   };
 
+  // Hand-picking from the list applies everywhere; Settings picks per repository or folder.
+  const pickOf = hooksSupported
+    ? (id: string, hook: HookName) => pickState(id, hook, hooksInfo, unsyncedIds)
+    : undefined;
+  const togglePick = async (note: Note, hook: HookName) => {
+    const picked = pickState(note.id, hook, hooksInfo, unsyncedIds).picked;
+    try {
+      await (picked ? api.unpickHookNote(hook, note.id) : api.pickHookNote(hook, note.id));
+    } catch (e) {
+      handle(e);
+    }
+    await refreshHooks();
+  };
+
+  // Leaving the notes never waits for the network, as with leaving a note.
+  const go = (next: Page) => {
+    flush();
+    history.pushState(null, "", PAGES[next]);
+    setPage(next);
+  };
+
+  const notesShown = page === "notes";
+
   return (
     // No note open: the list is the whole page. A note open: list | resize handle | editor on a
     // wide screen, the editor alone on a phone.
     <div
       className={cn(
         "grid h-dvh grid-cols-[minmax(0,1fr)] pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]",
-        open && !listHidden && "wide:grid-cols-[var(--sidebar)_auto_minmax(0,1fr)]",
+        notesShown && open && !listHidden && "wide:grid-cols-[var(--sidebar)_auto_minmax(0,1fr)]",
       )}
       style={{ "--sidebar": `${width}px` } as React.CSSProperties}
     >
-      <Sidebar
-        layout={open ? (listHidden ? "hidden" : "column") : "page"}
-        q={q}
-        onFilter={filter}
-        searchRef={searchRef}
-        onNew={() => newNote().then(() => bodyRef.current?.focus())}
-        views={views}
-        onSaveView={saveView}
-        onRemoveView={(v) => void removeView(v)}
-        tags={tags}
-        notes={shown}
-        pinned={pinned}
-        pinOf={pinOf}
-        onTogglePin={(n) => void togglePin(n)}
-        onDelete={remove}
-        currentId={current?.id}
-        canLoadMore={notes.length >= limit}
-        onLoadMore={() => setLimit((l) => l + PAGE)}
-        onOpen={(id) => void openNote(id)}
-        online={online}
-        pendingChanges={pending.length}
-      />
-
-      {open && !listHidden && <Splitter width={width} onChange={setWidth} />}
-
-      {open && (
-        <Editor
-          draft={draft}
-          onEdit={edit}
-          current={current}
-          showHistory={showHistory}
-          historyDisabled={!current || unsynced}
-          historyHint={
-            unsynced ? "History starts once the note has synced" : "What changed, and when"
-          }
-          pin={pinOf(current?.id)}
-          onTogglePin={() => current && void togglePin(current)}
-          listHidden={listHidden}
-          onToggleList={() => setListHidden(!listHidden)}
-          onBack={() => {
-            flush();
-            setOpen(false);
-          }}
-          onToggleHistory={() => void toggleHistory()}
-          onDelete={() => remove()}
-          onRestore={restore}
-          bodyRef={bodyRef}
-          saveLabel={activeSave}
+      {page === "settings" && (
+        <Settings
+          info={hooksInfo}
+          supported={hooksSupported}
+          online={online}
+          onChanged={refreshHooks}
+          onError={handle}
+          onBack={() => go("notes")}
         />
+      )}
+
+      {notesShown && (
+        <>
+          <Sidebar
+            layout={open ? (listHidden ? "hidden" : "column") : "page"}
+            q={q}
+            onFilter={filter}
+            searchRef={searchRef}
+            onNew={() => newNote().then(() => bodyRef.current?.focus())}
+            views={views}
+            onSaveView={saveView}
+            onRemoveView={(v) => void removeView(v)}
+            tags={tags}
+            notes={shown}
+            pinned={pinned}
+            pinOf={pinOf}
+            onTogglePin={(n) => void togglePin(n)}
+            pickOf={pickOf}
+            onTogglePick={(n, hook) => void togglePick(n, hook)}
+            onDelete={remove}
+            currentId={current?.id}
+            canLoadMore={notes.length >= limit}
+            onLoadMore={() => setLimit((l) => l + PAGE)}
+            onOpen={(id) => void openNote(id)}
+            onSettings={() => go("settings")}
+            online={online}
+            pendingChanges={pending.length}
+          />
+
+          {open && !listHidden && <Splitter width={width} onChange={setWidth} />}
+
+          {open && (
+            <Editor
+              draft={draft}
+              onEdit={edit}
+              current={current}
+              showHistory={showHistory}
+              historyDisabled={!current || unsynced}
+              historyHint={
+                unsynced ? "History starts once the note has synced" : "What changed, and when"
+              }
+              pin={pinOf(current?.id)}
+              onTogglePin={() => current && void togglePin(current)}
+              listHidden={listHidden}
+              onToggleList={() => setListHidden(!listHidden)}
+              onBack={() => {
+                flush();
+                setOpen(false);
+              }}
+              onToggleHistory={() => void toggleHistory()}
+              onDelete={() => remove()}
+              onRestore={restore}
+              bodyRef={bodyRef}
+              saveLabel={activeSave}
+            />
+          )}
+        </>
       )}
 
       {needsToken && (
@@ -438,6 +508,7 @@ export function App() {
             token.set(t);
             setNeedsToken(false);
             void refreshList();
+            void refreshHooks();
             void sync();
           }}
         />
