@@ -1,55 +1,36 @@
 import { PinIcon, PinOffIcon, Trash2Icon } from "lucide-react";
 
-import { History } from "@/web/components/History";
-import type { FullRevision, Note } from "@/web/lib/api";
+import { History } from "@/web/components/editor/history";
+import { removeNote, useEditor } from "@/web/hooks/editor.hook";
+import { bodyRef } from "@/web/hooks/focus";
+import { useUnsyncedIds } from "@/web/hooks/pending.hook";
+import { usePinOf, usePinToggle } from "@/web/hooks/pins.hook";
 import { field, footer, ghostButton, iconButton } from "@/web/lib/classes";
-import type { Draft } from "@/web/lib/draft";
+import { saveLabel } from "@/web/lib/draft";
 import { ago } from "@/web/lib/listing";
-import type { PinState } from "@/web/lib/pins";
+import { session } from "@/web/lib/session";
 import { cn } from "@/web/lib/utils";
 
 const textButton = cn(ghostButton, "text-[0.8125rem] text-muted-foreground");
 
-/** The right column: the open note's form, or its history. It holds no state of its own. */
+/** The right column: the open note's form, or its history. */
 export function Editor({
-  draft,
-  onEdit,
-  current,
-  showHistory,
-  historyDisabled,
-  historyHint,
-  pin,
-  onTogglePin,
   listHidden,
   onToggleList,
-  onBack,
-  onToggleHistory,
-  onDelete,
-  onRestore,
-  bodyRef,
-  saveLabel,
 }: {
-  draft: Draft;
-  onEdit: (patch: Partial<Draft>) => void;
-  current: Note | null;
-  showHistory: boolean;
-  historyDisabled: boolean;
-  historyHint: string;
-  pin: PinState;
-  onTogglePin: () => void;
   listHidden: boolean;
   onToggleList: () => void;
-  onBack: () => void;
-  onToggleHistory: () => void;
-  onDelete: () => void;
-  onRestore: (revision: FullRevision) => void;
-  bodyRef: React.RefObject<HTMLTextAreaElement | null>;
-  saveLabel: string;
 }) {
+  const { draft, current, showHistory, saveState, saveError } = useEditor();
+  const pin = usePinOf()(current?.id);
+  const togglePin = usePinToggle();
+  // History and pins live on the server, so a note it hasn't seen yet has neither.
+  const unsyncedIds = useUnsyncedIds();
+  const unsynced = current ? unsyncedIds.has(current.id) : false;
   return (
     <main className="flex min-h-0 flex-col gap-2.5 px-5 py-3.5 max-wide:px-4 max-wide:py-3">
       <header className="flex flex-wrap items-center gap-2">
-        <button className={ghostButton} aria-label="Back to list" onClick={onBack}>
+        <button className={ghostButton} aria-label="Back to list" onClick={session.close}>
           ←
         </button>
         <button
@@ -67,13 +48,13 @@ export function Editor({
           )}
           placeholder="Title"
           value={draft.title}
-          onChange={(e) => onEdit({ title: e.target.value })}
+          onChange={(e) => session.edit({ title: e.target.value })}
         />
         <button
           className={textButton}
           aria-pressed={draft.kind === "reference"}
           title="Reference: reusable rules to check work against (practices, checklists)"
-          onClick={() => onEdit({ kind: draft.kind === "reference" ? "note" : "reference" })}
+          onClick={() => session.edit({ kind: draft.kind === "reference" ? "note" : "reference" })}
         >
           Reference
         </button>
@@ -83,16 +64,16 @@ export function Editor({
           aria-pressed={pin.pinned}
           disabled={pin.disabled}
           title={pin.hint}
-          onClick={onTogglePin}
+          onClick={() => current && void togglePin(current)}
         >
           {pin.pinned ? <PinOffIcon /> : <PinIcon />}
         </button>
         <button
           className={textButton}
           aria-pressed={showHistory}
-          disabled={historyDisabled}
-          title={historyHint}
-          onClick={onToggleHistory}
+          disabled={!current || unsynced}
+          title={unsynced ? "History starts once the note has synced" : "What changed, and when"}
+          onClick={() => void session.toggleHistory()}
         >
           History
         </button>
@@ -100,27 +81,27 @@ export function Editor({
           className={cn(ghostButton, iconButton, "hover:text-destructive")}
           aria-label="Delete"
           title="Delete"
-          onClick={onDelete}
+          onClick={() => removeNote()}
         >
           <Trash2Icon />
         </button>
       </header>
       {showHistory && current ? (
-        <History key={current.id} noteId={current.id} onRestore={onRestore} />
+        <History key={current.id} noteId={current.id} onRestore={session.restore} />
       ) : (
         <>
           <input
             className={field}
             placeholder="tags, comma separated"
             value={draft.tags}
-            onChange={(e) => onEdit({ tags: e.target.value })}
+            onChange={(e) => session.edit({ tags: e.target.value })}
           />
           <textarea
             ref={bodyRef}
             className={cn(field, "min-h-0 flex-1 resize-none p-3.5 font-mono text-base/[1.6]")}
             placeholder="Write anything. Markdown welcome."
             value={draft.body}
-            onChange={(e) => onEdit({ body: e.target.value })}
+            onChange={(e) => session.edit({ body: e.target.value })}
           />
         </>
       )}
@@ -129,7 +110,7 @@ export function Editor({
           {current ? `by ${current.author} · created ${ago(current.created_at)}` : "new note"}
         </span>
         {/* Announced, since it can say an edit is only on this device or conflicted. */}
-        <output>{saveLabel}</output>
+        <output>{saveLabel(saveState, saveError)}</output>
       </footer>
     </main>
   );

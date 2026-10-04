@@ -1,100 +1,24 @@
 import { describe, expect, test } from "bun:test";
 
-import type { Note, NoteInput } from "@/shared/domain";
-import { ApiError, Offline } from "@/web/lib/api";
+import { fakeServer, fields, memoryStorage } from "@test/web/fake-server";
+
+import type { Note } from "@/shared/domain";
 import {
   baseOf,
-  type Fields,
   mergeFields,
   Outbox,
   type Outcome,
   Syncer,
   withPending,
+  withSettled,
 } from "@/web/lib/sync";
-
-const fields = (patch: Partial<Fields> = {}): Fields => ({
-  title: "",
-  body: "",
-  tags: [],
-  kind: "note",
-  ...patch,
-});
-
-/** An in-memory server with the API's write rules: versions, If-Match, 404 and 409. */
-function fakeServer() {
-  const notes = new Map<string, Note>();
-  let clock = 0;
-  const state = { offline: false, calls: [] as string[] };
-  const stamp = () => new Date(Date.UTC(2026, 8, 29, 12, 0, 0, ++clock)).toISOString();
-  const guard = (call: string) => {
-    if (state.offline) throw new Offline();
-    state.calls.push(call);
-  };
-  const missing = () => new ApiError(404, "noteNotFound", "Note not found");
-  const server = {
-    state,
-    notes,
-    /** A write made elsewhere (an agent, another device). */
-    edit(id: string, patch: Partial<Fields>) {
-      notes.set(id, { ...notes.get(id)!, ...patch, updated_at: stamp() });
-    },
-    remote: {
-      create: async (input: NoteInput) => {
-        guard("create");
-        const id = input.id!;
-        if (notes.has(id)) throw new ApiError(409, "noteExists", "exists");
-        const now = stamp();
-        const note: Note = {
-          ...fields(),
-          ...input,
-          id,
-          author: "human",
-          created_at: now,
-          updated_at: now,
-          progress: { done: 0, total: 0 },
-        } as Note;
-        notes.set(id, note);
-        return note;
-      },
-      update: async (id: string, patch: NoteInput, ifMatch?: string) => {
-        guard("update");
-        const cur = notes.get(id);
-        if (!cur) throw missing();
-        if (ifMatch && ifMatch !== cur.updated_at)
-          throw new ApiError(412, "noteChanged", "changed");
-        const next = { ...cur, ...patch, updated_at: stamp() } as Note;
-        notes.set(id, next);
-        return next;
-      },
-      get: async (id: string) => {
-        guard("get");
-        const cur = notes.get(id);
-        if (!cur) throw missing();
-        return cur;
-      },
-      delete: async (id: string) => {
-        guard("delete");
-        if (!notes.delete(id)) throw missing();
-      },
-    },
-  };
-  return server;
-}
-
-function memoryStorage() {
-  const data = new Map<string, string>();
-  return {
-    getItem: (k: string) => data.get(k) ?? null,
-    setItem: (k: string, v: string) => void data.set(k, v),
-  };
-}
 
 function setup() {
   const server = fakeServer();
   const outbox = new Outbox(memoryStorage());
   const syncer = new Syncer(outbox, server.remote);
   const outcomes: Outcome[] = [];
-  syncer.onSettled = (o) => outcomes.push(o);
+  syncer.onSettled((o) => void outcomes.push(o));
   return { server, outbox, syncer, outcomes };
 }
 
@@ -279,5 +203,48 @@ describe("withPending", () => {
 
     outbox.delete("listed-1");
     expect(withPending([listed], outbox.all(), false)).toEqual([]);
+  });
+});
+
+describe("withSettled", () => {
+  const listed = (id: string, body: string) =>
+    ({ id, ...fields({ body }), updated_at: "2026-09-29T12:00:00.000Z" }) as Note;
+
+  test("the server's answer replaces the listed note, in place", () => {
+    const a = listed("a", "old");
+    const b = listed("b", "other");
+    const note = { ...a, body: "new", updated_at: "2026-09-29T12:00:01.000Z" };
+    const outcome: Outcome = {
+      sent: { op: "save", id: "a", seq: 1, fields: fields({ body: "new" }), base: baseOf(a) },
+      note,
+      merged: false,
+      conflict: false,
+    };
+    expect(withSettled([b, a], outcome, true)).toEqual([b, note]);
+  });
+
+  test("a new note goes on top, only where new notes are shown", () => {
+    const note = listed("n", "fresh");
+    const outcome: Outcome = {
+      sent: { op: "save", id: "n", seq: 1, fields: fields({ body: "fresh" }), base: null },
+      note,
+      merged: false,
+      conflict: false,
+    };
+    const b = listed("b", "other");
+    expect(withSettled([b], outcome, true)).toEqual([note, b]);
+    expect(withSettled([b], outcome, false)).toEqual([b]);
+  });
+
+  test("a deleted note is gone", () => {
+    const outcome: Outcome = {
+      sent: { op: "delete", id: "a", seq: 1 },
+      note: null,
+      merged: false,
+      conflict: false,
+    };
+    expect(
+      withSettled([listed("a", "x"), listed("b", "y")], outcome, true).map((n) => n.id),
+    ).toEqual(["b"]);
   });
 });

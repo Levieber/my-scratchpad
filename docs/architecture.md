@@ -51,12 +51,13 @@ src/
     flags.ts, format.ts   Shared flags; how a note is printed for a person.
     commands/     notes.ts, find.ts (search, tags, saved views), pins.ts (pin, unpin, pins), history.ts, transfer.ts, connection.ts (status, login, serve…), hooks.ts.
   mcp/          tools.ts (names, descriptions, shapes), handlers.ts (what each does), server.ts (protocol, instructions); mcp.ts wires it.
-  web/          React PWA, bundled by Bun from the web/index.html import.
+  web/          React PWA, bundled by Bun from the web/index.html import. Files are kebab-case.
     index.css     The only stylesheet: Tailwind, the palette (light and dark), the breakpoint, base rules.
-    lib/          api.ts (the API from a browser), sync.ts (the offline outbox and syncer), listing.ts, draft.ts, pins.ts (when a note can be pinned), hooks.ts (when a note can be hand-picked for an agent hook), storage.ts (localStorage), classes.ts (the repeated controls' class lists), utils.ts (shadcn's `cn`).
-    components/   Sidebar (Filters, SavedViews, TagChips, NoteList), Editor, History, Splitter, TokenDialog, Settings (at /settings: which notes the agent hooks show).
+    lib/          Plain logic, tested without React: api.ts (the API from a browser), sync.ts (the offline outbox and syncer), editor-session.ts (the open note: autosave through the outbox, what the server answers), session.ts (the app's one session), store.ts (a value React can follow), failures.ts (what no component words itself: the token, logging), listing.ts, draft.ts, pins.ts, hooks.ts (when a note can be pinned or hand-picked), storage.ts (localStorage), classes.ts (the repeated controls' class lists), utils.ts (shadcn's `cn`).
+    hooks/        `<name>.hook.ts`: how components read data and act (useNotes, usePins, usePinToggle, useHookPicks, useEditor, useOnline, usePending…); focus.ts holds the search and body refs.
+    components/   By feature: shell/ (the frame, the splitter, the token dialog), notes/ (sidebar, list, rows, filters, tags, footer), views/ (saved searches), editor/ (the form and history), settings/ (at /settings: which notes the agent hooks show).
       ui/           shadcn components, as `bunx shadcn add <name>` writes them (components.json).
-    App.tsx       The state and effects that tie them together, and which page is open (it follows the address, shared/pages.ts); main.tsx mounts it.
+    app.tsx       The providers around the shell; main.tsx mounts it. Which page is open follows the address (shared/pages.ts, hooks/page.hook.ts).
 public/           Files that must live at the site root: service worker, manifest, icon.
 integrations/     Claude Code wiring: installer, hooks (run as `pad hook <name>`), skills.
 test/             Mirrors src/ (server/, shared/, cli/, client/, mcp/, web/, integrations/), plus e2e/ (the PWA in a real browser); support.ts has the fixtures: the production layers on an in-memory database, in a ManagedRuntime.
