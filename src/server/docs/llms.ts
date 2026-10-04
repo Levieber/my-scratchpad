@@ -2,6 +2,7 @@
 // the OpenAPI document.
 import { ERROR_CODES } from "@/shared/errors";
 import { KIND_NAMES, KINDS } from "@/shared/kinds";
+import { DIALECT } from "@/shared/markdown";
 import { MAX_PINS } from "@/shared/pins";
 
 export const llmsTxt = (base: string) => `# Scratchpad
@@ -29,7 +30,11 @@ Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 - GET    /api/hooks/{name}/notes?repo=&path=&dir=&home=   what a hook shows an agent working there, by section
 - GET    /api/pins, PUT /api/pins/{id}, DELETE /api/pins/{id}   the user's pinned notes (at most ${MAX_PINS}): what matters most right now
 
-Every note carries \`progress: {done, total}\`, counted from its markdown checkboxes.
+Every note carries \`progress: {done, total}\`, counted from its markdown checkboxes (outside code fences; an empty \`- [ ]\` is a placeholder, not a task).
+
+## Note bodies
+${DIALECT}
+The user reads notes rendered and ticks checkboxes there: a tick changes only that line's \`[ ]\`/\`[x]\`. Write task lists as \`- [ ] item\` so they can be ticked.
 
 ## History and concurrent edits
 Every change is kept as a revision; saves by one author within 5 minutes are one revision. To see what the user changed since you last read a note, \`GET /api/notes/{id}/diff?since=<the updated_at you read>\`.

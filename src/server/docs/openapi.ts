@@ -1,6 +1,7 @@
 import { ERROR_CODES } from "@/shared/errors";
 import { HOOK_NAMES, MAX_INCLUDE } from "@/shared/hooks";
 import { KIND_NAMES, KINDS } from "@/shared/kinds";
+import { DIALECT } from "@/shared/markdown";
 import { MAX_PINS } from "@/shared/pins";
 
 const kind = {
@@ -26,7 +27,7 @@ const Note = {
   properties: {
     id: { type: "string" },
     title: { type: "string" },
-    body: { type: "string", description: "Markdown" },
+    body: { type: "string", description: DIALECT },
     tags: { type: "array", items: { type: "string" } },
     kind,
     author: {

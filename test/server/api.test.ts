@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import type { Note } from "@/shared/domain";
+import { DIALECT, DIALECT_VERSION } from "@/shared/markdown";
 
 let server: TestServer | undefined;
 
@@ -387,5 +388,12 @@ describe("notes API", () => {
     expect((await call("GET", "/manifest.webmanifest")).headers.get("content-type")).toBe(
       "application/manifest+json",
     );
+  });
+
+  test("the markdown dialect of a note body is written down for agents and in the contract", async () => {
+    const openapi = (await call("GET", "/openapi.json")).data;
+    expect(openapi.components.schemas.Note.properties.body.description).toBe(DIALECT);
+    expect((await call("GET", "/llms.txt")).data).toContain(DIALECT);
+    expect(DIALECT).toContain(`dialect v${DIALECT_VERSION}`);
   });
 });
