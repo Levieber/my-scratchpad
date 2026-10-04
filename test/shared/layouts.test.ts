@@ -9,6 +9,7 @@ import {
   LAYOUTS,
   LAYOUTS_VERSION,
   mergePatch,
+  replacing,
   shownLayout,
 } from "@/shared/layouts";
 
@@ -65,7 +66,18 @@ describe("mergePatch (RFC 7396)", () => {
 describe("KnownViewOptions", () => {
   test("checks the options it knows and lets the others through", () => {
     const check = Schema.is(KnownViewOptions);
-    expect(check({ sort: { by: "updated", desc: true }, groupBy: "status:" })).toBe(true);
+    expect(check({ sort: { by: "updated", desc: true }, swimlanes: "status:" })).toBe(true);
     expect(check({ sort: { by: "colour" } })).toBe(false);
+  });
+});
+
+describe("replacing", () => {
+  test("is the merge patch that turns one value into another as a whole", () => {
+    const current = { by: "prefix", prefix: "status:", columns: ["todo"] };
+    const next = { by: "tags", tags: ["urgent"] };
+    const patch = replacing(current, next);
+    expect(patch).toEqual({ by: "tags", tags: ["urgent"], prefix: null, columns: null });
+    expect(mergePatch(current, patch)).toEqual(next);
+    expect(replacing(undefined, next)).toEqual(next);
   });
 });

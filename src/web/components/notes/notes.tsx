@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 
+import { NoteBoard } from "@/web/components/notes/note-board";
 import { NoteList } from "@/web/components/notes/note-list";
 import { useLayout } from "@/web/hooks/layout.hook";
 import { useListed } from "@/web/hooks/listed.hook";
@@ -32,7 +33,9 @@ export function Notes({
           is a list.
         </p>
       )}
-      {shown === "table" ? (
+      {shown === "board" ? (
+        <NoteBoard listed={listed} />
+      ) : shown === "table" ? (
         <Suspense>
           <NoteTable listed={listed} />
         </Suspense>

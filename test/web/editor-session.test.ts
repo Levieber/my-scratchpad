@@ -4,7 +4,8 @@ import { fakeServer, fields, memoryStorage } from "@test/web/fake-server";
 
 import type { FullRevision, Note } from "@/shared/domain";
 import { EditorSession } from "@/web/lib/editor-session";
-import { Outbox } from "@/web/lib/outbox";
+import { baseOf, fieldsOf, Outbox } from "@/web/lib/outbox";
+import { retag } from "@/web/lib/retag";
 import { type SyncResult, Syncer } from "@/web/lib/sync";
 
 function setup(initialMode: "read" | "write" = "read") {
@@ -190,6 +191,37 @@ describe("EditorSession", () => {
     expect(state()).toBe(before);
     session.create("x");
     expect(state()).not.toBe(before);
+  });
+
+  describe("retag (a board's move)", () => {
+    test("a note not open goes through the outbox, keeping an edit already waiting", async () => {
+      const { server, outbox, session, seed } = setup();
+      const note = await seed("body");
+      outbox.save(note.id, { ...fieldsOf(note), body: "body, edited offline" }, baseOf(note));
+      retag(session, outbox, note, ["status:done"]);
+      expect(outbox.get(note.id)).toMatchObject({
+        fields: { body: "body, edited offline", tags: ["status:done"] },
+      });
+      await settle();
+      expect(server.notes.get(note.id)).toMatchObject({
+        body: "body, edited offline",
+        tags: ["status:done"],
+      });
+    });
+
+    test("the open note changes through its form, so its next save keeps the new tags", async () => {
+      const { server, outbox, session, seed, state } = setup();
+      const note = await seed("open");
+      await session.open(async () => note);
+      retag(session, outbox, note, ["status:doing"]);
+      expect(state().draft.tags).toBe("status:doing");
+      session.edit({ body: "open, typed after" });
+      await settle();
+      expect(server.notes.get(note.id)).toMatchObject({
+        body: "open, typed after",
+        tags: ["status:doing"],
+      });
+    });
   });
 
   describe("Read and Write", () => {

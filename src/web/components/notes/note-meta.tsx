@@ -46,9 +46,12 @@ export function NoteMeta({
   note: n,
   inPinned,
   kind,
+  tags = n.tags,
   className,
 }: {
   note: Note;
+  /** The tags to show, when the layout says some already (a board's column). */
+  tags?: readonly string[];
   /** Listed under Pinned, which says so already. */
   inPinned: boolean;
   /** The kind filter in force, so it isn't repeated on every note. */
@@ -78,7 +81,7 @@ export function NoteMeta({
           {n.author}
         </Badge>
       )}
-      {n.tags.length > 0 && <span> · #{n.tags.join(" #")}</span>}
+      {tags.length > 0 && <span> · #{tags.join(" #")}</span>}
     </span>
   );
 }

@@ -82,6 +82,19 @@ export const LAYOUT_OPTIONS = {
       }),
     ),
   },
+  board: {
+    groupBy: Schema.optionalKey(
+      Schema.Union([
+        Schema.Struct({
+          by: Schema.Literal("prefix"),
+          prefix: Schema.NonEmptyString,
+          columns: Schema.optionalKey(Schema.Array(Schema.String)),
+        }),
+        Schema.Struct({ by: Schema.Literal("tags"), tags: Schema.Array(Schema.String) }),
+        Schema.Struct({ by: Schema.Literal("checklist") }),
+      ]),
+    ),
+  },
 } satisfies Record<Layout, Schema.Struct.Fields>;
 
 /**
@@ -92,6 +105,7 @@ export const KnownViewOptions = Schema.Struct({
   ...LAYOUT_OPTIONS.list,
   ...LAYOUT_OPTIONS.grid,
   ...LAYOUT_OPTIONS.table,
+  ...LAYOUT_OPTIONS.board,
 });
 export type KnownViewOptions = typeof KnownViewOptions.Type;
 

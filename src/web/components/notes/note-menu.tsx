@@ -51,7 +51,16 @@ function PickItem({
  * a phone; hidden until its `group/row` is hovered only on a wide screen with a mouse
  * (desktop-mouse, index.css).
  */
-export function NoteMenu({ note: n, className }: { note: Note; className?: string }) {
+export function NoteMenu({
+  note: n,
+  className,
+  children,
+}: {
+  note: Note;
+  className?: string;
+  /** Entries of the layout showing it (a board's "Move to…"), before Delete. */
+  children?: React.ReactNode;
+}) {
   const togglePin = usePinToggle();
   const picks = useHookPicks();
   const pin = usePinOf()(n.id);
@@ -97,6 +106,7 @@ export function NoteMenu({ note: n, className }: { note: Note; className?: strin
             onToggle={() => picks.toggle(n, "review")}
           />
         )}
+        {children}
         <DropdownMenuItem variant="destructive" onClick={() => removeNote(n)}>
           <Trash2Icon />
           Delete

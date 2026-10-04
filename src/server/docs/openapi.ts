@@ -127,6 +127,27 @@ const viewOptions = {
       required: ["by"],
       properties: { by: { type: "string", enum: TABLE_COLUMNS }, desc: { type: "boolean" } },
     },
+    groupBy: {
+      description:
+        "board: its columns. `prefix`: a column per value of the tags starting with it (`status:` → todo, doing…), `columns` first and shown even when empty. `tags`: a column per tag. `checklist`: by the checklist's progress. Each adds a column for notes in none. Moving a note changes its tags",
+      oneOf: [
+        {
+          type: "object",
+          required: ["by", "prefix"],
+          properties: {
+            by: { const: "prefix" },
+            prefix: { type: "string", minLength: 1 },
+            columns: { type: "array", items: { type: "string" } },
+          },
+        },
+        {
+          type: "object",
+          required: ["by", "tags"],
+          properties: { by: { const: "tags" }, tags: { type: "array", items: { type: "string" } } },
+        },
+        { type: "object", required: ["by"], properties: { by: { const: "checklist" } } },
+      ],
+    },
   },
   additionalProperties: true,
 };

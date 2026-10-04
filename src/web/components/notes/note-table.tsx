@@ -11,13 +11,14 @@ import {
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { useMemo } from "react";
 
-import { TABLE_COLUMNS, type TableColumn } from "@/shared/layouts";
+import type { KnownViewOptions } from "@/shared/domain";
+import { isObject, TABLE_COLUMNS, type TableColumn } from "@/shared/layouts";
 import { ListEnd } from "@/web/components/notes/list-end";
 import { NoteMenu } from "@/web/components/notes/note-menu";
 import { NoteMarks, Progress } from "@/web/components/notes/note-meta";
 import { openNote } from "@/web/hooks/editor.hook";
 import type { Listed } from "@/web/hooks/listed.hook";
-import { type TableSort, useTableSort } from "@/web/hooks/table-sort.hook";
+import { useViewOption } from "@/web/hooks/view-option.hook";
 import type { Note } from "@/web/lib/api";
 import { ago, tableValue } from "@/web/lib/listing";
 import { cn } from "@/web/lib/utils";
@@ -49,6 +50,14 @@ const columns = helper.columns(
     }),
   ),
 );
+
+type TableSort = NonNullable<KnownViewOptions["sort"]>;
+
+/** A view's `options.sort`, if it is one this app can read (a newer app may have written it). */
+const readSort = (value: unknown): TableSort | null =>
+  isObject(value) && TABLE_COLUMNS.some((c) => c === value.by)
+    ? { by: value.by as TableColumn, desc: value.desc === true }
+    : null;
 
 const toSorting = (sort: TableSort | null): SortingState =>
   sort ? [{ id: sort.by, desc: sort.desc ?? false }] : [];
@@ -92,7 +101,7 @@ function Cell({
 export function NoteTable({ listed }: { listed: Listed }) {
   const { top, rest, currentId } = listed;
   const data = useMemo(() => [...top, ...rest], [top, rest]);
-  const { sort, setSort } = useTableSort();
+  const [sort, setSort] = useViewOption("sort", readSort);
   const sorting = toSorting(sort);
   const table = useTable({
     features,

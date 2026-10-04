@@ -1,4 +1,4 @@
-import { LayoutGridIcon, ListIcon, type LucideIcon, Table2Icon } from "lucide-react";
+import { KanbanIcon, LayoutGridIcon, ListIcon, type LucideIcon, Table2Icon } from "lucide-react";
 
 import { isLayout, type Layout, LAYOUTS } from "@/shared/layouts";
 import { Hint } from "@/web/components/shell/hint";
@@ -9,6 +9,7 @@ const ICONS: Record<Layout, LucideIcon> = {
   list: ListIcon,
   grid: LayoutGridIcon,
   table: Table2Icon,
+  board: KanbanIcon,
 };
 
 /**
