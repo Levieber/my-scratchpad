@@ -12,7 +12,7 @@ Every variable is read in `src/config/` (`env.ts` has what the configs share), a
 | `PAD_TOKEN`         | –                                  | server: required when not on loopback; clients: the token to send |
 | `PAD_URL`           | from `pad login`, else local       | clients only                                                      |
 | `PAD_AUTHOR`        | `human` / `claude-code`            | attribution on writes                                             |
-| `NODE_ENV`          | –                                  | `production` disables HMR; the PWA is bundled once at startup     |
+| `NODE_ENV`          | –                                  | `production` disables HMR and builds the PWA at start (see below) |
 
 Clients (CLI, MCP server, SessionStart hook) prefer `pad login <url> <token>`, which writes `~/.config/scratchpad/config.json` (mode 600). Env vars override it.
 
@@ -30,8 +30,24 @@ Locally the log stays human-readable.
 ## Running
 
 - `bun run dev` — HMR, and browser console output streamed to the terminal.
-- `bun run start` — `NODE_ENV=production bun src/server.ts`. There is no server build: Bun bundles the PWA from the HTML import at startup (well under a second), compiling its Tailwind with the plugin `bunfig.toml` names. SIGINT/SIGTERM (a Railway redeploy) shut it down gracefully: requests are interrupted, the database is closed and the process exits 0 (`teardown` in `src/server/serve.ts`). Exiting non-zero on a signal would make the on-failure restart policy report every redeploy as a crash.
-- `bun run build` — optional: bundle the PWA into `dist/` (`scripts/build.ts web`) to inspect its output and size. Nothing serves `dist/`.
+- `bun run start` — `NODE_ENV=production bun src/server.ts`. With `NODE_ENV=production` the server first runs `scripts/build.ts web` in a process of its own (about half a second), then serves `dist/web` from disk: the bundler and Tailwind's compiler (the plugin `bunfig.toml` names) are gone when that process exits instead of staying in the server. It builds at every start, so a pulled change is never served as the old build, and needs nothing from the platform's build step. Where it can't (a compiled `pad`, a tree that can't be written) it logs a warning and Bun bundles on the first request, as before. SIGINT/SIGTERM (a Railway redeploy) shut it down gracefully: requests are interrupted, the database is closed and the process exits 0 (`teardown` in `src/server/serve.ts`). Exiting non-zero on a signal would make the on-failure restart policy report every redeploy as a crash.
+- `bun run build` — bundle the PWA into `dist/web` (`scripts/build.ts web`); the server does this itself at start, so run it only to inspect the output and its size.
+
+## Memory and egress
+
+Measured with a production server (`NODE_ENV=production`) on a fresh database of 1 000 notes of about 2 KB, Bun 1.4. Railway bills memory held and outbound traffic, so both are recorded.
+
+| What                                                               | Before                           | After                        |
+| ------------------------------------------------------------------ | -------------------------------- | ---------------------------- |
+| RSS at start, before the first page request                        | 67 MB                            | 67 MB                        |
+| RSS after the page is loaded once and the notes are in             | 160 MB                           | 96 MB (−40 %)                |
+| 1 000 polls of `GET /api/notes` (50 notes, 117 KB)                 | 117 MB, p95 2.67 ms              | 117 KB, p95 0.33 ms          |
+| One visible tab, nothing changing: list + tags + views + pins/tick | ~118 KB per 5 s, ~85 MB per hour | headers only, <1 MB/h (est.) |
+
+- **Memory.** Bun bundles the PWA on the first request and keeps the bundler and Tailwind's compiler for as long as the process runs: 82 MB with nothing else going on. Prebuilding takes it out of the server.
+- **Polls.** The PWA asks for the list, tags, views and pins every 5 s while a tab is visible. Those four answer with a weak `ETag` and `Cache-Control: private, no-cache`; the browser's own cache sends it back as `If-None-Match`, and the server answers `304` without reading a note (`polled` in `src/server/http.ts`). The version is SQLite's `total_changes()` and `data_version` plus an id per start (`src/server/storage/version.ts`), one trivial query. It moves on any write, not only to that collection, so a poll after an unrelated write is answered in full: that is the safe side. `test/e2e/polling.test.ts` counts the statuses in a real Chrome, with and without the service worker.
+- **Compression is not the app's job on Railway.** Its edge gzips the HTML, the JS bundle (637 KB → 212 KB on the wire) and the API's JSON (the real list of 37 notes: 147 KB → 57 KB), so the app does not compress. The hashed JS and CSS are `immutable`, so a repeat visit does not fetch them. Behind a proxy that doesn't compress, add that to the proxy.
+- **Not done**: a preview-only list (`?fields=preview`) would shrink the answer when something did change (bodies are 91 % of it), and slower polls for views and pins would save a few requests. With the 304 the idle cost is already near zero, so both wait for a number that says otherwise.
 
 ## Railway
 

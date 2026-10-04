@@ -37,14 +37,14 @@ export async function testStore(start = "2026-09-29T10:00:00.000Z") {
  * The API on a random port, on a fresh database. What the server logs is kept in `logs` (as
  * `Logger.formatStructured` shapes it) instead of printed.
  */
-export async function testServer({ token }: { token?: string } = {}) {
+export async function testServer({ token, prebuilt }: { token?: string; prebuilt?: string } = {}) {
   const logs: LogEntry[] = [];
   const sink = Logger.map(Logger.formatStructured, (entry) => void logs.push(entry));
   const runtime = ManagedRuntime.make(
-    serverLayer({ token: token === undefined ? undefined : Redacted.make(token) }).pipe(
-      Layer.provideMerge(Store.layer(":memory:")),
-      Layer.provide(Logger.layer([sink])),
-    ),
+    serverLayer({
+      token: token === undefined ? undefined : Redacted.make(token),
+      prebuilt,
+    }).pipe(Layer.provideMerge(Store.layer(":memory:")), Layer.provide(Logger.layer([sink]))),
   );
   const run = runner(runtime);
   const url = new URL(await run(HttpServer.addressFormattedWith(Effect.succeed)));

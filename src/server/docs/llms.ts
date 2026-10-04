@@ -39,6 +39,7 @@ The user reads notes rendered and ticks checkboxes there: a tick changes only th
 ## History and concurrent edits
 Every change is kept as a revision; saves by one author within 5 minutes are one revision. To see what the user changed since you last read a note, \`GET /api/notes/{id}/diff?since=<the updated_at you read>\`.
 Note responses carry \`ETag: "<updated_at>"\`. Send it back as \`If-Match\` on PATCH to refuse overwriting a change made meanwhile (412 noteChanged: fetch, merge, retry). Prefer append for logs: it never conflicts.
+List, tags, views and pins carry a weak \`ETag\`; a client that polls sends it back as \`If-None-Match\` and gets \`304\` with no body while nothing was written.
 
 ## Kinds and search
 ${KIND_NAMES.map((k) => `- ${k}: ${KINDS[k]}`).join("\n")}
