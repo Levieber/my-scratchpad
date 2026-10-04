@@ -1,5 +1,6 @@
+import { lazy, Suspense } from "react";
+
 import { EditorToolbar } from "@/web/components/editor/editor-toolbar";
-import { History } from "@/web/components/editor/history";
 import { Input } from "@/web/components/ui/input";
 import { Textarea } from "@/web/components/ui/textarea";
 import { useEditor, useLiveOpenNote } from "@/web/hooks/editor.hook";
@@ -7,6 +8,13 @@ import { bodyRef } from "@/web/hooks/focus";
 import { saveLabel } from "@/web/lib/draft";
 import { ago } from "@/web/lib/listing";
 import { session } from "@/web/lib/session";
+
+// Most visits never open a note's history: a chunk of its own, loaded when opened, wherever the
+// bundler splits (Bun.build with `splitting`). Bun.serve's HTML import doesn't split yet, so the
+// server still sends it in the one chunk (docs/architecture.md, "State in the PWA").
+const History = lazy(() =>
+  import("@/web/components/editor/history").then((m) => ({ default: m.History })),
+);
 
 /** The right column: the open note's form, or its history. */
 export function Editor({
@@ -22,7 +30,11 @@ export function Editor({
     <main className="flex min-h-0 flex-col gap-2.5 px-5 py-3.5 max-wide:px-4 max-wide:py-3">
       <EditorToolbar listHidden={listHidden} onToggleList={onToggleList} />
       {showHistory && current ? (
-        <History key={current.id} noteId={current.id} onRestore={session.restore} />
+        <Suspense
+          fallback={<p className="flex-1 text-xs text-muted-foreground">Loading history…</p>}
+        >
+          <History key={current.id} noteId={current.id} onRestore={session.restore} />
+        </Suspense>
       ) : (
         <>
           <Input

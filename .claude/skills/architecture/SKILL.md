@@ -28,7 +28,14 @@ The HTTP API is the only way in. Each folder of `src/` is one responsibility: `s
 
 ## PWA components
 
-Tailwind v4 utilities on the elements; no CSS classes of our own. Colors are the palette tokens (`bg-card`, `text-muted-foreground`, `border-border`, `text-primary`…, defined in `src/web/index.css`), never raw values. Repeated controls are class lists in `src/web/lib/classes.ts`, combined with `cn`. Layout splits at `wide:`/`max-wide:`; hide-until-hover only behind `desktop-mouse:`. Text sizes in rem, fields never below 1rem. For a component with real interaction (menu, dialog, popover…) add shadcn's with `bunx shadcn add <name>` into `src/web/components/ui/` (Base UI). Icons come from `lucide-react`. The details are in "Styling the PWA" in `docs/architecture.md`.
+- Tailwind v4 utilities on the elements; no CSS classes of our own. Colors are the palette tokens (`bg-card`, `text-muted-foreground`, `border-border`, `text-primary`…, in `src/web/index.css`), never raw values. Layout splits at `wide:`/`max-wide:`; hide-until-hover only behind `desktop-mouse:`. Text sizes in rem, fields never below 1rem, targets at least 24 px.
+- Every control is shadcn's on Base UI (`src/web/components/ui/`: Button, Input, Textarea, Badge, Toggle, ToggleGroup, Dialog, AlertDialog, Popover, Tooltip via `components/shell/hint.tsx`, DropdownMenu, Sonner); adjust with `className`. A form field is Base UI's `Field` around our `Input`. Add one with `bunx shadcn add <name>` (`--dry-run` first), point its `cn` import at `@/web/lib/utils`, and keep fields at 1rem. Icons from `lucide-react`.
+- Components by feature (`components/{notes,editor,views,settings,shell}/`); kebab-case files; hooks in `src/web/hooks/<name>.hook.ts`; plain logic, tested without React, in `src/web/lib/`.
+- State: server reads through TanStack Query hooks (`lib/queries.ts` keys; components never import `web/lib/api.ts`, `test/architecture.test.ts` checks); note writes only through the outbox, which settles into the cache; pins/views/picks are optimistic `useMutation`s; the open note is the `EditorSession` class (`useEditor`), whose `commit()` stays synchronous for `beforeunload`.
+- A `src/web` file over 200 lines of code fails lint: split it; a component past ~8 props gets a hook or context instead.
+- Browser behaviour (offline, tab close, stale answers, layout at 320/390/1280 px, keyboard) is tested in `test/e2e/` with `playwright-core` on the system Chrome (`CHROME=…`; skipped without one).
+
+The details are in "State in the PWA" and "Styling the PWA" in `docs/architecture.md`.
 
 ## Errors
 

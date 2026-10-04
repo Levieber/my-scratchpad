@@ -2,7 +2,7 @@
 // a localStorage stand-in.
 import type { Note, NoteInput } from "@/shared/domain";
 import { ApiError, Offline } from "@/web/lib/api";
-import type { Fields } from "@/web/lib/sync";
+import type { Fields } from "@/web/lib/outbox";
 
 export const fields = (patch: Partial<Fields> = {}): Fields => ({
   title: "",

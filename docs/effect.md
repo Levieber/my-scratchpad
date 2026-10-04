@@ -46,7 +46,7 @@ The HTTP contract did not change: the API tests pass with only their setup rewri
 
 **Validation messages kept.** Schema's own messages name the innermost failure (`Expected string at ["tags"][0]`). `inputProblem` maps a failure to the field's one-line rule (`tags must be an array of strings`), so API errors and `pad import` read as before.
 
-**The PWA stays as it is.** Its state is React's, and its offline outbox (`web/lib/sync.ts`) is already explicit and tested. Effect would add to the bundle a browser has to download, for little gain. The browser imports domain types type-only, so no Effect code reaches it (the build is byte-identical). `test/architecture.test.ts` keeps it that way.
+**The PWA stays as it is.** Its state is React's and TanStack Query's, and its offline outbox (`web/lib/outbox.ts`, `sync.ts`) is already explicit and tested. Effect would add to the bundle a browser has to download, for little gain. The browser imports domain types type-only, so no Effect code reaches it (the build is byte-identical). `test/architecture.test.ts` keeps it that way.
 
 **Modules by path, never a barrel.** `import { Effect } from "effect"` loads every module Effect has: Bun doesn't tree-shake at runtime. Measured on the SessionStart hook, that was 99 ms against 71 ms with `import * as Effect from "effect/Effect"`. The architecture test refuses barrel imports (`effect`, `effect/http`, `@effect/platform-bun`, …).
 

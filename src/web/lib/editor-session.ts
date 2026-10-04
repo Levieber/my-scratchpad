@@ -3,16 +3,9 @@
 // reads it through useEditor (hooks/use-editor.ts).
 import type { FullRevision, Note } from "@/web/lib/api";
 import { type Draft, emptyDraft, fromDraft, type SaveState, toDraft } from "@/web/lib/draft";
-import {
-  baseOf,
-  fieldsOf,
-  localNote,
-  mergeFields,
-  type Outbox,
-  type Outcome,
-  type SyncResult,
-  type Syncer,
-} from "@/web/lib/sync";
+import { baseOf, fieldsOf, type Outbox } from "@/web/lib/outbox";
+import { localNote } from "@/web/lib/pending";
+import { mergeFields, type Outcome, type SyncResult, type Syncer } from "@/web/lib/sync";
 
 export type EditorState = {
   /** Whether the editor is showing at all. */

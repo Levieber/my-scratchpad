@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 import { Editor } from "@/web/components/editor/editor";
 import { Sidebar } from "@/web/components/notes/sidebar";
-import { Settings } from "@/web/components/settings/settings";
 import { Splitter } from "@/web/components/shell/splitter";
 import { useBackgroundSync } from "@/web/hooks/background-sync.hook";
 import { useEditor } from "@/web/hooks/editor.hook";
@@ -10,6 +9,13 @@ import { usePage } from "@/web/hooks/page.hook";
 import { useShortcuts } from "@/web/hooks/shortcuts.hook";
 import { storedWidth, storeWidth } from "@/web/lib/storage";
 import { cn } from "@/web/lib/utils";
+
+// Most visits never open Settings: a chunk of its own, loaded when opened, wherever the
+// bundler splits (Bun.build with `splitting`). Bun.serve's HTML import doesn't split yet, so the
+// server still sends it in the one chunk (docs/architecture.md, "State in the PWA").
+const Settings = lazy(() =>
+  import("@/web/components/settings/settings").then((m) => ({ default: m.Settings })),
+);
 
 /** The page's frame: Settings, or the notes (list | resize handle | editor). */
 export function Shell() {
@@ -32,7 +38,11 @@ export function Shell() {
       )}
       style={{ "--sidebar": `${width}px` } as React.CSSProperties}
     >
-      {page === "settings" && <Settings />}
+      {page === "settings" && (
+        <Suspense>
+          <Settings />
+        </Suspense>
+      )}
       {notesShown && (
         <>
           <Sidebar layout={open ? (listHidden ? "hidden" : "column") : "page"} />

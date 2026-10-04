@@ -3,8 +3,8 @@ import { useCallback } from "react";
 
 import { usePending } from "@/web/hooks/pending.hook";
 import { api, type Note } from "@/web/lib/api";
+import { withPending } from "@/web/lib/pending";
 import { keys, POLL_MS, queryClient } from "@/web/lib/queries";
-import { withPending } from "@/web/lib/sync";
 
 /**
  * The list for a search, as it will be once the outbox is sent (`withPending`, applied on every

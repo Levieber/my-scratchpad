@@ -1,6 +1,6 @@
 // What the editor form holds while a note is being written, and how it maps to a note's fields.
 import type { Kind } from "@/shared/kinds";
-import type { Fields } from "@/web/lib/sync";
+import type { Fields } from "@/web/lib/outbox";
 
 export type Draft = { title: string; body: string; tags: string; kind: Kind };
 
