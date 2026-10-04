@@ -1,6 +1,6 @@
 // The open note: what the editor shows, autosaving it through the outbox, and what the server
 // answers for it. A plain class, like Outbox and Syncer, so it is tested without React; the editor
-// reads it through useEditor (hooks/use-editor.ts).
+// reads it through useEditor (hooks/editor.hook.ts).
 import type { FullRevision, Note } from "@/web/lib/api";
 import { type Draft, emptyDraft, fromDraft, type SaveState, toDraft } from "@/web/lib/draft";
 import { baseOf, fieldsOf, type Outbox } from "@/web/lib/outbox";
