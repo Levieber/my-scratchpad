@@ -6,20 +6,18 @@ import { Hint } from "@/web/components/shell/hint";
 import { Button } from "@/web/components/ui/button";
 import { Input } from "@/web/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/web/components/ui/popover";
+import { usePickedFor } from "@/web/hooks/layout.hook";
 import { useViews } from "@/web/hooks/notes.hook";
 import { useSearch } from "@/web/hooks/search.hook";
-import { isSaving, useViewMutations } from "@/web/hooks/views.hook";
+import { useActiveView, useViewMutations } from "@/web/hooks/views.hook";
 import { cn } from "@/web/lib/utils";
-
-const sameQuery = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /** Saved searches: apply one, delete one, or name the current search. */
 export function SavedViews() {
   const views = useViews();
   const { q, filter } = useSearch();
   const { remove } = useViewMutations();
-  // One still being saved isn't the search's view yet: the form naming it stays until it is.
-  const activeView = views.find((v) => !isSaving(v) && sameQuery(v.query, q));
+  const activeView = useActiveView();
   if (views.length === 0 && !q.trim()) return null;
 
   return (
@@ -71,6 +69,7 @@ export function SavedViews() {
  */
 function NameView() {
   const { save } = useViewMutations();
+  const how = usePickedFor();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [taken, setTaken] = useState(false);
@@ -101,7 +100,7 @@ function NameView() {
           onSubmit={async (e) => {
             e.preventDefault();
             if (!name.trim()) return;
-            const result = await save(name.trim());
+            const result = await save(name.trim(), how);
             if (result === "saved") setOpen(false);
             else if (result === "taken") setTaken(true);
           }}

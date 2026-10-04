@@ -7,7 +7,7 @@ import { HookCard } from "@/web/components/settings/hook-card";
 import { Button } from "@/web/components/ui/button";
 import { useHooksInfo } from "@/web/hooks/hooks-info.hook";
 import { useOnline } from "@/web/hooks/online.hook";
-import { go } from "@/web/hooks/page.hook";
+import { go } from "@/web/hooks/route.hook";
 
 /** The settings page: which notes the agent hooks show, and taking the notes out or in. */
 export function Settings() {

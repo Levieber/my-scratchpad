@@ -3,9 +3,10 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { Editor } from "@/web/components/editor/editor";
 import { Sidebar } from "@/web/components/notes/sidebar";
 import { Splitter } from "@/web/components/shell/splitter";
+import { useAddress } from "@/web/hooks/address.hook";
 import { useBackgroundSync } from "@/web/hooks/background-sync.hook";
 import { useEditor } from "@/web/hooks/editor.hook";
-import { usePage } from "@/web/hooks/page.hook";
+import { usePage } from "@/web/hooks/route.hook";
 import { useShortcuts } from "@/web/hooks/shortcuts.hook";
 import { storedWidth, storeWidth } from "@/web/lib/storage";
 import { cn } from "@/web/lib/utils";
@@ -21,6 +22,7 @@ const Settings = lazy(() =>
 export function Shell() {
   useShortcuts();
   useBackgroundSync();
+  useAddress();
   const page = usePage();
   const { open } = useEditor();
   const [width, setWidth] = useState(storedWidth);

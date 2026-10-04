@@ -1,5 +1,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 
+import { currentRoute } from "@/web/hooks/route.hook";
+
 const PAGE = 50;
 
 type Search = {
@@ -19,8 +21,10 @@ const SearchContext = createContext<Search | null>(null);
  * string, so a view is just that string saved under a name, and every control edits that string.
  */
 export function SearchProvider({ children }: { children: ReactNode }) {
-  const [q, setQ] = useState("");
-  const [asked, setAsked] = useState("");
+  // The address the app opened at may name a search (lib/routes.ts); hooks/address.hook.ts
+  // keeps the address following it.
+  const [q, setQ] = useState(() => currentRoute().q);
+  const [asked, setAsked] = useState(q);
   const [limit, setLimit] = useState(PAGE);
   useEffect(() => {
     const t = setTimeout(() => setAsked(q), 200);
