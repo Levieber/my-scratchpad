@@ -2,10 +2,24 @@ import { replacing } from "@/shared/layouts";
 import { useSearch } from "@/web/hooks/search.hook";
 import { useStore } from "@/web/hooks/store.hook";
 import { sameQuery, useActiveView, useViewMutations } from "@/web/hooks/views.hook";
+import type { NewView } from "@/web/lib/api";
 import { Store } from "@/web/lib/store";
 
 // Options set on this page for a search: they show at once, even offline, over the view's.
 const picked = new Store<{ q: string; values: Record<string, unknown> } | null>(null);
+
+/**
+ * The options set for the search in force while it has no view, for a view saved now to keep:
+ * otherwise saving it would forget the board's columns or the table's order just chosen.
+ */
+export function usePickedOptions(): Pick<NewView, "options"> {
+  const { q } = useSearch();
+  const pick = useStore(picked);
+  const set = Object.entries(pick && sameQuery(pick.q, q) ? pick.values : {}).filter(
+    ([, value]) => value !== null,
+  );
+  return set.length ? { options: Object.fromEntries(set) } : {};
+}
 
 /**
  * One of a layout's options (shared/domain.ts LAYOUT_OPTIONS) for the search in force, and

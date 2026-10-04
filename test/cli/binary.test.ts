@@ -71,6 +71,13 @@ describe("compiled pad", () => {
     ]);
   });
 
+  test("saves a view with its layout and lists it", async () => {
+    const added = await run(["views", "add", "Todo", "#todo", "--layout", "board"]);
+    expect([added.code, added.out]).toEqual([0, "saved Todo: #todo  [board]"]);
+    expect((await run(["views"])).out).toBe("@Todo  #todo  [board]");
+    expect((await run(["views", "add", "Bad", "x", "--layout", "calendar"])).code).not.toBe(0);
+  });
+
   test("runs the SessionStart hook", async () => {
     const { code, out } = await run(["hook", "session-start"], JSON.stringify({ session_id: "s" }));
     expect(code).toBe(0);

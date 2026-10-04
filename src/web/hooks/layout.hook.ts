@@ -2,6 +2,7 @@ import { type Layout, shownLayout } from "@/shared/layouts";
 import { currentRoute } from "@/web/hooks/route.hook";
 import { useSearch } from "@/web/hooks/search.hook";
 import { useStore } from "@/web/hooks/store.hook";
+import { usePickedOptions } from "@/web/hooks/view-option.hook";
 import { sameQuery, useActiveView, useViewMutations } from "@/web/hooks/views.hook";
 import type { NewView } from "@/web/lib/api";
 import { preferredLayout } from "@/web/lib/layout-prefs";
@@ -45,10 +46,14 @@ export function useChooseLayout() {
   };
 }
 
-/** What a view saved now keeps of how it is shown: a layout picked for this search, if any. */
-export function usePickedFor(): Pick<NewView, "layout"> {
+/**
+ * What a view saved now keeps of how it is shown: a layout picked for this search, and the
+ * options set for it. What nobody chose is left out, to stay each device's own.
+ */
+export function usePickedFor(): Pick<NewView, "layout" | "options"> {
   const { q } = useSearch();
   const pick = useStore(picked);
   const layout = useLayout().layout;
-  return pick && sameQuery(pick.q, q) ? { layout } : {};
+  const options = usePickedOptions();
+  return { ...(pick && sameQuery(pick.q, q) && { layout }), ...options };
 }
