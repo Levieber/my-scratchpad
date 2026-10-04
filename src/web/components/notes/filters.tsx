@@ -1,4 +1,5 @@
 import { operatorValue, setOperator } from "@/shared/query";
+import { useSearch } from "@/web/hooks/data.hook";
 import { chip } from "@/web/lib/classes";
 import { cn } from "@/web/lib/utils";
 
@@ -18,7 +19,8 @@ const group = "flex min-w-0 flex-wrap gap-1";
 const option = cn(chip, "rounded-lg px-3 py-[3px] text-[0.8125rem]");
 
 /** The kind and author chips: they edit the search box, so the query stays the one source. */
-export function Filters({ q, onFilter }: { q: string; onFilter: (next: string) => void }) {
+export function Filters() {
+  const { q, filter } = useSearch();
   const kind = operatorValue(q, "kind");
   const author = operatorValue(q, "author");
   return (
@@ -30,7 +32,7 @@ export function Filters({ q, onFilter }: { q: string; onFilter: (next: string) =
             key={k}
             className={option}
             aria-pressed={kind === k}
-            onClick={() => onFilter(setOperator(q, "kind", k))}
+            onClick={() => filter(setOperator(q, "kind", k))}
           >
             {label}
           </button>
@@ -42,7 +44,7 @@ export function Filters({ q, onFilter }: { q: string; onFilter: (next: string) =
             key={a}
             className={option}
             aria-pressed={author === a}
-            onClick={() => onFilter(setOperator(q, "author", a))}
+            onClick={() => filter(setOperator(q, "author", a))}
           >
             {label}
           </button>

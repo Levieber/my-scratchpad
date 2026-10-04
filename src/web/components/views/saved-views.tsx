@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { View } from "@/web/lib/api";
+import { useSearch, useViews } from "@/web/hooks/data.hook";
+import { useViewMutations } from "@/web/hooks/views.hook";
 import { field, moreButton } from "@/web/lib/classes";
 import { cn } from "@/web/lib/utils";
 
@@ -10,22 +11,13 @@ const pillButton = "min-h-6 border-0 bg-transparent py-0.5 text-xs text-muted-fo
 const sameQuery = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /**
- * Saved searches: apply one, delete one, or name the current search. `onSave` says whether the
+ * Saved searches: apply one, delete one, or name the current search. Saving says whether the
  * name was taken, the one failure the person can fix, so the form stays open and says so.
  */
-export function SavedViews({
-  views,
-  q,
-  onFilter,
-  onSave,
-  onRemove,
-}: {
-  views: View[];
-  q: string;
-  onFilter: (next: string) => void;
-  onSave: (name: string) => Promise<"saved" | "taken" | "failed">;
-  onRemove: (view: View) => void;
-}) {
+export function SavedViews() {
+  const views = useViews();
+  const { q, filter } = useSearch();
+  const { save: saveView, remove } = useViewMutations();
   const [naming, setNaming] = useState<string | null>(null);
   const [nameTaken, setNameTaken] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -40,7 +32,7 @@ export function SavedViews({
   if (views.length === 0 && !q.trim()) return null;
 
   const save = async (name: string) => {
-    const result = await onSave(name);
+    const result = await saveView(name);
     if (result === "saved") setNaming(null);
     else if (result === "taken") setNameTaken(true);
   };
@@ -57,14 +49,14 @@ export function SavedViews({
             className={cn(pillButton, "px-2 aria-pressed:text-foreground")}
             aria-pressed={activeView?.id === v.id}
             title={v.query}
-            onClick={() => onFilter(activeView?.id === v.id ? "" : v.query)}
+            onClick={() => filter(activeView?.id === v.id ? "" : v.query)}
           >
             {v.name}
           </button>
           <button
             className={cn(pillButton, "min-w-6 px-1")}
             aria-label={`Delete view ${v.name}`}
-            onClick={() => onRemove(v)}
+            onClick={() => void remove(v)}
           >
             ×
           </button>

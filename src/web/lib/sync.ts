@@ -35,6 +35,8 @@ type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 
 export class Outbox {
   private entries = new Map<string, Pending>();
+  // The same array until something changes, so React can tell when it did (useSyncExternalStore).
+  private snapshot: readonly Pending[] = [];
   private seq = 0;
   private listeners = new Set<() => void>();
 
@@ -48,15 +50,16 @@ export class Outbox {
         this.seq = Math.max(this.seq, p.seq);
       }
     } catch {}
+    this.snapshot = [...this.entries.values()];
   }
 
-  all = (): Pending[] => [...this.entries.values()];
+  all = (): readonly Pending[] => this.snapshot;
   get = (id: string): Pending | undefined => this.entries.get(id);
 
-  subscribe(fn: () => void) {
+  subscribe = (fn: () => void) => {
     this.listeners.add(fn);
     return () => void this.listeners.delete(fn);
-  }
+  };
 
   /** Queues the editor's content. An edit already waiting keeps its base: it started from there. */
   save(id: string, fields: Fields, base: Base | null) {
@@ -95,6 +98,7 @@ export class Outbox {
   }
 
   private persist() {
+    this.snapshot = [...this.entries.values()];
     try {
       this.storage?.setItem(this.key, JSON.stringify(this.all()));
     } catch {}
@@ -199,14 +203,20 @@ export type SyncResult =
 
 /** Sends the outbox in order, one run at a time; a run asked for during one follows it. */
 export class Syncer {
-  onSettled: (o: Outcome) => void = () => {};
   private running: Promise<SyncResult> | null = null;
   private again = false;
+  private listeners = new Set<(o: Outcome) => void>();
 
   constructor(
     private outbox: Outbox,
     private remote: Remote,
   ) {}
+
+  /** What the server answered for each entry it accepted, as it does. */
+  onSettled(fn: (o: Outcome) => void) {
+    this.listeners.add(fn);
+    return () => void this.listeners.delete(fn);
+  }
 
   run(): Promise<SyncResult> {
     if (this.running) {
@@ -233,7 +243,7 @@ export class Syncer {
       try {
         const outcome = await push(entry, this.remote);
         this.outbox.settle(entry, outcome.note, outcome.merged);
-        this.onSettled(outcome);
+        this.listeners.forEach((fn) => fn(outcome));
       } catch (e) {
         if (e instanceof Offline) return { status: "offline" };
         if (e instanceof Unauthorized) return { status: "unauthorized" };
@@ -263,7 +273,7 @@ export function localNote(id: string, fields: Fields): Note {
  * The list as it will be once the outbox is sent: pending edits applied, pending deletes gone,
  * and (`withNew`) notes made here that the server hasn't seen on top.
  */
-export function withPending(notes: Note[], pending: Pending[], withNew: boolean): Note[] {
+export function withPending(notes: Note[], pending: readonly Pending[], withNew: boolean): Note[] {
   const byId = new Map(pending.map((p) => [p.id, p]));
   const shown = notes
     .filter((n) => byId.get(n.id)?.op !== "delete")
@@ -281,3 +291,17 @@ export function withPending(notes: Note[], pending: Pending[], withNew: boolean)
 
 // What a pending edit doesn't change about a listed note.
 const pick = ({ author, created_at, updated_at }: Note) => ({ author, created_at, updated_at });
+
+/**
+ * A list as the server has it once `outcome` landed: the saved note in place of the listed one
+ * (on top when it is new and `withNew`), a deleted one gone. The outbox forgets an entry the
+ * moment the server accepts it, so without this the list would show the note as it was until the
+ * next refresh arrives.
+ */
+export function withSettled(notes: Note[], { sent, note }: Outcome, withNew: boolean): Note[] {
+  if (sent.op === "delete") return notes.filter((n) => n.id !== sent.id);
+  if (!note) return notes;
+  const at = notes.findIndex((n) => n.id === note.id);
+  if (at >= 0) return notes.with(at, note);
+  return withNew && sent.base === null ? [note, ...notes] : notes;
+}

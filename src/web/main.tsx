@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 
-import { App } from "./App";
+import { App } from "./app";
 
 // PWA files are served from public/ at runtime; added here so the bundler doesn't try to resolve
 // them. (The apple-touch-icon is a static tag in index.html instead: iOS reads it when the page is

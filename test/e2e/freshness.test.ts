@@ -13,11 +13,10 @@ import {
   useApp,
 } from "@test/e2e/support";
 
-// `test.failing` until the list drops stale answers (issue #3, phase 1): these show the bug.
 describeE2E("a slow network", () => {
   const app = useApp();
 
-  test.failing("a late list response doesn't overwrite a newer one", async () => {
+  test("a late list response doesn't overwrite a newer one", async () => {
     await app.api.create({ body: "alpha one" });
     await app.api.create({ body: "zeta two" });
     const page = await (await app.context()).newPage();
@@ -34,7 +33,7 @@ describeE2E("a slow network", () => {
     expect(await row(page, "zeta two").count()).toBe(1);
   });
 
-  test.failing("the open note is replaced only by a newer version", async () => {
+  test("the open note is replaced only by a newer version", async () => {
     const note = await app.api.create({ body: "first draft" });
     const page = await app.open();
     await openNote(page, "first draft");
@@ -56,49 +55,45 @@ describeE2E("a slow network", () => {
     expect(await body.inputValue()).toBe("second draft");
   });
 
-  test.failing(
-    "ticking a checklist box: the n/m counter never goes back",
-    async () => {
-      await app.api.create({ title: "Chores", body: "- [ ] dishes\n- [ ] laundry" });
-      const page = await app.open();
-      const counter = row(page, "Chores");
-      await counter.getByText("0/2").waitFor();
-      // Every value the row's details take, in order, however briefly.
-      await counter.evaluate((li) => {
-        const seen: string[] = [];
-        (window as unknown as { seen: string[] }).seen = seen;
-        const record = () => {
-          const text = /\d+\/\d+/.exec(li.textContent ?? "")?.[0];
-          if (text && seen.at(-1) !== text) seen.push(text);
-        };
-        record();
-        new MutationObserver(record).observe(li, {
-          subtree: true,
-          childList: true,
-          characterData: true,
-        });
+  test("ticking a checklist box: the n/m counter never goes back", async () => {
+    await app.api.create({ title: "Chores", body: "- [ ] dishes\n- [ ] laundry" });
+    const page = await app.open();
+    const counter = row(page, "Chores");
+    await counter.getByText("0/2").waitFor();
+    // Every value the row's details take, in order, however briefly.
+    await counter.evaluate((li) => {
+      const seen: string[] = [];
+      (window as unknown as { seen: string[] }).seen = seen;
+      const record = () => {
+        const text = /\d+\/\d+/.exec(li.textContent ?? "")?.[0];
+        if (text && seen.at(-1) !== text) seen.push(text);
+      };
+      record();
+      new MutationObserver(record).observe(li, {
+        subtree: true,
+        childList: true,
+        characterData: true,
       });
+    });
 
-      // Every list answer takes 700 ms to arrive, and holds what the server had when asked.
-      await page.route(LIST, async (route) => {
-        const response = await route.fetch();
-        await Bun.sleep(700);
-        await route.fulfill({ response });
-      });
-      await openNote(page, "Chores");
-      await page
-        .getByPlaceholder("Write anything. Markdown welcome.")
-        .fill("- [x] dishes\n- [ ] laundry");
-      await page.getByPlaceholder("Title").focus();
-      for (let i = 0; i < 4; i++) {
-        await Bun.sleep(500);
-        await poll(page);
-      }
-      await Bun.sleep(1_000);
+    // Every list answer takes 700 ms to arrive, and holds what the server had when asked.
+    await page.route(LIST, async (route) => {
+      const response = await route.fetch();
+      await Bun.sleep(700);
+      await route.fulfill({ response });
+    });
+    await openNote(page, "Chores");
+    await page
+      .getByPlaceholder("Write anything. Markdown welcome.")
+      .fill("- [x] dishes\n- [ ] laundry");
+    await page.getByPlaceholder("Title").focus();
+    for (let i = 0; i < 4; i++) {
+      await Bun.sleep(500);
+      await poll(page);
+    }
+    await Bun.sleep(1_000);
 
-      const seen = await page.evaluate(() => (window as unknown as { seen: string[] }).seen);
-      expect(seen).toEqual(["0/2", "1/2"]);
-    },
-    15_000,
-  );
+    const seen = await page.evaluate(() => (window as unknown as { seen: string[] }).seen);
+    expect(seen).toEqual(["0/2", "1/2"]);
+  }, 15_000);
 });
