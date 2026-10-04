@@ -63,6 +63,16 @@ const RULES: Rule[] = [
     ],
   },
   {
+    files: ["src/web/components/**/*.tsx"],
+    mayNotImport: [
+      {
+        specifier: /^@\/web\/lib\/api$/,
+        because:
+          "components read and write through hooks (src/web/hooks/), which own caching, polling and failures; a component calling the API itself skips all three",
+      },
+    ],
+  },
+  {
     files: ["src/server/storage/**/*.ts"],
     mayNotImport: [
       {

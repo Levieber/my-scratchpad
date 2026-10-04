@@ -4,7 +4,8 @@ import { fakeServer, fields, memoryStorage } from "@test/web/fake-server";
 
 import type { FullRevision, Note } from "@/shared/domain";
 import { EditorSession } from "@/web/lib/editor-session";
-import { type SyncResult, Outbox, Syncer } from "@/web/lib/sync";
+import { Outbox } from "@/web/lib/outbox";
+import { type SyncResult, Syncer } from "@/web/lib/sync";
 
 function setup() {
   const server = fakeServer();

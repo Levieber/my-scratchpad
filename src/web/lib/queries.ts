@@ -1,11 +1,12 @@
 // What the app reads from the server, cached by TanStack Query: one client, its keys, and how
-// it retries. Reads only: every write to a note goes through the outbox (lib/sync.ts), which
+// it retries. Reads only: every write to a note goes through the outbox (lib/outbox.ts), which
 // settles into this cache.
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 
 import { type Note, Offline, Unauthorized } from "@/web/lib/api";
 import { handle } from "@/web/lib/failures";
-import { type Outcome, withSettled } from "@/web/lib/sync";
+import { withSettled } from "@/web/lib/pending";
+import type { Outcome } from "@/web/lib/sync";
 
 // Every key starts with the server, so a cache never answers for another one.
 const server = location.origin;

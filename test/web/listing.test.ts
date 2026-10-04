@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { Note } from "@/shared/domain";
-import { groupNotes, preview, visibleTags } from "@/web/lib/listing";
+import { groupNotes, preview, toggled, visibleTags } from "@/web/lib/listing";
 
 const note = (patch: Partial<Note>): Note => ({
   id: "x",
@@ -89,5 +89,13 @@ describe("visibleTags", () => {
 
   test("always shows the selected tags", () => {
     expect(visibleTags(tags, ["d", "a"], 2).map((t) => t.tag)).toEqual(["a", "b", "d"]);
+  });
+});
+
+describe("toggled", () => {
+  test("the one value pressed or released", () => {
+    expect(toggled(["a"], ["a", "b"])).toBe("b");
+    expect(toggled(["a", "b"], ["a"])).toBe("b");
+    expect(toggled(["a"], ["a"])).toBeUndefined();
   });
 });

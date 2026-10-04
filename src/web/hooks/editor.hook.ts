@@ -6,11 +6,11 @@ import { listedNote } from "@/web/hooks/notes.hook";
 import { useUnsyncedIds } from "@/web/hooks/pending.hook";
 import { api, isApiError, type Note, Unauthorized } from "@/web/lib/api";
 import { handle } from "@/web/lib/failures";
+import { localNote } from "@/web/lib/pending";
 import { keys, POLL_MS, queryClient } from "@/web/lib/queries";
 import { session } from "@/web/lib/session";
 import { outbox } from "@/web/lib/storage";
 import { Store } from "@/web/lib/store";
-import { localNote } from "@/web/lib/sync";
 
 /** The open note and its form, as the editor session has them (lib/editor-session.ts). */
 export const useEditor = () => useSyncExternalStore(session.subscribe, session.getSnapshot);

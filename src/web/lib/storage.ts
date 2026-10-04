@@ -1,7 +1,8 @@
 // What this browser remembers: the sidebar's width, and the outbox of edits the server doesn't
 // have yet.
 import { api } from "@/web/lib/api";
-import { Outbox, Syncer } from "@/web/lib/sync";
+import { Outbox } from "@/web/lib/outbox";
+import { Syncer } from "@/web/lib/sync";
 
 const WIDTH_KEY = "pad-sidebar-width";
 const DEFAULT_WIDTH = 360;

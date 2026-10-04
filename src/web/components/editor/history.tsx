@@ -2,13 +2,10 @@ import { useState } from "react";
 
 import { Badge } from "@/web/components/ui/badge";
 import { Button } from "@/web/components/ui/button";
-import { loadRevision, useDiff, useRevisions } from "@/web/hooks/history.hook";
-import { type FullRevision, Offline } from "@/web/lib/api";
+import { historyError, loadRevision, useDiff, useRevisions } from "@/web/hooks/history.hook";
+import type { FullRevision } from "@/web/lib/api";
 import { ago } from "@/web/lib/listing";
 import { cn } from "@/web/lib/utils";
-
-const describe = (e: unknown) =>
-  e instanceof Offline ? "History needs a connection." : e instanceof Error ? e.message : String(e);
 
 // The unified diff's own header names the revisions, which the panel already shows.
 const diffRows = (diff: string) =>
@@ -66,7 +63,7 @@ export function History({
   };
 
   const error = listError ?? diffError ?? restoreError;
-  if (error) return <p className={cn("flex-1", meta)}>{describe(error)}</p>;
+  if (error) return <p className={cn("flex-1", meta)}>{historyError(error)}</p>;
   if (!revisions) return <p className={cn("flex-1", meta)}>Loading history…</p>;
 
   return (

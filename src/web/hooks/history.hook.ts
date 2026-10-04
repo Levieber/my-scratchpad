@@ -1,6 +1,6 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
 
-import { api } from "@/web/lib/api";
+import { api, Offline } from "@/web/lib/api";
 import { keys, queryClient } from "@/web/lib/queries";
 
 // History is read when asked for, never polled: it opens on what was just saved (the editor
@@ -22,3 +22,7 @@ export const loadRevision = (id: string, rev: number) =>
     queryKey: keys.revision(id, rev),
     queryFn: () => api.revision(id, rev),
   });
+
+/** Why history isn't shown, for the person. */
+export const historyError = (e: unknown) =>
+  e instanceof Offline ? "History needs a connection." : e instanceof Error ? e.message : String(e);
