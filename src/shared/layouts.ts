@@ -40,6 +40,8 @@ export function shownLayout(
 /** The table's columns, which are also what it sorts by (`options.sort.by`). */
 export const TABLE_COLUMNS = ["title", "kind", "tags", "author", "progress", "updated"] as const;
 
+export type TableColumn = (typeof TABLE_COLUMNS)[number];
+
 /**
  * `patch` applied to `target` as a JSON Merge Patch (RFC 7396): objects merge key by key, null
  * removes a key, anything else replaces. A view's options are edited this way, so a client that

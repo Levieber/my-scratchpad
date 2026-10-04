@@ -1,5 +1,6 @@
 // Pure helpers behind the note list, kept apart from React so they can be tested directly.
 import type { Note } from "@/shared/domain";
+import type { TableColumn } from "@/shared/layouts";
 
 import type { Tag } from "./api";
 
@@ -37,6 +38,41 @@ export function preview(note: Note, max = 240): string {
   if (lines[0] && same(lines[0], note.title)) lines.shift();
   const text = lines.join(" · ");
   return text.length > max ? text.slice(0, max - 1) + "…" : text;
+}
+
+const FENCE = /^\s*(```|~~~)/;
+
+/**
+ * The start of a note's body, for a card to render: without a first line repeating the title, at
+ * most `lines` lines, and never stopping inside a code fence (the rest would read as code).
+ */
+export function cardBody(note: Note, lines = 12): string {
+  const all = note.body.split("\n");
+  let start = all.findIndex((l) => l.trim() !== "");
+  if (start === -1) return "";
+  if (same(stripLine(all[start]!), note.title)) start++;
+  const kept = all.slice(start, start + lines);
+  const fences = kept.flatMap((l, i) => (FENCE.test(l) ? [i] : []));
+  return (fences.length % 2 ? kept.slice(0, fences.at(-1)) : kept).join("\n").trim();
+}
+
+/**
+ * What the table sorts a note by in `column`. Progress is the share done, and a note without
+ * tasks sorts below one with none done.
+ */
+export function tableValue(n: Note, column: TableColumn): string | number {
+  switch (column) {
+    case "title":
+      return n.title.toLowerCase();
+    case "tags":
+      return n.tags.join(" ");
+    case "progress":
+      return n.progress.total ? n.progress.done / n.progress.total : -1;
+    case "updated":
+      return n.updated_at;
+    default:
+      return n[column];
+  }
 }
 
 export type Group = { label: string; notes: Note[] };

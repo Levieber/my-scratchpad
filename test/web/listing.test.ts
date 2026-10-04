@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { Note } from "@/shared/domain";
-import { groupNotes, preview, toggled, visibleTags } from "@/web/lib/listing";
+import { cardBody, groupNotes, preview, tableValue, toggled, visibleTags } from "@/web/lib/listing";
 
 const note = (patch: Partial<Note>): Note => ({
   id: "x",
@@ -97,5 +97,37 @@ describe("toggled", () => {
     expect(toggled(["a"], ["a", "b"])).toBe("b");
     expect(toggled(["a", "b"], ["a"])).toBe("b");
     expect(toggled(["a"], ["a"])).toBeUndefined();
+  });
+});
+
+describe("cardBody", () => {
+  test("drops a first line repeating the title, and keeps the rest as markdown", () => {
+    const n = note({ title: "Plan", body: "\n# Plan\n\n- [ ] **one**\n- [x] two" });
+    expect(cardBody(n)).toBe("- [ ] **one**\n- [x] two");
+  });
+
+  test("stops at `lines` lines, but never inside a code fence", () => {
+    const n = note({ title: "T", body: "a\nb\n```ts\nconst x = 1;\nmore\n```" });
+    expect(cardBody(n, 4)).toBe("a\nb");
+    expect(cardBody(n, 6)).toBe("a\nb\n```ts\nconst x = 1;\nmore\n```");
+  });
+
+  test("an empty body has nothing to show", () => {
+    expect(cardBody(note({ title: "T", body: "\n\n" }))).toBe("");
+  });
+});
+
+describe("tableValue", () => {
+  test("sorts progress by the share done, with no tasks below none done", () => {
+    const value = (done: number, total: number) =>
+      tableValue(note({ progress: { done, total } }), "progress");
+    expect([value(0, 0), value(0, 2), value(1, 2), value(3, 3)]).toEqual([-1, 0, 0.5, 1]);
+  });
+
+  test("titles ignore case; tags read as one string; updated is its time", () => {
+    const n = note({ title: "Zebra", tags: ["b", "a"], updated_at: "2026-01-02T00:00:00.000Z" });
+    expect(tableValue(n, "title")).toBe("zebra");
+    expect(tableValue(n, "tags")).toBe("b a");
+    expect(tableValue(n, "updated")).toBe("2026-01-02T00:00:00.000Z");
   });
 });

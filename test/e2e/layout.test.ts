@@ -2,39 +2,9 @@
 // approximated from the CSS (test/web/styles.test.ts holds what the CSS alone can prove).
 import { expect, test } from "bun:test";
 
-import { describeE2E, eventually, openNote, useApp } from "@test/e2e/support";
-import type { Page } from "playwright-core";
+import { describeE2E, eventually, openNote, useApp, violations } from "@test/e2e/support";
 
 const WIDTHS = [320, 390, 1280];
-
-// What a pointer or a finger aims at. An inline link in a sentence would be exempt (WCAG 2.5.8);
-// the app has none.
-const TARGETS =
-  "button, a[href], input, textarea, select, [role=button], [role=link], [role=menuitem], [role=menuitemcheckbox], [role=menuitemradio], [role=radio], [role=checkbox], [role=switch], [role=tab], [role=option]";
-
-/** Whatever on the page breaks a rule, as readable lines; empty when it all holds. */
-const violations = (page: Page) =>
-  page.evaluate((targets) => {
-    const found: string[] = [];
-    const root = document.documentElement;
-    if (root.scrollWidth > root.clientWidth)
-      found.push(`scrolls sideways: ${root.scrollWidth} > ${root.clientWidth}`);
-    for (const el of document.querySelectorAll<HTMLElement>(targets)) {
-      if (!el.checkVisibility({ visibilityProperty: true })) continue;
-      // Base UI's checkbox mirrors its state into a hidden native input (1 px, aria-hidden, out
-      // of the tab order) for forms; nobody aims at it.
-      if (el.closest("[aria-hidden=true]")) continue;
-      const box = el.getBoundingClientRect();
-      const name = `${el.tagName.toLowerCase()} "${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 30) ?? ""}"`;
-      if (box.width < 24 || box.height < 24)
-        found.push(`${name} is ${Math.round(box.width)}x${Math.round(box.height)}`);
-      if (el.matches("input, textarea, select")) {
-        const size = parseFloat(getComputedStyle(el).fontSize);
-        if (size < 16) found.push(`${name} has a ${size}px font`);
-      }
-    }
-    return found;
-  }, TARGETS);
 
 describeE2E("layout", () => {
   const app = useApp();

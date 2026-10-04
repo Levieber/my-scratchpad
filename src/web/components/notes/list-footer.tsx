@@ -1,8 +1,8 @@
 import { PAGES } from "@/shared/pages";
 import { Button } from "@/web/components/ui/button";
 import { useOnline } from "@/web/hooks/online.hook";
-import { go } from "@/web/hooks/page.hook";
 import { usePending } from "@/web/hooks/pending.hook";
+import { go } from "@/web/hooks/route.hook";
 import { useSearch } from "@/web/hooks/search.hook";
 import { useExport, useImportLimits } from "@/web/hooks/transfer.hook";
 import { cn } from "@/web/lib/utils";
