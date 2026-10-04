@@ -13,7 +13,6 @@ import type {
   ImportTally,
 } from "@/shared/archive";
 import { diffStats } from "@/shared/diff/lines";
-import { type HookSelection, type View } from "@/shared/domain";
 import { isHookName, normalizeScope } from "@/shared/hooks";
 import { newId } from "@/shared/ids";
 import { MAX_PINS } from "@/shared/pins";
@@ -80,9 +79,9 @@ export const makeTransfer = (sql: SqlClient.SqlClient, parts: Parts) => {
         const ids = new Set(notes.map((n) => n.id));
         return {
           notes,
-          views: whole ? yield* parts.views : ([] as View[]),
+          views: whole ? yield* parts.views : [],
           pins: (yield* parts.pinRows).filter((p) => whole || ids.has(p.note_id)),
-          hook_selections: whole ? yield* parts.hookSelections : ([] as HookSelection[]),
+          hook_selections: whole ? yield* parts.hookSelections : [],
         };
       }).pipe(sql.withTransaction),
     );

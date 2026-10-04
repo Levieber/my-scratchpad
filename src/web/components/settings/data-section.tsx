@@ -34,8 +34,10 @@ export function DataSection() {
     try {
       setOutcome({ result: await importArchive(read.data) });
     } catch (e) {
-      // The server's refusal (a newer version, a file that isn't an archive) is the answer.
-      setOutcome({ error: refusal(e) });
+      // The server's refusal (a newer version, a file that isn't an archive) is the answer. Offline
+      // or a missing token is already on screen elsewhere, and leaves nothing to say here.
+      const message = refusal(e);
+      setOutcome(message ? { error: message } : null);
     }
   };
 

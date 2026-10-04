@@ -298,6 +298,25 @@ describe("POST /api/import", () => {
     expect({ ...after.data, exported_at: 0 }).toEqual({ ...before.data, exported_at: 0 });
   });
 
+  test("two imports of the same archive at once leave every note written exactly once", async () => {
+    const { call } = await boot();
+    const archive = JSON.parse(await fixture("export-v2.json"));
+    const [one, two] = await Promise.all([
+      call("POST", "/api/import", archive),
+      call("POST", "/api/import", archive),
+    ]);
+    expect([one.status, two.status]).toEqual([200, 200]);
+    // Each note, view, pin and selection has one winner; the other import finds it taken.
+    const created = (part: (r: typeof one.data) => { created: number }) =>
+      part(one.data).created + part(two.data).created;
+    expect(created((r) => r)).toBe(2);
+    expect(created((r) => r.views)).toBe(1);
+    expect(created((r) => r.pins)).toBe(2);
+    expect(created((r) => r.hook_selections)).toBe(1);
+    expect([one.data.failed, two.data.failed]).toEqual([[], []]);
+    expect((await history(call, "archive-note-0001")).length).toBe(3);
+  });
+
   test("a note that exists is left as it is, and nothing is pinned for it", async () => {
     const { call } = await boot();
     await call("POST", "/api/notes", { id: "archive-note-0002", body: "mine, edited here" });
