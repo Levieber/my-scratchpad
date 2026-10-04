@@ -39,6 +39,12 @@ describe("the Read view's checkboxes", () => {
     expect(toggleTask(body, 1)).toBe("- [ ]\n- [ ] first\n- [ ] second");
   });
 
+  test("tick the task, not an example in a longer code fence around a shorter one", () => {
+    const body = "````\n```\n- [ ] example\n````\n- [ ] real";
+    expect(readNote(body).editable).toBe(true);
+    expect(toggleTask(body, 0)).toBe("````\n```\n- [ ] example\n````\n- [x] real");
+  });
+
   test("stay read-only where the renderer and progress read the body differently", () => {
     // A task in a quote renders as one, but isn't counted: the boxes can't be trusted to map.
     const body = "- [ ] counted\n\n> - [ ] quoted";
