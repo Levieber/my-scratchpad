@@ -45,7 +45,7 @@ src/
       migrations.ts Named schema changes, recorded in schema_migrations.
   client/       Talking to the API as a client.
     client.ts     The `Client` service over HTTP, used by the CLI, the MCP server and the Claude Code hooks.
-    transfer.ts   `pad export` / `pad import`: notes as a JSON array, built on the public API. Import keeps ids, so it is safe to repeat.
+    transfer.ts   `pad export` / `pad import` on `/api/export` and `/api/import`; against a server without them, the notes alone through the notes API. Import keeps ids, so it is safe to repeat.
     location.ts   Where a command or agent works: the repository's name (from its remote), the folder in it, the folder.
     hook-notes.ts What a hook shows there, from the server, or as before from a server older than hook selections.
   config/       Every env var and file under ~/.config/scratchpad, as Effect Config.

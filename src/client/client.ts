@@ -11,6 +11,7 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
 import { ClientConfig } from "@/config/client";
+import type { ExportArchive, ImportResult } from "@/shared/archive";
 import type {
   FullRevision,
   HookNotes,
@@ -110,6 +111,14 @@ const make = Effect.fnUntraced(function* ({
     pins: () => req<Note[]>("GET", "/api/pins"),
     pin: (id: string) => req<void>("PUT", `/api/pins/${encodeURIComponent(id)}`),
     unpin: (id: string) => req<void>("DELETE", `/api/pins/${encodeURIComponent(id)}`),
+    /** The whole archive (version 2): every note the filters match, with history unless off. */
+    exportArchive: (q: Omit<ListParams, "limit" | "offset"> = {}, history = true) =>
+      req<ExportArchive>(
+        "GET",
+        `/api/export${query({ ...q, history: history ? undefined : false })}`,
+      ),
+    /** An archive, or an array of notes (version 1), as parsed JSON; the server reads it. */
+    importArchive: (archive: unknown) => req<ImportResult>("POST", "/api/import", archive),
     health: () => req<{ ok: boolean }>("GET", "/api/health"),
     /** A note's history, newest first. */
     revisions: (id: string, q: { limit?: number; offset?: number } = {}) =>

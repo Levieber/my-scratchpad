@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -50,6 +50,25 @@ describe("compiled pad", () => {
     expect((await run(["--version"])).out).toBe("pad v0.1.0");
     const ls = await run(["ls"]);
     expect([ls.code, ls.out]).toEqual([0, expect.stringContaining("Binary note")]);
+  });
+
+  test("exports an archive, with or without history, and imports it back without changing anything", async () => {
+    const file = join(dir, "export.json");
+    const whole = await run(["export", file]);
+    const archive = JSON.parse(readFileSync(file, "utf8"));
+    expect(archive).toMatchObject({ format: "pad-export", version: 2 });
+    expect(whole.out).toBe(`exported ${archive.notes.length} notes to ${file} with their history`);
+    expect(archive.notes[0].revisions.length).toBeGreaterThan(0);
+
+    const bare = await run(["export", file, "--no-history"]);
+    expect(bare.out).toBe(`exported ${archive.notes.length} notes to ${file}`);
+    expect(JSON.parse(readFileSync(file, "utf8")).notes[0]).not.toHaveProperty("revisions");
+
+    const again = await run(["import", file]);
+    expect([again.code, again.out]).toEqual([
+      0,
+      `created 0, skipped ${archive.notes.length} existing`,
+    ]);
   });
 
   test("runs the SessionStart hook", async () => {

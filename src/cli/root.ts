@@ -25,7 +25,7 @@ export const pad = Command.make("pad").pipe(
   Command.withDescription(
     `pad — scratchpad CLI.
 
-Import keeps ids, so re-importing skips notes that exist; the author becomes you, not the original.
+Import keeps ids, authors, dates and history, so re-importing skips notes that exist and changes nothing.
 Kinds: ${KIND_NAMES.join(", ")}. Search operators: pad ls kind:reference author:agent '#launch' seo (author: human, agent, or a name)
 Env (overrides \`pad login\`): PAD_URL, PAD_TOKEN, PAD_AUTHOR.`,
   ),
