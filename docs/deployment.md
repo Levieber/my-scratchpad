@@ -4,15 +4,16 @@
 
 Every variable is read in `src/config/` (`env.ts` has what the configs share), as Effect `Config`: a value that is set but malformed (`PAD_PORT=abc`) stops startup with the reason instead of being used, an empty one counts as unset, and tokens are `Redacted`, so they never show in a log.
 
-| Var                 | Default                            |                                                                   |
-| ------------------- | ---------------------------------- | ----------------------------------------------------------------- |
-| `PAD_PORT` / `PORT` | 7777                               | `PORT` (set by Railway) also switches the bind host to `0.0.0.0`  |
-| `PAD_HOST`          | 127.0.0.1                          |                                                                   |
-| `PAD_DB`            | `~/.local/share/scratchpad/pad.db` | `/data/pad.db` on Railway                                         |
-| `PAD_TOKEN`         | –                                  | server: required when not on loopback; clients: the token to send |
-| `PAD_URL`           | from `pad login`, else local       | clients only                                                      |
-| `PAD_AUTHOR`        | `human` / `claude-code`            | attribution on writes                                             |
-| `NODE_ENV`          | –                                  | `production` disables HMR and builds the PWA at start (see below) |
+| Var                    | Default                            |                                                                          |
+| ---------------------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| `PAD_PORT` / `PORT`    | 7777                               | `PORT` (set by Railway) also switches the bind host to `0.0.0.0`         |
+| `PAD_HOST`             | 127.0.0.1                          |                                                                          |
+| `PAD_DB`               | `~/.local/share/scratchpad/pad.db` | `/data/pad.db` on Railway                                                |
+| `PAD_TOKEN`            | –                                  | server: required when not on loopback; clients: the token to send        |
+| `PAD_MAX_IMPORT_BYTES` | 67108864 (64 MiB)                  | server: the most one import may send (`POST /api/import`, over it `413`) |
+| `PAD_URL`              | from `pad login`, else local       | clients only                                                             |
+| `PAD_AUTHOR`           | `human` / `claude-code`            | attribution on writes                                                    |
+| `NODE_ENV`             | –                                  | `production` disables HMR and builds the PWA at start (see below)        |
 
 Clients (CLI, MCP server, SessionStart hook) prefer `pad login <url> <token>`, which writes `~/.config/scratchpad/config.json` (mode 600). Env vars override it.
 

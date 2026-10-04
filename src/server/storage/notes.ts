@@ -26,7 +26,7 @@ export type ListQuery = {
   offset?: number;
 };
 
-const normTags = (tags: unknown): string[] =>
+export const normTags = (tags: unknown): string[] =>
   Array.isArray(tags)
     ? [...new Set(tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean))]
     : [];

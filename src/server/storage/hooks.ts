@@ -106,6 +106,33 @@ export const makeHooks = (sql: SqlClient.SqlClient) => {
     saveHookSelection: (hook: HookName, scope: string, patch: SelectionPatch, author: string) =>
       run(write(hook, scope, patch, author).pipe(sql.withTransaction)),
 
+    /**
+     * A selection from an export, as it was chosen (its date and author too). One already stored
+     * for this hook and scope is left alone ("skipped"). Hand-picked notes that aren't here are
+     * dropped, as they are when a picked note is deleted.
+     */
+    importHookSelection: (selection: HookSelection & { hook: HookName }) =>
+      run(
+        Effect.gen(function* () {
+          if (yield* find(selection.hook, selection.scope)) return "skipped";
+          const found = yield* existing(selection.include);
+          const include = [...new Set(selection.include)].filter((id) => found.has(id));
+          if (include.length > MAX_INCLUDE)
+            return yield* new HookLimit({ reason: `At most ${MAX_INCLUDE} hand-picked notes` });
+          if (selection.limit > HOOKS[selection.hook].maxLimit)
+            return yield* new HookLimit({
+              reason: `${selection.hook} shows at most ${HOOKS[selection.hook].maxLimit} notes`,
+            });
+          const { limit, ...row } = selection;
+          yield* sql`INSERT INTO hook_selections ${sql.insert({
+            ...row,
+            include: JSON.stringify(include),
+            note_limit: limit,
+          })}`;
+          return "created";
+        }).pipe(sql.withTransaction),
+      ),
+
     /** Back to the default; deleting a selection that isn't stored succeeds. */
     deleteHookSelection: (hook: HookName, scope: string) =>
       run(

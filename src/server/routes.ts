@@ -8,6 +8,7 @@ import type * as Redacted from "effect/Redacted";
 
 import { RevisionNotFound } from "@/server/storage/errors";
 import { Store } from "@/server/storage/store";
+import { DEFAULT_MAX_IMPORT_BYTES } from "@/shared/archive";
 
 import { llmsTxt } from "./docs/llms";
 import { openapi } from "./docs/openapi";
@@ -32,9 +33,16 @@ import {
 import { noteDiff } from "./note-diff";
 import { pwaRoutes } from "./pwa";
 import { resourceWith } from "./resource";
+import { exportArchive, importArchive, importLimits } from "./transfer";
 
-/** The API's routes, on the Store. With `token`, every route but the health check needs it. */
-export const routes = (token: Redacted.Redacted | undefined) =>
+/**
+ * The API's routes, on the Store. With `token`, every route but the health check needs it;
+ * `maxImportBytes` is the most one import may send.
+ */
+export const routes = (
+  token: Redacted.Redacted | undefined,
+  maxImportBytes = DEFAULT_MAX_IMPORT_BYTES,
+) =>
   HttpRouter.addAll(
     Effect.gen(function* () {
       const store = yield* Store;
@@ -147,6 +155,17 @@ export const routes = (token: Redacted.Redacted | undefined) =>
         resource("/api/pins/:id", {
           PUT: Effect.as(Effect.flatMap(routeId, store.pin), noContent),
           DELETE: Effect.as(Effect.flatMap(routeId, store.unpin), noContent),
+        }),
+
+        // A download, so it carries a filename; the notes are all of them, not a page.
+        resource("/api/export", {
+          GET: Effect.flatMap(request, (req) => exportArchive(store, req)),
+        }),
+
+        // GET says what a client may send, and that this server imports at all.
+        resource("/api/import", {
+          GET: Effect.succeed(importLimits(maxImportBytes)),
+          POST: Effect.flatMap(request, (req) => importArchive(store, req, maxImportBytes)),
         }),
 
         resource("/api/hooks", { GET: Effect.map(hooksInfo(store), (info) => json(info)) }),

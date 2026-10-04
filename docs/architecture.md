@@ -13,6 +13,7 @@ src/
     domain.ts     The API's shapes as Schemas (Note, NoteInput, Revision, View); every client shares the types.
     validation.ts The sentences for a note that didn't decode (the API's 400 and `pad import`).
     errors.ts     Error codes + messages.
+    archive.ts    The export archive (docs/export-format.md): its schemas, versions, `parseArchive`; pure, so any client can read one.
     kinds.ts      Note kinds (note, reference); a use case is a tag, not a kind.
     query.ts      The search language (`kind:x author:x #tag words`); run by the server, edited by the PWA.
     checklist.ts  Markdown checkboxes → `progress` on every note, and which line each task is on (what a tick in the PWA edits).
@@ -28,6 +29,7 @@ src/
     http.ts       Reading a request (body, If-Match, query, paging) and writing a response or a refusal.
     note-diff.ts  What `GET /api/notes/:id/diff` computes.
     hook-notes.ts What the hook endpoints read, and the notes a hook shows an agent where it works.
+    transfer.ts   `GET /api/export` and `POST /api/import` over HTTP: the size limit, the filename, the refusals.
     pwa.ts        The PWA files that live at the site root (service worker, manifest, the icons).
     pages.ts      The PWA's pages, served under the Content-Security-Policy.
     observability.ts  A request id on every request and response, one log line per request, the JSON logger.
@@ -35,6 +37,7 @@ src/
     storage/      SQLite + FTS5 through effect/sql; knows nothing about HTTP.
       store.ts      The `Store` service and its layers: composes the five below, plus the health `ping`.
       notes.ts, revisions.ts, views.ts, pins.ts, hooks.ts   The queries, one file per area.
+      transfer.ts   Both ends of the archive: everything out in one read, a note with its revisions in (a transaction each); views, pins and hook selections come in through their own files.
       errors.ts     What the store fails with besides a defect (NoteNotFound, NoteChanged, …).
       rows.ts       A row of SQLite → the API's shapes.
       sql.ts        What every query shares: SQL failures as defects, the clock.

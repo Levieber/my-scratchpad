@@ -25,6 +25,8 @@ type ServerOptions = {
   development?: boolean;
   /** The folder of a built PWA to serve (pwa-build.ts); without it, Bun bundles it on demand. */
   prebuilt?: string;
+  /** The most bytes one import may send; see DEFAULT_MAX_IMPORT_BYTES. */
+  maxImportBytes?: number;
 };
 
 /** The API and PWA served by Bun, on whatever Store is provided. Port 0 picks a free one. */
@@ -34,8 +36,9 @@ export const serverLayer = ({
   port = 0,
   development = false,
   prebuilt,
+  maxImportBytes,
 }: ServerOptions) =>
-  HttpRouter.serve(Layer.merge(routes(token), requestLogging), {
+  HttpRouter.serve(Layer.merge(routes(token, maxImportBytes), requestLogging), {
     disableLogger: true,
     disableListenLog: true,
   }).pipe(
@@ -95,6 +98,7 @@ export const main = Effect.gen(function* () {
     port: config.port,
     development: !config.production,
     prebuilt,
+    maxImportBytes: config.maxImportBytes,
   }).pipe(Layer.provide(Store.layer(config.db)));
   return yield* Layer.launch(
     Layer.effectDiscard(

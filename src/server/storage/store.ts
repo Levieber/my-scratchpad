@@ -10,20 +10,26 @@ import { makeNotes } from "./notes";
 import { makePins } from "./pins";
 import { makeRevisions } from "./revisions";
 import { sqlite } from "./sqlite";
+import { makeTransfer } from "./transfer";
 import { makeVersion } from "./version";
 import { makeViews } from "./views";
 
 const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const { record, ...history } = makeRevisions(sql);
+  const notes = makeNotes(sql, record);
+  const views = makeViews(sql);
+  const pins = makePins(sql);
+  const hooks = makeHooks(sql);
 
   return {
-    ...makeNotes(sql, record),
+    ...notes,
     ...history,
-    ...makeViews(sql),
-    ...makePins(sql),
-    ...makeHooks(sql),
+    ...views,
+    ...pins,
+    ...hooks,
     ...makeVersion(sql),
+    ...makeTransfer(sql, { ...notes, ...views, ...pins, ...hooks }),
 
     /**
      * Reads a row of the notes table: fails when the file can't be read at all, not just when a

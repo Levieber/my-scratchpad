@@ -44,6 +44,15 @@ describe("server config", () => {
     expect(Exit.isFailure(exit)).toBe(true);
   });
 
+  test("an import may send 64 MiB unless the operator says otherwise; a malformed limit fails", async () => {
+    expect((await server()).maxImportBytes).toBe(64 * 1024 * 1024);
+    expect((await server({ PAD_MAX_IMPORT_BYTES: "1000" })).maxImportBytes).toBe(1000);
+    const exit = await Effect.runPromiseExit(
+      ServerConfig.parse(env({ PAD_MAX_IMPORT_BYTES: "lots" })),
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
+  });
+
   test("the token is redacted, and an empty one is no token", async () => {
     const { token } = await server({ PAD_TOKEN: "s3cret" });
     expect(Option.map(token, Redacted.value)).toEqual(Option.some("s3cret"));

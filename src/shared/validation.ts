@@ -9,6 +9,10 @@ const FIELD_RULES: Record<string, string> = {
   title: "title must be a string",
   body: "body must be a string",
   tags: "tags must be an array of strings",
+  author: "author must be a string",
+  created_at: "created_at must be a date",
+  updated_at: "updated_at must be a date",
+  revisions: "revisions must be a list of {title, body, tags, kind, author, updated_at}",
 };
 
 /** The top-level field a decoding failure is about, or undefined when the value isn't an object. */

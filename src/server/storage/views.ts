@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type * as SqlClient from "effect/sql/SqlClient";
 
+import type { ArchiveView } from "@/shared/archive";
 import { View } from "@/shared/domain";
 import { newId } from "@/shared/ids";
 
@@ -25,6 +26,29 @@ export const makeViews = (sql: SqlClient.SqlClient) => ({
         if (taken.length) return yield* new ViewExists({ name });
         yield* sql`INSERT INTO views ${sql.insert(view)}`;
         return view;
+      }).pipe(sql.withTransaction),
+    ),
+
+  /**
+   * A view from an export, with the id and date it had. A name already taken is left alone
+   * ("skipped"); an id already taken by another view is replaced by a new one.
+   */
+  importView: (view: ArchiveView) =>
+    run(
+      Effect.gen(function* () {
+        const name = view.name.trim().slice(0, 64);
+        if ((yield* sql`SELECT 1 FROM views WHERE name = ${name}`).length) return "skipped";
+        const idTaken = view.id
+          ? (yield* sql`SELECT 1 FROM views WHERE id = ${view.id}`).length > 0
+          : true;
+        const row: View = {
+          id: view.id && !idTaken ? view.id : newId(),
+          name,
+          query: view.query.trim(),
+          created_at: view.created_at ?? (yield* nowIso),
+        };
+        yield* sql`INSERT INTO views ${sql.insert(row)}`;
+        return "created";
       }).pipe(sql.withTransaction),
     ),
 

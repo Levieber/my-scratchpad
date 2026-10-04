@@ -1,3 +1,4 @@
+import { ARCHIVE_FORMAT, ARCHIVE_VERSION } from "@/shared/archive";
 import { ERROR_CODES } from "@/shared/errors";
 import { HOOK_NAMES, MAX_INCLUDE } from "@/shared/hooks";
 import { KIND_NAMES, KINDS } from "@/shared/kinds";
@@ -198,6 +199,104 @@ const ifNoneMatch = {
   description:
     "The ETag of the last answer: if nothing was written since, the answer is 304 with no body",
 };
+const ExportedRevision = {
+  type: "object",
+  description:
+    "A revision as written to an archive: content as of updated_at. The list is oldest first; the database's own ids stay out.",
+  required: ["title", "body", "tags", "kind", "author", "updated_at"],
+  properties: {
+    title: { type: "string" },
+    body: { type: "string" },
+    tags: { type: "array", items: { type: "string" } },
+    kind,
+    author: { type: "string" },
+    updated_at: { type: "string", format: "date-time" },
+    added: { type: "integer", description: "Counted again from the bodies when left out" },
+    removed: { type: "integer", description: "Counted again from the bodies when left out" },
+  },
+};
+
+// A note as exported: the note without `progress` (derived, so never written), and its history.
+const { progress: _progress, ...exportedProperties } = Note.properties;
+const ExportedNote = {
+  type: "object",
+  required: Note.required.filter((name) => name !== "progress"),
+  properties: {
+    ...exportedProperties,
+    revisions: {
+      type: "array",
+      items: ExportedRevision,
+      description: "Oldest first; left out when exported with history=false",
+    },
+  },
+};
+
+const ExportArchive = {
+  type: "object",
+  description:
+    "The portable archive: how a user moves between deployments, and their backup. Specified in docs/export-format.md. Importers read version 1 (a bare array of notes) and 2, ignore fields they don't know, and refuse a version newer than they read.",
+  required: ["format", "version", "exported_at", "notes", "views", "pins", "hook_selections"],
+  properties: {
+    format: { const: ARCHIVE_FORMAT },
+    version: { const: ARCHIVE_VERSION },
+    exported_at: { type: "string", format: "date-time" },
+    source: {
+      type: "object",
+      description: "Where it came from, for people; never read back",
+      properties: { app_version: { type: "string" } },
+    },
+    notes: { type: "array", items: ExportedNote },
+    views: { type: "array", items: { $ref: "#/components/schemas/View" } },
+    pins: {
+      type: "array",
+      description: "In the order they were pinned",
+      items: {
+        type: "object",
+        required: ["note_id", "pinned_at"],
+        properties: {
+          note_id: { type: "string" },
+          pinned_at: { type: "string", format: "date-time" },
+        },
+      },
+    },
+    hook_selections: { type: "array", items: { $ref: "#/components/schemas/HookSelection" } },
+  },
+};
+
+const tally = (description: string) => ({
+  type: "object",
+  description,
+  required: ["created", "skipped"],
+  properties: { created: { type: "integer" }, skipped: { type: "integer" } },
+});
+
+const ImportResult = {
+  type: "object",
+  required: ["created", "skipped", "failed", "views", "pins", "hook_selections"],
+  properties: {
+    created: { type: "integer", description: "Notes written" },
+    skipped: {
+      type: "integer",
+      description: "Notes whose id exists here; left exactly as they were",
+    },
+    views: tally("Saved searches; one whose name exists is skipped"),
+    pins: tally("Pins, only for notes this import created; others are skipped"),
+    hook_selections: tally("Hook selections; one for a hook and scope already stored is skipped"),
+    failed: {
+      type: "array",
+      description: "Items that could not be imported, each alone: the rest were",
+      items: {
+        type: "object",
+        required: ["item", "message"],
+        properties: {
+          item: { type: "string", description: "e.g. `note 3` or `pin <note id>`" },
+          message: { type: "string" },
+        },
+      },
+    },
+  },
+};
+
 const polledResponses = (description: string, schema: object) => ({
   200: {
     description,
@@ -216,6 +315,32 @@ const error = (description: string) => ({
   description,
   ...json({ $ref: "#/components/schemas/Error" }),
 });
+
+// What narrows the list; the export takes the same, so "export these notes" is the current search.
+const listFilters = [
+  {
+    name: "q",
+    in: "query",
+    schema: { type: "string" },
+    description:
+      "Full-text search. `kind:<kind>`, `author:<who>` and `#<tag>` narrow it, e.g. `kind:reference #launch seo` or `author:agent`",
+  },
+  { name: "kind", in: "query", schema: { type: "string", enum: KIND_NAMES } },
+  {
+    name: "author",
+    in: "query",
+    schema: { type: "string" },
+    description:
+      "`human`, `agent` (anyone who isn't the human) or an author's name such as `claude-code`",
+  },
+  {
+    name: "tag",
+    in: "query",
+    schema: { type: "array", items: { type: "string" } },
+    explode: true,
+    description: "Repeat to require several tags",
+  },
+];
 
 export const openapi = {
   openapi: "3.1.0",
@@ -237,6 +362,8 @@ export const openapi = {
       View,
       HookSelection,
       HookSection,
+      ExportArchive,
+      ImportResult,
       Error: {
         type: "object",
         required: ["error", "message"],
@@ -254,28 +381,7 @@ export const openapi = {
         operationId: "listNotes",
         summary: "List or full-text search notes (most recently updated first)",
         parameters: [
-          {
-            name: "q",
-            in: "query",
-            schema: { type: "string" },
-            description:
-              "Full-text search. `kind:<kind>`, `author:<who>` and `#<tag>` narrow it, e.g. `kind:reference #launch seo` or `author:agent`",
-          },
-          { name: "kind", in: "query", schema: { type: "string", enum: KIND_NAMES } },
-          {
-            name: "author",
-            in: "query",
-            schema: { type: "string" },
-            description:
-              "`human`, `agent` (anyone who isn't the human) or an author's name such as `claude-code`",
-          },
-          {
-            name: "tag",
-            in: "query",
-            schema: { type: "array", items: { type: "string" } },
-            explode: true,
-            description: "Repeat to require several tags",
-          },
+          ...listFilters,
           { name: "limit", in: "query", schema: { type: "integer", default: 50, maximum: 500 } },
           { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
           ifNoneMatch,
@@ -502,6 +608,76 @@ export const openapi = {
         operationId: "unpinNote",
         summary: "Unpin a note",
         responses: { 204: { description: "Unpinned (or wasn't pinned)" }, 404: notFound },
+      },
+    },
+    "/api/export": {
+      get: {
+        operationId: "exportNotes",
+        summary:
+          "Download the archive: every matching note (not a page) with its history, plus views, pins and hook selections",
+        description:
+          "Without filters the archive holds everything. With filters it holds only the matching notes (and the pins on them): views and hook selections are the user's own setup, not part of a subset. Answers with `Content-Disposition: attachment`.",
+        parameters: [
+          ...listFilters,
+          {
+            name: "history",
+            in: "query",
+            schema: { type: "boolean", default: true },
+            description: "`false` leaves each note's revisions out, for a smaller file",
+          },
+        ],
+        responses: {
+          200: {
+            description: "The archive",
+            ...json({ $ref: "#/components/schemas/ExportArchive" }),
+          },
+          400: error("invalidKind or invalidParam"),
+        },
+      },
+    },
+    "/api/import": {
+      get: {
+        operationId: "importLimits",
+        summary:
+          "What an import may send: the archive versions this server reads, and the most bytes",
+        responses: {
+          200: {
+            description: "Limits",
+            ...json({
+              type: "object",
+              required: ["formats", "max_bytes"],
+              properties: {
+                formats: { type: "array", items: { type: "integer" } },
+                max_bytes: { type: "integer", description: "Set by the server's operator" },
+              },
+            }),
+          },
+        },
+      },
+      post: {
+        operationId: "importNotes",
+        summary: "Import an archive (version 2) or a bare array of notes (version 1)",
+        description:
+          "Synchronous. A note whose id exists is skipped and left as it is, so importing the same file twice changes nothing. Each note goes in with its revisions, dates and author as the archive has them (the sender's author where it names none), in one transaction: an import can set any author, since authors are display names and are never mapped to accounts. A bad item fails alone and is listed in `failed`; an archive from a newer version is refused whole.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                oneOf: [
+                  { $ref: "#/components/schemas/ExportArchive" },
+                  { type: "array", items: { $ref: "#/components/schemas/Note" } },
+                ],
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Imported", ...json({ $ref: "#/components/schemas/ImportResult" }) },
+          400: error("invalidJson or invalidImport"),
+          413: error("payloadTooLarge: over the server's limit (see GET)"),
+          422: error("unsupportedFormat: an archive newer than this server reads"),
+        },
       },
     },
     "/api/hooks": {

@@ -28,6 +28,8 @@ Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 - GET    /api/views, POST /api/views {name, query}, DELETE /api/views/{id}   saved searches
 - GET    /api/hooks   the notes agent hooks show (session start, end-of-turn review), as the user chose them
 - GET    /api/hooks/{name}/notes?repo=&path=&dir=&home=   what a hook shows an agent working there, by section
+- GET    /api/export?q=&kind=&author=&tag=&history=   the user's notes with their history, views and pins, as one JSON archive (a backup; how to move between deployments)
+- POST   /api/import   an archive from /api/export (or a bare array of notes); notes whose id exists are skipped, so importing twice is safe. GET says how large it may be
 - GET    /api/pins, PUT /api/pins/{id}, DELETE /api/pins/{id}   the user's pinned notes (at most ${MAX_PINS}): what matters most right now
 
 Every note carries \`progress: {done, total}\`, counted from its markdown checkboxes (outside code fences; an empty \`- [ ]\` is a placeholder, not a task).

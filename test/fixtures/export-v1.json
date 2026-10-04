@@ -1,0 +1,24 @@
+[
+  {
+    "id": "legacy-note-0001",
+    "title": "Launch checklist",
+    "body": "# Launch checklist\n- [x] domain\n- [ ] announce",
+    "tags": ["launch", "checklist"],
+    "kind": "reference",
+    "author": "human",
+    "created_at": "2026-08-01T09:00:00.000Z",
+    "updated_at": "2026-08-03T18:30:00.000Z",
+    "progress": { "done": 1, "total": 2 }
+  },
+  {
+    "id": "legacy-note-0002",
+    "title": "Idea",
+    "body": "Try a weekly review.",
+    "tags": [],
+    "kind": "note",
+    "author": "claude-code",
+    "created_at": "2026-08-02T10:00:00.000Z",
+    "updated_at": "2026-08-02T10:00:00.000Z",
+    "progress": { "done": 0, "total": 0 }
+  }
+]

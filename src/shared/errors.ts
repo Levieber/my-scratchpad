@@ -24,6 +24,9 @@ export const ERROR_MESSAGES = {
   invalidScope:
     "A scope is empty (everywhere), a repository's name with an optional folder, a folder from ~ (~/work), or an absolute folder",
   hookLimit: "Too many hand-picked notes, or a limit above the hook's maximum",
+  invalidImport: "The file is not an export archive, or a part of it has the wrong shape",
+  unsupportedFormat: "The archive is from a newer version than this server reads",
+  payloadTooLarge: "The import is larger than this server accepts",
   notFound: "No such endpoint",
   methodNotAllowed: "Method not allowed",
   internal: "Internal error",
