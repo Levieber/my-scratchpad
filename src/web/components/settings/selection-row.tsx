@@ -1,15 +1,16 @@
+import { Field } from "@base-ui/react/field";
 import { XIcon } from "lucide-react";
 import { useState } from "react";
 
 import type { HookName } from "@/shared/hooks";
+import { Button } from "@/web/components/ui/button";
+import { Input } from "@/web/components/ui/input";
 import { useHookChoices, useHookSection } from "@/web/hooks/hooks-info.hook";
 import { useOnline } from "@/web/hooks/online.hook";
 import type { HookSelection, HooksInfo } from "@/web/lib/api";
-import { button, field, ghostButton, iconButton, primaryButton } from "@/web/lib/classes";
 import { refusal } from "@/web/lib/failures";
 import { scopeLabel } from "@/web/lib/hooks";
 import { ago } from "@/web/lib/listing";
-import { cn } from "@/web/lib/utils";
 
 /**
  * What a hook shows in one place: the search and limit, and the notes they give. Keyed by what
@@ -50,7 +51,6 @@ export function SelectionRow({
 
   const label = scopeLabel(scope);
   const dirty = query !== initialQuery || limit !== initialLimit;
-  const errorId = `hook-${hook}-${scope || "everywhere"}-error`;
   const picked = new Set(shown?.include);
 
   return (
@@ -75,22 +75,30 @@ export function SelectionRow({
         }}
       >
         {/* Visible "Search" leads the name; the place, hidden, tells the rows apart. */}
-        <label className="flex flex-[1_1_16rem] items-center gap-1.5 text-sm text-muted-foreground">
-          Search<span className="sr-only"> for {label}</span>
-          <input
-            className={cn(field, "min-w-0 flex-1 text-foreground")}
-            aria-describedby={error ? errorId : undefined}
-            aria-invalid={Boolean(error)}
+        <Field.Root
+          className="flex flex-[1_1_16rem] flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground"
+          invalid={Boolean(error)}
+        >
+          <Field.Label>
+            Search<span className="sr-only"> for {label}</span>
+          </Field.Label>
+          <Input
+            className="w-auto flex-1"
             placeholder="hand-picked notes only"
             value={query}
             disabled={!online}
             onChange={(e) => setQuery(e.target.value)}
           />
-        </label>
-        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          Limit
-          <input
-            className={cn(field, "w-20")}
+          {error && (
+            <Field.Error match className="basis-full text-xs text-destructive">
+              {error}
+            </Field.Error>
+          )}
+        </Field.Root>
+        <Field.Root className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Field.Label>Limit</Field.Label>
+          <Input
+            className="w-20"
             type="number"
             min={1}
             max={info.max_limit}
@@ -98,26 +106,20 @@ export function SelectionRow({
             disabled={!online}
             onChange={(e) => setLimit(e.target.value)}
           />
-        </label>
-        <button className={primaryButton} disabled={!online || busy || !dirty}>
+        </Field.Root>
+        <Button type="submit" disabled={!online || busy || !dirty}>
           Save
-        </button>
+        </Button>
         {stored && (
-          <button
-            type="button"
-            className={button}
+          <Button
+            variant="outline"
             disabled={!online || busy}
             onClick={() => void act(() => choices.reset(scope))}
           >
             {scope ? "Remove" : "Reset to default"}
-          </button>
+          </Button>
         )}
       </form>
-      {error && (
-        <p id={errorId} role="alert" className="text-xs text-destructive">
-          {error}
-        </p>
-      )}
       <div className="text-sm">
         <p className="text-xs text-muted-foreground">
           {shown?.notes.length
@@ -131,14 +133,15 @@ export function SelectionRow({
               {picked.has(n.id) && (
                 <>
                   <span className="text-xs text-muted-foreground">hand-picked</span>
-                  <button
-                    className={cn(ghostButton, iconButton, "size-6 p-0")}
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
                     aria-label={`Stop hand-picking ${n.title}`}
                     disabled={!online || busy}
                     onClick={() => void act(() => choices.unpick(n.id, scope))}
                   >
                     <XIcon />
-                  </button>
+                  </Button>
                 </>
               )}
             </li>

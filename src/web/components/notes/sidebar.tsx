@@ -2,10 +2,12 @@ import { Filters } from "@/web/components/notes/filters";
 import { ListFooter } from "@/web/components/notes/list-footer";
 import { NoteList } from "@/web/components/notes/note-list";
 import { TagChips } from "@/web/components/notes/tag-chips";
+import { Hint } from "@/web/components/shell/hint";
+import { Button } from "@/web/components/ui/button";
+import { Input } from "@/web/components/ui/input";
 import { SavedViews } from "@/web/components/views/saved-views";
 import { newNote, searchRef } from "@/web/hooks/focus";
 import { useSearch } from "@/web/hooks/search.hook";
-import { field, primaryButton } from "@/web/lib/classes";
 import { cn } from "@/web/lib/utils";
 
 /** The left column: search, filters, saved views, tags and the list. */
@@ -30,14 +32,16 @@ export function Sidebar({
     >
       <header className="flex items-center gap-2">
         <h1 className="flex-1 text-[1.0625rem] font-bold tracking-[-0.01em]">Scratchpad</h1>
-        <button className={primaryButton} title="New note (Ctrl+Alt+N)" onClick={newNote}>
-          + New
-        </button>
+        <Hint label="New note (Ctrl+Alt+N)">
+          <Button aria-keyshortcuts="Control+Alt+N" onClick={newNote}>
+            + New
+          </Button>
+        </Hint>
       </header>
-      <input
+      <Input
         ref={searchRef}
-        className={field}
         type="search"
+        aria-label="Search"
         placeholder="Search…  (Ctrl+K)"
         aria-keyshortcuts="Control+K Meta+K"
         value={q}

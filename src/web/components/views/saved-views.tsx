@@ -1,109 +1,132 @@
-import { useEffect, useRef, useState } from "react";
+import { Field } from "@base-ui/react/field";
+import { XIcon } from "lucide-react";
+import { useState } from "react";
 
+import { Hint } from "@/web/components/shell/hint";
+import { Button } from "@/web/components/ui/button";
+import { Input } from "@/web/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/web/components/ui/popover";
 import { useViews } from "@/web/hooks/notes.hook";
 import { useSearch } from "@/web/hooks/search.hook";
-import { useViewMutations } from "@/web/hooks/views.hook";
-import { field, moreButton } from "@/web/lib/classes";
+import { isSaving, useViewMutations } from "@/web/hooks/views.hook";
 import { cn } from "@/web/lib/utils";
-
-// WCAG 2.2 target size: every control here is at least 24 x 24 px (min-h-6).
-const pillButton = "min-h-6 border-0 bg-transparent py-0.5 text-xs text-muted-foreground";
 
 const sameQuery = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-/**
- * Saved searches: apply one, delete one, or name the current search. Saving says whether the
- * name was taken, the one failure the person can fix, so the form stays open and says so.
- */
+/** Saved searches: apply one, delete one, or name the current search. */
 export function SavedViews() {
   const views = useViews();
   const { q, filter } = useSearch();
-  const { save: saveView, remove } = useViewMutations();
-  const [naming, setNaming] = useState<string | null>(null);
-  const [nameTaken, setNameTaken] = useState(false);
-  const nameRef = useRef<HTMLInputElement>(null);
-  // Focus moves to the field once, when the person opens the form: not on every re-render, which
-  // the 5 s poll would otherwise turn into stealing focus from the Save button.
-  const formOpen = naming !== null;
-  useEffect(() => {
-    if (formOpen) nameRef.current?.focus();
-  }, [formOpen]);
-
-  const activeView = views.find((v) => sameQuery(v.query, q));
+  const { remove } = useViewMutations();
+  // One still being saved isn't the search's view yet: the form naming it stays until it is.
+  const activeView = views.find((v) => !isSaving(v) && sameQuery(v.query, q));
   if (views.length === 0 && !q.trim()) return null;
-
-  const save = async (name: string) => {
-    const result = await saveView(name);
-    if (result === "saved") setNaming(null);
-    else if (result === "taken") setNameTaken(true);
-  };
 
   return (
     <fieldset className="flex flex-wrap items-center gap-1.5" aria-label="Saved views">
-      {views.map((v) => (
-        <span
-          key={v.id}
-          className="inline-flex items-center rounded-full border border-border data-[active=true]:border-primary data-[active=true]:bg-accent"
-          data-active={activeView?.id === v.id}
-        >
-          <button
-            className={cn(pillButton, "px-2 aria-pressed:text-foreground")}
-            aria-pressed={activeView?.id === v.id}
-            title={v.query}
-            onClick={() => filter(activeView?.id === v.id ? "" : v.query)}
+      {views.map((v) => {
+        const active = activeView?.id === v.id;
+        return (
+          <span
+            key={v.id}
+            className={cn(
+              "inline-flex items-center rounded-full border border-border",
+              active && "border-primary bg-accent",
+            )}
           >
-            {v.name}
-          </button>
-          <button
-            className={cn(pillButton, "min-w-6 px-1")}
-            aria-label={`Delete view ${v.name}`}
-            onClick={() => remove(v)}
-          >
-            ×
-          </button>
-        </span>
-      ))}
-      {q.trim() && !activeView && naming === null && (
-        <button
-          className={cn(moreButton, "min-h-6")}
-          onClick={() => {
-            setNameTaken(false);
-            setNaming("");
-          }}
-        >
-          Save this search
-        </button>
-      )}
-      {naming !== null && (
-        <form
-          className="flex flex-wrap items-center gap-1"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (naming.trim()) void save(naming.trim());
-          }}
-        >
-          <input
-            ref={nameRef}
-            className={cn(field, "min-h-6 w-32 px-2 py-0.5")}
-            aria-label="View name"
-            aria-invalid={nameTaken}
-            aria-describedby={nameTaken ? "view-name-error" : undefined}
-            placeholder="Name this view"
-            value={naming}
-            onChange={(e) => {
-              setNameTaken(false);
-              setNaming(e.target.value);
-            }}
-            onKeyDown={(e) => e.key === "Escape" && setNaming(null)}
-          />
-          <button className={cn(moreButton, "min-h-6")}>Save</button>
-          {nameTaken && (
-            <span id="view-name-error" role="alert" className="basis-full text-xs text-destructive">
-              A view with this name already exists
-            </span>
-          )}
-        </form>
-      )}
+            <Hint label={v.query}>
+              <Button
+                variant="ghost"
+                size="xs"
+                className={cn(
+                  "rounded-full font-normal text-muted-foreground hover:bg-transparent",
+                  active && "text-foreground",
+                )}
+                aria-pressed={active}
+                onClick={() => filter(active ? "" : v.query)}
+              >
+                {v.name}
+              </Button>
+            </Hint>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="rounded-full text-muted-foreground"
+              aria-label={`Delete view ${v.name}`}
+              onClick={() => remove(v)}
+            >
+              <XIcon />
+            </Button>
+          </span>
+        );
+      })}
+      {q.trim() && !activeView && <NameView />}
     </fieldset>
+  );
+}
+
+/**
+ * Names the search in force. A name already taken is the one failure the person can fix, so the
+ * popover stays open and says so.
+ */
+function NameView() {
+  const { save } = useViewMutations();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [taken, setTaken] = useState(false);
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        setName("");
+        setTaken(false);
+      }}
+    >
+      <PopoverTrigger
+        render={
+          <Button
+            variant="outline"
+            size="xs"
+            className="border-dashed font-normal text-muted-foreground"
+          />
+        }
+      >
+        Save this search
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 max-w-[calc(100vw-2rem)]">
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!name.trim()) return;
+            const result = await save(name.trim());
+            if (result === "saved") setOpen(false);
+            else if (result === "taken") setTaken(true);
+          }}
+        >
+          <Field.Root className="flex flex-col gap-1.5" invalid={taken}>
+            <Field.Label className="text-xs font-medium">View name</Field.Label>
+            <Input
+              placeholder="Name this view"
+              value={name}
+              onChange={(e) => {
+                setTaken(false);
+                setName(e.target.value);
+              }}
+            />
+            {taken && (
+              <Field.Error match className="text-xs text-destructive">
+                A view with this name already exists
+              </Field.Error>
+            )}
+          </Field.Root>
+          <Button type="submit" size="sm" className="self-end">
+            Save
+          </Button>
+        </form>
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -2,7 +2,6 @@ import { PAGES } from "@/shared/pages";
 import { useOnline } from "@/web/hooks/online.hook";
 import { go } from "@/web/hooks/page.hook";
 import { usePending } from "@/web/hooks/pending.hook";
-import { footer } from "@/web/lib/classes";
 import { cn } from "@/web/lib/utils";
 
 /** The connection, what is waiting to sync, and the links out of the list. */
@@ -10,7 +9,7 @@ export function ListFooter() {
   const online = useOnline();
   const pending = usePending().length;
   return (
-    <footer className={footer}>
+    <footer className="flex justify-between gap-2 text-xs text-muted-foreground">
       <output>
         <span
           aria-hidden="true"

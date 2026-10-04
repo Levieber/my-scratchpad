@@ -5,6 +5,11 @@ import { api, isApiError, type View } from "@/web/lib/api";
 import { handle } from "@/web/lib/failures";
 import { keys, queryClient } from "@/web/lib/queries";
 
+const SAVING = "saving:";
+
+/** A view shown before the server has it: it may yet be refused (a name already taken). */
+export const isSaving = (view: View) => view.id.startsWith(SAVING);
+
 /** Puts `change` in the views at once; what it returns undoes it. */
 async function optimistic(change: (views: View[]) => View[]) {
   await queryClient.cancelQueries({ queryKey: keys.views });
@@ -25,7 +30,7 @@ export function useViewMutations() {
     onMutate: (view) =>
       optimistic((v) => [
         ...v,
-        { ...view, id: `saving:${view.name}`, created_at: new Date().toISOString() },
+        { ...view, id: `${SAVING}${view.name}`, created_at: new Date().toISOString() },
       ]),
     onError: rollback,
     onSettled: refetch,

@@ -1,12 +1,11 @@
 import { operatorValue } from "@/shared/query";
 import { NoteRow } from "@/web/components/notes/note-row";
+import { Button } from "@/web/components/ui/button";
 import { useEditor } from "@/web/hooks/editor.hook";
 import { useNotes, usePins } from "@/web/hooks/notes.hook";
 import { useSearch } from "@/web/hooks/search.hook";
 import type { Note } from "@/web/lib/api";
-import { moreButton } from "@/web/lib/classes";
 import { groupNotes } from "@/web/lib/listing";
-import { cn } from "@/web/lib/utils";
 
 const heading =
   "mx-2.5 mt-3 mb-1 text-[0.6875rem] font-semibold tracking-wider text-muted-foreground uppercase group-first/section:mt-0";
@@ -57,9 +56,14 @@ export function NoteList({ roomy }: { /** The list is the whole screen. */ roomy
         </p>
       )}
       {canLoadMore && (
-        <button className={cn(moreButton, "mx-auto my-2 block")} onClick={loadMore}>
+        <Button
+          variant="outline"
+          size="xs"
+          className="mx-auto my-2 flex border-dashed text-muted-foreground"
+          onClick={loadMore}
+        >
           Load more
-        </button>
+        </Button>
       )}
     </nav>
   );

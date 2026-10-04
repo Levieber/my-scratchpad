@@ -1,8 +1,9 @@
 import { useState } from "react";
 
+import { Badge } from "@/web/components/ui/badge";
+import { Button } from "@/web/components/ui/button";
 import { loadRevision, useDiff, useRevisions } from "@/web/hooks/history.hook";
 import { type FullRevision, Offline } from "@/web/lib/api";
-import { button, outlineBadge } from "@/web/lib/classes";
 import { ago } from "@/web/lib/listing";
 import { cn } from "@/web/lib/utils";
 
@@ -84,7 +85,14 @@ export function History({
             >
               <span className="block text-sm font-semibold">
                 {ago(r.updated_at)}
-                {i === 0 && <span className={outlineBadge}>current</span>}
+                {i === 0 && (
+                  <Badge
+                    variant="outline"
+                    className="ml-1.5 h-4 px-1.5 text-[0.6875rem] text-muted-foreground"
+                  >
+                    current
+                  </Badge>
+                )}
               </span>
               <span className={meta}>
                 {r.author} · <span className="text-success">+{r.added}</span>{" "}
@@ -103,9 +111,9 @@ export function History({
                 {!diff.from && " · created"}
               </span>
               {diff.to.id !== revisions[0]?.id && (
-                <button className={button} onClick={() => void restore()}>
+                <Button variant="outline" size="sm" onClick={() => void restore()}>
                   Restore this version
-                </button>
+                </Button>
               )}
             </header>
             {Object.entries(diff.changes).map(([field, c]) => (

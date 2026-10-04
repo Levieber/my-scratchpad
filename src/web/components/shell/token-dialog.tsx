@@ -1,42 +1,53 @@
-import { useEffect, useRef, useState } from "react";
+import { Field } from "@base-ui/react/field";
+import { useState } from "react";
 
+import { Button } from "@/web/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/web/components/ui/dialog";
+import { Input } from "@/web/components/ui/input";
 import { useStore } from "@/web/hooks/store.hook";
-import { field, primaryButton } from "@/web/lib/classes";
 import { needsToken } from "@/web/lib/failures";
 import { provideToken } from "@/web/lib/session";
 
-/** Asks for the access token when the server refuses the one this browser has (or has none). */
+/**
+ * Asks for the access token when the server refuses the one this browser has (or has none).
+ * Nothing works without it, so it can't be dismissed: no close button, no Escape, no click
+ * outside. Focus starts in the field (Base UI's initial focus) and stays in the dialog.
+ */
 export function TokenDialog() {
-  const shown = useStore(needsToken);
-  return shown ? <TokenForm onSave={provideToken} /> : null;
-}
-
-function TokenForm({ onSave }: { onSave: (token: string) => void }) {
+  const open = useStore(needsToken);
   const [value, setValue] = useState("");
-  // The dialog blocks the whole app, so moving focus into it is expected (unlike autoFocus on a page).
-  const input = useRef<HTMLInputElement>(null);
-  useEffect(() => input.current?.focus(), []);
   return (
-    <div className="fixed inset-0 grid place-items-center bg-black/40 p-4">
-      <form
-        className="flex w-[min(360px,100%)] flex-col gap-2.5 rounded-card bg-card p-5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (value) onSave(value);
-        }}
-      >
-        <p>This scratchpad requires an access token.</p>
-        <input
-          ref={input}
-          className={field}
-          type="password"
-          placeholder="PAD_TOKEN"
-          aria-label="Access token"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
-        <button className={primaryButton}>Save</button>
-      </form>
-    </div>
+    <Dialog open={open} disablePointerDismissal onOpenChange={() => {}}>
+      <DialogContent showCloseButton={false} className="sm:max-w-sm">
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (value) provideToken(value);
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Access token</DialogTitle>
+            <DialogDescription>This scratchpad requires an access token.</DialogDescription>
+          </DialogHeader>
+          <Field.Root>
+            <Field.Label className="sr-only">Access token</Field.Label>
+            <Input
+              type="password"
+              placeholder="PAD_TOKEN"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </Field.Root>
+          <Button type="submit">Save</Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
