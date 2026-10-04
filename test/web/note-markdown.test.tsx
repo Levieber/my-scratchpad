@@ -70,6 +70,11 @@ describe("rendering is a trust boundary", () => {
     "- [ ] <script>alert(1)</script>",
     "| a |\n|---|\n| <img src=x onerror=alert(1)> |",
     '<https://x.example/"onmouseover="alert(1)>',
+    // Highlighted code is set as HTML (the renderer's highlighter hook), so it must come escaped.
+    ...["ts", "sh", "zsh", "json", "toml", "python", ""].map(
+      (lang) =>
+        `\`\`\`${lang}\n"<script>alert(1)</script>" <img src=x onerror=alert(1)> // '"\n\`\`\``,
+    ),
   ];
 
   // Only real tags count: hostile markup shown as text is escaped (`&lt;script&gt;`), harmless.
@@ -100,5 +105,31 @@ describe("rendering is a trust boundary", () => {
     expect(html).toContain('href="https://a.example/x"');
     expect(html).toContain('href="https://b.example/y"');
     expect(html).toContain('rel="noopener noreferrer"');
+  });
+});
+
+describe("fenced code", () => {
+  const code = (html: string) => /<code[^>]*>([\s\S]*?)<\/code>/.exec(html)?.[1] ?? "";
+
+  test.each([
+    ["ts", "const a: number = 1 // note", "th-keyword"],
+    ["zsh", 'echo "$HOME"', "th-command"],
+    ["sh", "ls -la # list", "th-comment"],
+    ["json", '{"a": true}', "th-property"],
+    ["toml", "[server]\nport = 7777", "th-heading"],
+  ])("%s is highlighted", (lang, source, token) => {
+    expect(code(render(`\`\`\`${lang}\n${source}\n\`\`\``))).toContain(`class="th-token ${token}"`);
+  });
+
+  test("another language, or none, is the code as it is, escaped", () => {
+    expect(code(render("```python\nprint('<b>')\n```"))).toBe("print(&#39;&lt;b&gt;&#39;)");
+    expect(code(render("```\n<b>x</b>\n```"))).toBe("&lt;b&gt;x&lt;/b&gt;");
+  });
+
+  test("the only markup in highlighted code is the token spans", () => {
+    const html = code(render('```ts\nconst s = "<img src=x onerror=alert(1)>" // </code>\n```'));
+    const tags = html.match(/<[^>]*>/g) ?? [];
+    expect(tags.length).toBeGreaterThan(0);
+    for (const tag of tags) expect(tag).toMatch(/^(<span class="th-token th-[a-z-]+">|<\/span>)$/);
   });
 });
