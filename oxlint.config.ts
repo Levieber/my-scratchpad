@@ -24,6 +24,12 @@ export default defineConfig({
       },
     },
     {
+      // A board's columns take a dragged card. Dragging is the pointer's shortcut; the keyboard
+      // and touch way is each card's "Move to" menu, so a column needs no handler of its own.
+      files: ["src/web/components/notes/note-board.tsx"],
+      rules: { "jsx-a11y/no-noninteractive-element-interactions": "off" },
+    },
+    {
       // shadcn's components, copied whole from its registry (see knip.ts).
       files: ["src/web/components/ui/**"],
       rules: { "eslint/max-lines": "off" },

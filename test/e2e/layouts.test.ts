@@ -37,7 +37,7 @@ describeE2E("layouts", () => {
         await shownAs(page, key === "table" && width < 721 ? "list" : key);
         found[key] = await violations(page);
       }
-      expect(found).toEqual({ list: [], grid: [], table: [] });
+      expect(found).toEqual(Object.fromEntries(LAYOUTS.map((l) => [l.key, []])));
     }, 20_000);
 
   test("keyboard only: from the search to the picker, arrows, and Space", async () => {
@@ -125,6 +125,73 @@ describeE2E("layouts", () => {
       .getByRole("button", { name: "Sorted", exact: true })
       .click();
     await shownAs(other, "table");
+  }, 20_000);
+
+  test("board: the keyboard moves a note with Move to, which lands in its history", async () => {
+    const note = await app.api.create({
+      title: "Board keys",
+      body: "x",
+      tags: ["boardkeys", "status:todo"],
+    });
+    const page = await app.open(1280, "/?q=%23boardkeys&layout=board");
+    await shownAs(page, "board");
+    const todo = page.getByRole("region", { name: "todo" });
+    await todo.getByRole("button", { name: "Board keys", exact: true }).waitFor();
+
+    await todo.getByRole("button", { name: 'Options for "Board keys"' }).focus();
+    await page.keyboard.press("Enter");
+    await page.getByRole("menuitemradio", { name: "todo" }).waitFor();
+    // From the checked column, the next radio down is doing.
+    for (let i = 0; i < 8; i++) {
+      const focused = await page.evaluate(() => document.activeElement?.textContent ?? "");
+      if (focused === "doing") break;
+      await page.keyboard.press("ArrowDown");
+    }
+    await page.keyboard.press("Enter");
+
+    await page
+      .getByRole("region", { name: "doing" })
+      .getByRole("button", { name: "Board keys", exact: true })
+      .waitFor();
+    await eventually(async () =>
+      expect((await app.api.get(note.id)).tags).toEqual(["boardkeys", "status:doing"]),
+    );
+    const history = (await (
+      await fetch(new URL(`/api/notes/${note.id}/revisions`, app.server.url))
+    ).json()) as {
+      tags: string[];
+    }[];
+    expect(history[0]?.tags).toEqual(["boardkeys", "status:doing"]);
+  }, 20_000);
+
+  test("board: a move made offline is sent once back online", async () => {
+    const note = await app.api.create({ title: "Board offline", body: "x", tags: ["boardoff"] });
+    const page = await app.open(1280, "/?q=%23boardoff&layout=board");
+    const card = page.getByRole("button", { name: "Board offline", exact: true });
+    await card.waitFor();
+    await page.context().setOffline(true);
+    await page.getByRole("button", { name: 'Options for "Board offline"' }).click();
+    await page.getByRole("menuitemradio", { name: "done" }).click();
+    await page
+      .getByRole("region", { name: "done" })
+      .getByRole("button", { name: "Board offline", exact: true })
+      .waitFor();
+    expect((await app.api.get(note.id)).tags).toEqual(["boardoff"]);
+    await page.context().setOffline(false);
+    await eventually(
+      async () => expect((await app.api.get(note.id)).tags).toEqual(["boardoff", "status:done"]),
+      10_000,
+    );
+  }, 25_000);
+
+  test("board: a card dragged to a column moves there", async () => {
+    const note = await app.api.create({ title: "Board drag", body: "x", tags: ["boarddrag"] });
+    const page = await app.open(1280, "/?q=%23boarddrag&layout=board");
+    const card = page.getByRole("button", { name: "Board drag", exact: true });
+    await card.dragTo(page.getByRole("region", { name: "doing" }));
+    await eventually(async () =>
+      expect((await app.api.get(note.id)).tags).toEqual(["boarddrag", "status:doing"]),
+    );
   }, 20_000);
 
   test("a layout this app doesn't know shows as the list, and says so", async () => {

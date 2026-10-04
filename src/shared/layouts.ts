@@ -12,6 +12,7 @@ export const LAYOUTS = [
   { key: "list", label: "List", since: 1 },
   { key: "grid", label: "Grid", since: 1 },
   { key: "table", label: "Table", since: 1 },
+  { key: "board", label: "Board", since: 1 },
 ] as const;
 
 export type Layout = (typeof LAYOUTS)[number]["key"];
@@ -42,6 +43,15 @@ export const TABLE_COLUMNS = ["title", "kind", "tags", "author", "progress", "up
 
 export type TableColumn = (typeof TABLE_COLUMNS)[number];
 
+/** How a board makes its columns (`options.groupBy`); see web/lib/board.ts. */
+export type GroupBy =
+  /** A column per value of the tags starting with `prefix` (`status:todo`), `columns` first. */
+  | { by: "prefix"; prefix: string; columns?: readonly string[] }
+  /** A column per tag, in this order. */
+  | { by: "tags"; tags: readonly string[] }
+  /** By the note's checklist: no tasks, to do, under way, done. Read from the body, so fixed. */
+  | { by: "checklist" };
+
 /**
  * `patch` applied to `target` as a JSON Merge Patch (RFC 7396): objects merge key by key, null
  * removes a key, anything else replaces. A view's options are edited this way, so a client that
@@ -54,6 +64,18 @@ export function mergePatch(target: unknown, patch: unknown): unknown {
     if (value === null) delete merged[key];
     else merged[key] = mergePatch(merged[key], value);
   return merged;
+}
+
+/**
+ * The merge patch that turns `current` into `next` as a whole, removing what `next` lacks, for an
+ * option whose shapes differ (one GroupBy for another), which merging would mix.
+ */
+export function replacing(current: unknown, next: unknown): unknown {
+  if (!isObject(current) || !isObject(next)) return next;
+  const patch: Record<string, unknown> = {};
+  for (const key of Object.keys(current)) if (!(key in next)) patch[key] = null;
+  for (const [key, value] of Object.entries(next)) patch[key] = replacing(current[key], value);
+  return patch;
 }
 
 export const isObject = (value: unknown): value is Record<string, unknown> =>

@@ -183,7 +183,7 @@ describe("notes API", () => {
       name: "Work",
       query: "#work",
       layout: "table",
-      options: { sort: { by: "updated", desc: true, nulls: "last" }, groupBy: "status:" },
+      options: { sort: { by: "updated", desc: true, nulls: "last" }, swimlanes: "status:" },
     });
     expect(made.status).toBe(201);
     const path = `/api/views/${made.data.id}`;
@@ -194,7 +194,7 @@ describe("notes API", () => {
       name: "Work items",
       query: "#work",
       layout: "table",
-      options: { sort: { by: "updated", desc: true, nulls: "last" }, groupBy: "status:" },
+      options: { sort: { by: "updated", desc: true, nulls: "last" }, swimlanes: "status:" },
     });
 
     // Options merge (RFC 7396): sort.by changes, desc goes, what this server doesn't know stays.
@@ -204,7 +204,7 @@ describe("notes API", () => {
     });
     expect(sorted.data).toMatchObject({
       layout: "grid",
-      options: { sort: { by: "title", nulls: "last" }, groupBy: "status:", extra: 1 },
+      options: { sort: { by: "title", nulls: "last" }, swimlanes: "status:", extra: 1 },
     });
     const listed = (await call("GET", "/api/views")).data as { id: string }[];
     expect(listed.find((v) => v.id === made.data.id)).toEqual(sorted.data);
@@ -230,6 +230,8 @@ describe("notes API", () => {
       ],
       ["PATCH", path, { layout: 3 }, 400, "invalidLayout"],
       ["PATCH", path, { options: { sort: "title" } }, 400, "invalidViewOptions"],
+      ["PATCH", path, { options: { groupBy: { by: "prefix" } } }, 400, "invalidViewOptions"],
+      ["PATCH", path, { options: { groupBy: { by: "assignee" } } }, 400, "invalidViewOptions"],
       ["PATCH", path, { name: " " }, 400, "invalidBody"],
       ["PATCH", path, { query: "" }, 400, "invalidBody"],
       ["PATCH", path, [], 400, "invalidBody"],
