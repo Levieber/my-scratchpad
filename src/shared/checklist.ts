@@ -16,22 +16,42 @@ export type Task = { /** 0-based line in the body. */ line: number; done: boolea
  */
 export function tasks(body: string): Task[] {
   const found: Task[] = [];
-  let fence: string | null = null;
+  const fences = fenceWalker();
   for (const [line, text] of body.split("\n").entries()) {
-    if (fence) {
-      const close = /^\s*(`{3,}|~{3,})\s*$/.exec(text)?.[1];
-      if (close && close[0] === fence[0] && close.length >= fence.length) fence = null;
-      continue;
-    }
-    const open = OPEN.exec(text)?.[1];
-    if (open) {
-      fence = open;
-      continue;
-    }
+    if (fences.isCode(text)) continue;
     const m = BOX.exec(text);
     if (m && (m[2] ?? "").trim()) found.push({ line, done: m[1] !== " " });
   }
   return found;
+}
+
+/** Follows lines through code fences: `isCode` says whether a line is a fence or inside one. */
+function fenceWalker() {
+  let fence: string | null = null;
+  let opened = -1;
+  let line = -1;
+  return {
+    isCode(text: string) {
+      line++;
+      if (fence) {
+        const close = /^\s*(`{3,}|~{3,})\s*$/.exec(text)?.[1];
+        if (close && close[0] === fence[0] && close.length >= fence.length) fence = null;
+        return true;
+      }
+      fence = OPEN.exec(text)?.[1] ?? null;
+      if (fence) opened = line;
+      return fence !== null;
+    },
+    /** The line the fence still open after the last line opened on, if one is. */
+    unclosed: () => (fence ? opened : null),
+  };
+}
+
+/** Where a code fence that `lines` leave open starts, or null: cutting there keeps code whole. */
+export function unclosedFence(lines: readonly string[]): number | null {
+  const fences = fenceWalker();
+  for (const text of lines) fences.isCode(text);
+  return fences.unclosed();
 }
 
 export type Progress = { done: number; total: number };
