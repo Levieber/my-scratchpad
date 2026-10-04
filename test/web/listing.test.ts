@@ -112,6 +112,12 @@ describe("cardBody", () => {
     expect(cardBody(n, 6)).toBe("a\nb\n```ts\nconst x = 1;\nmore\n```");
   });
 
+  test("a shorter fence inside a longer one is text, as the renderer reads it", () => {
+    const n = note({ title: "T", body: "a\n````md\n```\nexample\n```\n````\nb" });
+    expect(cardBody(n, 5)).toBe("a");
+    expect(cardBody(n, 7)).toBe(n.body);
+  });
+
   test("an empty body has nothing to show", () => {
     expect(cardBody(note({ title: "T", body: "\n\n" }))).toBe("");
   });

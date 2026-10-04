@@ -1,4 +1,5 @@
 // Pure helpers behind the note list, kept apart from React so they can be tested directly.
+import { unclosedFence } from "@/shared/checklist";
 import type { Note } from "@/shared/domain";
 import type { TableColumn } from "@/shared/layouts";
 
@@ -40,8 +41,6 @@ export function preview(note: Note, max = 240): string {
   return text.length > max ? text.slice(0, max - 1) + "…" : text;
 }
 
-const FENCE = /^\s*(```|~~~)/;
-
 /**
  * The start of a note's body, for a card to render: without a first line repeating the title, at
  * most `lines` lines, and never stopping inside a code fence (the rest would read as code).
@@ -52,8 +51,10 @@ export function cardBody(note: Note, lines = 12): string {
   if (start === -1) return "";
   if (same(stripLine(all[start]!), note.title)) start++;
   const kept = all.slice(start, start + lines);
-  const fences = kept.flatMap((l, i) => (FENCE.test(l) ? [i] : []));
-  return (fences.length % 2 ? kept.slice(0, fences.at(-1)) : kept).join("\n").trim();
+  return kept
+    .slice(0, unclosedFence(kept) ?? kept.length)
+    .join("\n")
+    .trim();
 }
 
 /**
