@@ -1,11 +1,14 @@
 import * as BunHttpServer from "@effect/platform-bun/BunHttpServer";
+import * as Cause from "effect/Cause";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServer from "effect/http/HttpServer";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import type * as Redacted from "effect/Redacted";
+import type * as Runtime from "effect/Runtime";
 
 import { ServerConfig } from "@/config/server";
 import { Store } from "@/server/storage/store";
@@ -53,6 +56,22 @@ class UnsafeListen extends Data.TaggedError("UnsafeListen")<{ host: string }> {
     return `Refusing to listen on ${this.host} without PAD_TOKEN. Set PAD_TOKEN to a long random secret.`;
   }
 }
+
+/**
+ * The exit code of `bun src/server.ts`. A signal (SIGTERM from a redeploy, SIGINT) interrupts the
+ * main fiber and `main` never succeeds on its own, so an interrupt-only exit is the requested
+ * shutdown and exits 0: a non-zero code is what Railway's and systemd's on-failure restart policies
+ * report as a crash.
+ */
+export const teardown: Runtime.Teardown = (exit, onExit) => {
+  if (Exit.isSuccess(exit) || Cause.hasInterruptsOnly(exit.cause)) {
+    console.log("Program finished successfully.");
+    onExit(0);
+  } else {
+    console.error("Program ended with an error.");
+    onExit(1);
+  }
+};
 
 /** `pad serve` and `bun src/server.ts`: the server on the configured address and database. */
 export const main = Effect.gen(function* () {

@@ -30,7 +30,7 @@ Locally the log stays human-readable.
 ## Running
 
 - `bun run dev` — HMR, and browser console output streamed to the terminal.
-- `bun run start` — `NODE_ENV=production bun src/server.ts`. There is no server build: Bun bundles the PWA from the HTML import at startup (well under a second), compiling its Tailwind with the plugin `bunfig.toml` names. SIGINT/SIGTERM (a Railway redeploy) shut it down gracefully: requests are interrupted and the database is closed.
+- `bun run start` — `NODE_ENV=production bun src/server.ts`. There is no server build: Bun bundles the PWA from the HTML import at startup (well under a second), compiling its Tailwind with the plugin `bunfig.toml` names. SIGINT/SIGTERM (a Railway redeploy) shut it down gracefully: requests are interrupted, the database is closed and the process exits 0 (`teardown` in `src/server/serve.ts`). Exiting non-zero on a signal would make the on-failure restart policy report every redeploy as a crash.
 - `bun run build` — optional: bundle the PWA into `dist/` (`scripts/build.ts web`) to inspect its output and size. Nothing serves `dist/`.
 
 ## Railway
