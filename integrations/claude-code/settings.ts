@@ -21,12 +21,19 @@ export const HOOKS = {
 } as const satisfies Record<string, { name: HookName; timeout: number; matcher?: string }>;
 
 export const ALLOW = [
-  ...["search", "get", "create", "append", "update", "history", "diff"].map(
+  ...["search", "get", "create", "append", "update", "history", "diff", "hooks"].map(
     (t) => `mcp__scratchpad__scratchpad_${t}`,
   ),
-  ...["pad ls:*", "pad show:*", "pad history:*", "pad diff:*", "pad tags", "pad status"].map(
-    (c) => `Bash(${c})`,
-  ),
+  ...[
+    "pad ls:*",
+    "pad show:*",
+    "pad history:*",
+    "pad diff:*",
+    "pad tags",
+    "pad status",
+    "pad hooks",
+    "pad hooks preview:*",
+  ].map((c) => `Bash(${c})`),
 ];
 
 export const hookCommand = (pad: string, name: HookName) => `${pad} hook ${name}`;

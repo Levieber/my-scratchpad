@@ -11,8 +11,20 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
 import { ClientConfig } from "@/config/client";
-import type { FullRevision, Note, NoteDiff, NoteInput, Revision, Tag, View } from "@/shared/domain";
+import type {
+  FullRevision,
+  HookNotes,
+  HookSelection,
+  HooksInfo,
+  Note,
+  NoteDiff,
+  NoteInput,
+  Revision,
+  Tag,
+  View,
+} from "@/shared/domain";
 import { readError } from "@/shared/errors";
+import type { Location } from "@/shared/hooks";
 
 /** `GET /api/notes` parameters. `q` may carry `kind:x`, `author:x` and `#tag` operators. */
 export type ListParams = {
@@ -81,6 +93,7 @@ const make = Effect.fnUntraced(function* ({
     });
 
   const note = (id: string) => `/api/notes/${encodeURIComponent(id)}`;
+  const hook = (name: string) => `/api/hooks/${encodeURIComponent(name)}`;
 
   return {
     list: (q: ListParams = {}) => req<Note[]>("GET", `/api/notes${query(q)}`),
@@ -105,6 +118,21 @@ const make = Effect.fnUntraced(function* ({
     /** The latest change by default; `since` (ISO time) for everything changed after it. */
     diff: (id: string, q: { from?: number; to?: number; since?: string } = {}) =>
       req<NoteDiff>("GET", `${note(id)}/diff${query(q)}`),
+    /** Each agent hook's default and the selections the user stored. */
+    hooks: () => req<HooksInfo>("GET", "/api/hooks"),
+    /** What `name` shows an agent at `at`; `override` is this machine's search for everywhere. */
+    hookNotes: (name: string, at: Location, override?: string) =>
+      req<HookNotes>("GET", `${hook(name)}/notes${query({ ...at, query: override })}`),
+    saveHookSelection: (
+      name: string,
+      selection: { scope?: string; query?: string | null; include?: string[]; limit?: number },
+    ) => req<HookSelection>("PUT", hook(name), selection),
+    deleteHookSelection: (name: string, scope = "") =>
+      req<void>("DELETE", `${hook(name)}${query({ scope })}`),
+    pickHookNote: (name: string, id: string, scope = "") =>
+      req<void>("PUT", `${hook(name)}/include/${encodeURIComponent(id)}${query({ scope })}`),
+    unpickHookNote: (name: string, id: string, scope = "") =>
+      req<void>("DELETE", `${hook(name)}/include/${encodeURIComponent(id)}${query({ scope })}`),
   };
 });
 

@@ -11,6 +11,7 @@ import * as Logger from "effect/Logger";
 
 import { Client } from "@/client/client";
 import { ClientConfig } from "@/config/client";
+import { HookConfig } from "@/config/hooks";
 import { Handlers } from "@/mcp/handlers";
 import { Server } from "@/mcp/server";
 import { Scratchpad } from "@/mcp/tools";
@@ -27,7 +28,7 @@ McpServer.toolkit(Scratchpad).pipe(
     ),
   ),
   Layer.provide(Server),
-  Layer.provide([ClientConfig.layer, BunStdio.layer]),
+  Layer.provide([ClientConfig.layer, HookConfig.layer, BunStdio.layer]),
   // stdout is the protocol; anything logged goes to stderr.
   Layer.provide(Layer.succeed(Logger.LogToStderr, true)),
   Layer.launch,

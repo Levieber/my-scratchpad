@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { Client as McpClient } from "@modelcontextprotocol/sdk/client/index.js";
@@ -56,6 +58,7 @@ describe("MCP server", () => {
         "scratchpad_diff",
         "scratchpad_get",
         "scratchpad_history",
+        "scratchpad_hooks",
         "scratchpad_search",
         "scratchpad_update",
       ].toSorted(),
@@ -65,6 +68,8 @@ describe("MCP server", () => {
       title: "Search scratchpad",
       readOnlyHint: true,
     });
+    // Agents read what the hooks show them; only the user chooses it.
+    expect(byName.scratchpad_hooks?.annotations?.readOnlyHint).toBe(true);
     expect(byName.scratchpad_delete?.annotations?.destructiveHint).toBe(true);
     expect(byName.scratchpad_search?.inputSchema.properties).toHaveProperty("query");
   });
@@ -81,6 +86,36 @@ describe("MCP server", () => {
 
     const history = await call("scratchpad_history", { id: created.data.id });
     expect(history.data.map((r: { author: string }) => r.author)).toEqual(["claude-code"]);
+  });
+
+  test("scratchpad_hooks says what the hooks show in a folder, and why", async () => {
+    const repo = realpathSync(mkdtempSync(join(tmpdir(), "pad-mcp-hooks-")));
+    try {
+      for (const args of [
+        ["init", "-q"],
+        ["remote", "add", "origin", "https://host/me/demo-app"],
+      ])
+        Bun.spawnSync(["git", "-C", repo, ...args]);
+      const made = await call("scratchpad_create", { body: "Demo rules", tags: ["demo"] });
+      await fetch(new URL("/api/hooks/session-start", server.url), {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ scope: "demo-app", query: "#demo" }),
+      });
+
+      const { data } = await call("scratchpad_hooks", { cwd: repo });
+      expect(data.here).toEqual({ repo: "demo-app", path: "", dir: repo });
+      const sessionStart = data.hooks.find((h: { name: string }) => h.name === "session-start");
+      expect(sessionStart.shown_here[0]).toEqual({
+        scope: "demo-app",
+        query: "#demo",
+        source: "user",
+        notes: [{ id: made.data.id, title: "Demo rules" }],
+      });
+      expect(sessionStart.selections).toHaveLength(1);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   test("an API error comes back as a tool error with its message", async () => {

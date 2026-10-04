@@ -7,9 +7,13 @@ import { basename, dirname } from "node:path";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 
-import { Client } from "@/client/client";
+import { hookSections } from "@/client/hook-notes";
+import { locate } from "@/client/location";
 import { ClientConfig } from "@/config/client";
 import { HookConfig } from "@/config/hooks";
+import type { HookSection, Note } from "@/shared/domain";
+// The hooks that show notes; this file's own HookName is every hook Claude Code runs.
+import type { HookName as NotesHook } from "@/shared/hooks";
 
 import { editedFile, editsPath, reviewReason } from "./review";
 
@@ -23,21 +27,45 @@ type HookEvent = {
 const quietly = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(Effect.timeout("1500 millis"), Effect.ignoreCause);
 
+const cwdOf = (event: HookEvent) =>
+  typeof event.cwd === "string" && event.cwd ? event.cwd : process.cwd();
+
+/** A section's heading: where its notes come from, and the search that picked them. */
+function sectionHeading(hook: NotesHook, s: HookSection) {
+  const what = s.query ?? "hand-picked";
+  if (s.scope) return `Notes for ${s.scope} (${what})`;
+  if (s.source === "default") return hook === "session-start" ? "Recent notes" : "Reference notes";
+  return `Notes selected by the user (${what})`;
+}
+
+// Titles only: anything more would spend context in every session.
+const noteLine = (s: HookSection) => (n: Note) =>
+  `- ${n.title} (id: ${n.id}, ${n.author}, ${n.updated_at.slice(0, 10)}${s.include.includes(n.id) ? ", hand-picked" : ""})`;
+
+/** The sections with notes, each under its heading; what the session sees and `pad hooks preview` shows. */
+export const sectionsText = (hook: NotesHook, sections: readonly HookSection[]) =>
+  sections
+    .filter((s) => s.notes.length)
+    .map((s) => `## ${sectionHeading(hook, s)}\n${s.notes.map(noteLine(s)).join("\n")}`)
+    .join("\n\n");
+
 /**
- * SessionStart: tells Claude the scratchpad exists and lists the titles of the notes the user
- * selected (`pad hooks`; by default the most recently changed ones that aren't references).
+ * SessionStart: tells Claude the scratchpad exists and lists the titles of the notes chosen for
+ * where it works (`pad hooks`): by default the most recently changed ones that aren't
+ * references, plus whatever the user chose for this repository or folder.
  */
-export const sessionStart = (_event: HookEvent) =>
+export const sessionStart = (event: HookEvent) =>
   quietly(
     Effect.gen(function* () {
       const { url } = yield* ClientConfig;
-      const { chosen, queries } = yield* HookConfig;
-      const selected = yield* (yield* Client).list({ q: queries["session-start"], limit: 8 });
-
-      const selectedText = selected
-        .map((n) => `- ${n.title} (id: ${n.id}, ${n.author}, ${n.updated_at.slice(0, 10)})`)
-        .join("\n");
-      const custom = chosen["session-start"] !== undefined;
+      const { chosen } = yield* HookConfig;
+      const sections = yield* hookSections(
+        "session-start",
+        locate(cwdOf(event)),
+        chosen["session-start"],
+      );
+      const custom = sections.some((s) => s.source !== "default");
+      const listed = sectionsText("session-start", sections);
 
       const context = [
         `# Scratchpad (${url})`,
@@ -48,9 +76,7 @@ export const sessionStart = (_event: HookEvent) =>
         custom
           ? ""
           : "The user's reference notes (practices, principles, checklists) aren't loaded here: after a turn that edits files you'll be asked to check the edits against the ones that apply.",
-        selected.length
-          ? `\n## ${custom ? `Notes selected by the user (${queries["session-start"]})` : "Recent notes"}\n${selectedText}`
-          : "",
+        listed ? `\n${listed}` : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -79,9 +105,9 @@ export const recordEdit = (event: HookEvent) =>
   );
 
 /**
- * Stop: after a turn that edited files, asks Claude to check them against the reference notes that
- * apply (see review.ts). Silent when nothing was edited, when the review already ran this turn,
- * with PAD_REVIEW=off, or when the server is unreachable.
+ * Stop: after a turn that edited files, asks Claude to check them against the reference notes
+ * chosen for where it works (see review.ts). Silent when nothing was edited, when the review
+ * already ran this turn, with PAD_REVIEW=off, or when the server is unreachable.
  */
 export const review = (event: HookEvent) =>
   quietly(
@@ -94,12 +120,13 @@ export const review = (event: HookEvent) =>
       // `stop_hook_active` means this turn is Claude answering our own review, so its edits are
       // the review's fixes, not new work to review.
       if (!files.length || event.stop_hook_active || process.env.PAD_REVIEW === "off") return;
-      const { queries } = yield* HookConfig;
-      const notes = yield* (yield* Client).list({ q: queries.review, limit: 100 });
+      const { chosen } = yield* HookConfig;
+      const cwd = cwdOf(event);
+      const at = locate(cwd);
+      const sections = yield* hookSections("review", at, chosen.review);
+      const notes = sections.flatMap((s) => s.notes);
       if (!notes.length) return;
-      const cwd = typeof event.cwd === "string" ? event.cwd : process.cwd();
-      const root = Bun.spawnSync(["git", "-C", cwd, "rev-parse", "--show-toplevel"]);
-      const repo = basename(root.success ? root.stdout.toString().trim() : cwd);
+      const repo = at.repo ?? basename(cwd);
       yield* Console.log(
         JSON.stringify({ decision: "block", reason: reviewReason({ files, cwd, repo, notes }) }),
       );

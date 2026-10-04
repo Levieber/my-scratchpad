@@ -73,19 +73,13 @@ describe("hook config", () => {
     }
   };
 
-  test("without a file, every hook uses its default", async () => {
-    const config = await withFile(undefined);
-    expect(config.chosen).toEqual({});
-    expect(config.queries).toEqual({ "session-start": "kind:note", review: "kind:reference" });
+  test("without a file, every hook follows the server", async () => {
+    expect((await withFile(undefined)).chosen).toEqual({});
   });
 
-  test("a chosen query replaces the default of that hook only", async () => {
+  test("this machine's search applies to that hook only", async () => {
     const config = await withFile(JSON.stringify({ review: "  #seo kind:reference " }));
     expect(config.chosen).toEqual({ review: "#seo kind:reference" });
-    expect(config.queries).toEqual({
-      "session-start": "kind:note",
-      review: "#seo kind:reference",
-    });
   });
 
   test("a broken or odd file is ignored value by value", async () => {

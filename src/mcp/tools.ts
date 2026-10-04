@@ -122,4 +122,27 @@ const Delete = tool(
   .annotate(Tool.Title, "Delete note")
   .annotate(Tool.Destructive, true);
 
-export const Scratchpad = Toolkit.make(Search, Get, Create, Append, Update, History, Diff, Delete);
+// Read only: which notes an agent is shown is the user's choice (`pad hooks`, the PWA).
+const Hooks = tool(
+  "scratchpad_hooks",
+  "What the scratchpad's hooks show you where you work: the note titles that open each session and the references the end-of-turn review checks, by section (everywhere, this repository, a folder), with the user's stored choices.",
+  {
+    cwd: Schema.optional(
+      described(Schema.String, "An absolute folder; default the project you're working in"),
+    ),
+  },
+)
+  .annotate(Tool.Title, "Hook notes")
+  .annotate(Tool.Readonly, true);
+
+export const Scratchpad = Toolkit.make(
+  Search,
+  Get,
+  Create,
+  Append,
+  Update,
+  History,
+  Diff,
+  Delete,
+  Hooks,
+);

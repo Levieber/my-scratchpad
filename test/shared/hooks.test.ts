@@ -7,6 +7,7 @@ import {
   isHookName,
   normalizeScope,
   repoName,
+  scopeLocation,
   scopeMatches,
 } from "@/shared/hooks";
 
@@ -85,6 +86,19 @@ describe("bySpecificity", () => {
       "my-scratchpad",
       "",
     ]);
+  });
+});
+
+describe("scopeLocation", () => {
+  test("is a place the scope applies to, so a selection can be previewed from anywhere", () => {
+    for (const scope of ["", "my-scratchpad", "my-scratchpad/apps/web", "/home/me/notes"])
+      expect(scopeMatches(scope, scopeLocation(scope))).toBe(true);
+    expect(scopeLocation("my-scratchpad/apps/web")).toEqual({
+      repo: "my-scratchpad",
+      path: "apps/web",
+    });
+    expect(scopeLocation("/home/me/notes")).toEqual({ dir: "/home/me/notes" });
+    expect(scopeLocation("")).toEqual({});
   });
 });
 

@@ -40,9 +40,11 @@ src/
   client/       Talking to the API as a client.
     client.ts     The `Client` service over HTTP, used by the CLI, the MCP server and the Claude Code hooks.
     transfer.ts   `pad export` / `pad import`: notes as a JSON array, built on the public API. Import keeps ids, so it is safe to repeat.
+    location.ts   Where a command or agent works: the repository's name (from its remote), the folder in it, the folder.
+    hook-notes.ts What a hook shows there, from the server, or as before from a server older than hook selections.
   config/       Every env var and file under ~/.config/scratchpad, as Effect Config.
     env.ts        What they share (empty = unset, XDG folders, the port, reading a JSON file).
-    server.ts, client.ts, hooks.ts   ServerConfig; ClientConfig (`pad login`); HookConfig (`pad hooks`).
+    server.ts, client.ts, hooks.ts   ServerConfig; ClientConfig (`pad login`); HookConfig (this machine's own hook searches, `pad hooks set --local`).
   cli/          `pad` (effect/cli); cli.ts wires it.
     root.ts       The root command, `out`, `reported` (API errors → one line, exit 1), the author.
     flags.ts, format.ts   Shared flags; how a note is printed for a person.

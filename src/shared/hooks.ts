@@ -73,6 +73,14 @@ export function scopeMatches(scope: string, at: Location): boolean {
 export const bySpecificity = (a: string, b: string) =>
   segments(b).length - segments(a).length || a.localeCompare(b);
 
+/** A place where `scope` (normalized) applies: what a client asks about to preview a selection. */
+export function scopeLocation(scope: string): Location {
+  if (!scope) return {};
+  if (scope.startsWith("/")) return { dir: scope };
+  const [repo, ...path] = segments(scope);
+  return { repo, path: path.join("/") };
+}
+
 /**
  * A repository's name: the last part of its `origin` remote (`git@host:me/pad.git`,
  * `https://host/me/pad`), else its top-level folder's. The remote comes first because a worktree
