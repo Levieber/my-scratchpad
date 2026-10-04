@@ -10,6 +10,7 @@ import { makeNotes } from "./notes";
 import { makePins } from "./pins";
 import { makeRevisions } from "./revisions";
 import { sqlite } from "./sqlite";
+import { makeVersion } from "./version";
 import { makeViews } from "./views";
 
 const make = Effect.gen(function* () {
@@ -22,6 +23,7 @@ const make = Effect.gen(function* () {
     ...makeViews(sql),
     ...makePins(sql),
     ...makeHooks(sql),
+    ...makeVersion(sql),
 
     /**
      * Reads a row of the notes table: fails when the file can't be read at all, not just when a

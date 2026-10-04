@@ -397,3 +397,119 @@ describe("notes API", () => {
     expect(DIALECT).toContain(`dialect v${DIALECT_VERSION}`);
   });
 });
+
+describe("conditional reads of the polled collections", () => {
+  const COLLECTIONS = ["/api/notes", "/api/tags", "/api/views", "/api/pins"];
+
+  /** What a polling client holds: the ETag of its last answer. */
+  const etagOf = async (path: string) => {
+    const etag = (await call("GET", path)).headers.get("etag");
+    expect(etag).toBeTruthy();
+    return etag!;
+  };
+
+  test("each answers with an ETag and asks to be revalidated, never reused blindly", async () => {
+    for (const path of COLLECTIONS) {
+      const res = await call("GET", path);
+      expect([path, res.status, res.headers.get("cache-control")]).toEqual([
+        path,
+        200,
+        "private, no-cache",
+      ]);
+      expect(res.headers.get("etag")).toBeTruthy();
+    }
+  });
+
+  test("the ETag sent back gets 304 with no body, and again until something is written", async () => {
+    await call("POST", "/api/notes", { body: "one" });
+    for (const path of COLLECTIONS) {
+      const etag = await etagOf(path);
+      for (let poll = 0; poll < 2; poll++) {
+        const res = await call("GET", path, undefined, { "if-none-match": etag });
+        expect([path, res.status, res.data, res.headers.get("etag")]).toEqual([
+          path,
+          304,
+          null,
+          etag,
+        ]);
+      }
+    }
+  });
+
+  test("an ETag from before a write is answered in full, with a new ETag", async () => {
+    const created = (await call("POST", "/api/notes", { body: "one", tags: ["a"] })).data as Note;
+    const writes: [string, () => Promise<unknown>][] = [
+      ["/api/notes", () => call("PATCH", `/api/notes/${created.id}`, { body: "two" })],
+      ["/api/tags", () => call("PATCH", `/api/notes/${created.id}`, { tags: ["b"] })],
+      ["/api/pins", () => call("PUT", `/api/pins/${created.id}`)],
+      ["/api/views", () => call("POST", "/api/views", { name: "mine", query: "#b" })],
+      ["/api/notes", () => call("DELETE", `/api/notes/${created.id}`)],
+    ];
+    for (const [path, write] of writes) {
+      const stale = await etagOf(path);
+      await write();
+      const res = await call("GET", path, undefined, { "if-none-match": stale });
+      expect([path, res.status]).toEqual([path, 200]);
+      expect(res.headers.get("etag")).not.toBe(stale);
+    }
+  });
+
+  test("a read that changes nothing keeps the ETag", async () => {
+    await call("POST", "/api/notes", { body: "one" });
+    const etag = await etagOf("/api/notes");
+    await call("GET", "/api/notes");
+    await call("GET", "/api/tags");
+    expect(await etagOf("/api/notes")).toBe(etag);
+  });
+
+  test("a weak ETag, a list of them and * all match, as a proxy that compresses may send", async () => {
+    const etag = await etagOf("/api/notes");
+    for (const header of [etag.replace(/^W\//, ""), `"other", ${etag}`, "*"])
+      expect([
+        header,
+        (await call("GET", "/api/notes", undefined, { "if-none-match": header })).status,
+      ]).toEqual([header, 304]);
+    expect(
+      (await call("GET", "/api/notes", undefined, { "if-none-match": '"other"' })).status,
+    ).toBe(200);
+  });
+
+  test("the ETag is the same whatever the query, and the list is still filtered by it", async () => {
+    await call("POST", "/api/notes", { body: "coffee", tags: ["shop"] });
+    await call("POST", "/api/notes", { body: "tea" });
+    const etag = await etagOf("/api/notes");
+    const filtered = await call("GET", "/api/notes?q=coffee");
+    expect([filtered.status, filtered.data]).toEqual([
+      200,
+      [expect.objectContaining({ body: "coffee" })],
+    ]);
+    expect(filtered.headers.get("etag")).toBe(etag);
+  });
+
+  test("a restart never matches an ETag from before it, even on the same data", async () => {
+    const first = await etagOf("/api/notes");
+    await server?.stop();
+    server = undefined;
+    expect(await etagOf("/api/notes")).not.toBe(first);
+  });
+
+  test("a client without the token gets 401, not a 304 that confirms nothing changed", async () => {
+    await boot("secret");
+    const res = await call("GET", "/api/notes", undefined, { "if-none-match": "*" });
+    expect([res.status, res.data.error, res.headers.get("etag")]).toEqual([
+      401,
+      "unauthorized",
+      null,
+    ]);
+  });
+
+  test("the contract documents the ETag and the 304 of each collection", async () => {
+    const { paths } = (await call("GET", "/openapi.json")).data;
+    for (const path of COLLECTIONS) {
+      const get = paths[path].get;
+      expect([path, get.responses[200].headers.ETag]).toEqual([path, expect.anything()]);
+      expect([path, get.responses[304]]).toEqual([path, expect.anything()]);
+      expect(get.parameters.map((p: { name: string }) => p.name)).toContain("If-None-Match");
+    }
+  });
+});

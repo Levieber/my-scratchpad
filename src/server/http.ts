@@ -2,7 +2,7 @@
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as HttpRouter from "effect/http/HttpRouter";
-import type * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Schema from "effect/Schema";
 
@@ -94,17 +94,48 @@ export const readAppendText = (req: Request) =>
     return text ?? "";
   });
 
-/** If-Match against a note: its updated_at, quoted as in the ETag or bare, or `*` for any. */
-export function matches(header: string | undefined, note: Note): boolean {
-  if (header === undefined) return true;
-  const tags = header.split(",").map((t) =>
+// The tags of an If-Match or If-None-Match header, as bare strings: weak ones compare by their
+// value, which is all a proxy that compresses a response leaves intact.
+const entityTags = (header: string) =>
+  header.split(",").map((t) =>
     t
       .trim()
       .replace(/^W\//, "")
       .replace(/^"(.*)"$/, "$1"),
   );
+
+/** If-Match against a note: its updated_at, quoted as in the ETag or bare, or `*` for any. */
+export function matches(header: string | undefined, note: Note): boolean {
+  if (header === undefined) return true;
+  const tags = entityTags(header);
   return tags.includes("*") || tags.includes(note.updated_at);
 }
+
+const revalidate = (version: string) => ({
+  // Weak, since a proxy may compress the body. Cached but checked on every use: a client that
+  // can't be sure what changed asks, and gets a 304 instead of the list.
+  etag: `W/"${version}"`,
+  "cache-control": "private, no-cache",
+});
+
+/**
+ * A collection that clients poll, answered in full or as a 304 when they hold its current
+ * `version` (If-None-Match). A 304 skips serialising the body as well as sending it.
+ */
+export const polled = <E, R>(version: Effect.Effect<string>, read: Effect.Effect<unknown, E, R>) =>
+  Effect.gen(function* () {
+    const req = yield* HttpServerRequest.HttpServerRequest;
+    // The version is read before the data: a write in between leaves the data newer than its
+    // version, and the next poll just asks again. The other order could pin old data to a new one.
+    const current = yield* version;
+    const held = req.headers["if-none-match"];
+    if (held !== undefined) {
+      const tags = entityTags(held);
+      if (tags.includes("*") || tags.includes(current))
+        return HttpServerResponse.empty({ status: 304, headers: revalidate(current) });
+    }
+    return HttpServerResponse.jsonUnsafe(yield* read, { headers: revalidate(current) });
+  });
 
 export const searchParams = (req: Request) => new URL(req.originalUrl).searchParams;
 

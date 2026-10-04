@@ -20,6 +20,7 @@ import {
   noContent,
   noteJson,
   page,
+  polled,
   readAppendText,
   readInput,
   readJson,
@@ -53,10 +54,13 @@ export const routes = (token: Redacted.Redacted | undefined) =>
         ),
 
         resource("/api/notes", {
-          GET: Effect.gen(function* () {
-            const req = yield* request;
-            return json(yield* store.list(yield* readListQuery(searchParams(req))));
-          }),
+          GET: polled(
+            store.version,
+            Effect.gen(function* () {
+              const req = yield* request;
+              return yield* store.list(yield* readListQuery(searchParams(req)));
+            }),
+          ),
           POST: Effect.gen(function* () {
             const req = yield* request;
             const input = yield* readInput(req);
@@ -112,10 +116,10 @@ export const routes = (token: Redacted.Redacted | undefined) =>
           }),
         }),
 
-        resource("/api/tags", { GET: Effect.map(store.tags, (tags) => json(tags)) }),
+        resource("/api/tags", { GET: polled(store.version, store.tags) }),
 
         resource("/api/views", {
-          GET: Effect.map(store.views, (views) => json(views)),
+          GET: polled(store.version, store.views),
           POST: Effect.gen(function* () {
             const body = yield* readJson(yield* request);
             const { name, query } = (body && typeof body === "object" ? body : {}) as Record<
@@ -137,7 +141,7 @@ export const routes = (token: Redacted.Redacted | undefined) =>
           DELETE: Effect.as(Effect.flatMap(routeId, store.deleteView), noContent),
         }),
 
-        resource("/api/pins", { GET: Effect.map(store.pins, (notes) => json(notes)) }),
+        resource("/api/pins", { GET: polled(store.version, store.pins) }),
 
         // PUT and DELETE on the note's id: both idempotent, so a client can retry either blindly.
         resource("/api/pins/:id", {
