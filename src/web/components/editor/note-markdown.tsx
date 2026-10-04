@@ -6,6 +6,7 @@ import { Markdown } from "@tanstack/markdown/react";
 import { useMemo } from "react";
 
 import { elements, TaskActions } from "@/web/components/editor/markdown-elements";
+import { highlight } from "@/web/lib/highlight";
 import { readNote } from "@/web/lib/note-markdown";
 
 export function NoteMarkdown({
@@ -23,7 +24,9 @@ export function NoteMarkdown({
   );
   return (
     <TaskActions.Provider value={actions}>
-      <Markdown components={elements}>{document}</Markdown>
+      <Markdown components={elements} highlighter={highlight}>
+        {document}
+      </Markdown>
     </TaskActions.Provider>
   );
 }

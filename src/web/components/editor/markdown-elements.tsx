@@ -75,9 +75,10 @@ export const elements: MarkdownComponents = {
   ol: styled("ol", "my-2 list-decimal pl-6 [&_ol]:my-0.5"),
   li: styled("li", "my-0.5"),
   blockquote: styled("blockquote", "my-2 border-l-4 border-border pl-3 text-muted-foreground"),
+  // Highlighted tokens (lib/highlight.ts) in the palette, so they follow light and dark.
   pre: styled(
     "pre",
-    "my-2 overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm [&>code]:bg-transparent [&>code]:p-0",
+    "my-2 overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm [&>code]:bg-transparent [&>code]:p-0 [&_.th-command]:text-primary [&_.th-comment]:text-muted-foreground [&_.th-comment]:italic [&_.th-deleted]:text-destructive [&_.th-function]:font-semibold [&_.th-heading]:font-semibold [&_.th-inserted]:text-success [&_.th-keyword]:text-primary [&_.th-literal]:text-destructive [&_.th-meta]:text-muted-foreground [&_.th-number]:text-destructive [&_.th-string]:text-success [&_.th-tag]:text-primary [&_.th-type]:font-semibold",
   ),
   code: styled("code", "rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]"),
   table: Table,
