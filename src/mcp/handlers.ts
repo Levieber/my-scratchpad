@@ -17,6 +17,8 @@ const summary = (n: Note) => ({
   tags: n.tags,
   kind: n.kind,
   ...(n.progress.total > 0 && { progress: n.progress }),
+  ...(n.parent_id && { parent_id: n.parent_id }),
+  ...(n.subpages > 0 && { subpages: n.subpages }),
   author: n.author,
   updated_at: n.updated_at,
   preview: n.body.length > 200 ? n.body.slice(0, 200) + "…" : n.body,
@@ -51,9 +53,9 @@ export const Handlers = Scratchpad.toLayer(
     });
 
     return Scratchpad.of({
-      scratchpad_search: ({ query, tags, kind, author, limit }) =>
+      scratchpad_search: ({ query, tags, kind, author, parent, limit }) =>
         Effect.map(
-          client.list({ q: query, tag: tags, kind, author, limit: limit ?? 20 }),
+          client.list({ q: query, tag: tags, kind, author, parent, limit: limit ?? 20 }),
           (notes) => notes.map(summary),
         ),
       scratchpad_get: ({ id }) => client.get(id),

@@ -5,7 +5,7 @@ import type * as SqlClient from "effect/sql/SqlClient";
 import { MAX_PINS } from "@/shared/pins";
 
 import { NoteNotFound, PinLimit } from "./errors";
-import { decodeNote } from "./rows";
+import { decodeNote, NOTE_COLUMNS } from "./rows";
 import { nowIso, run } from "./sql";
 
 export const makePins = (sql: SqlClient.SqlClient) => {
@@ -25,7 +25,8 @@ export const makePins = (sql: SqlClient.SqlClient) => {
     // The row id breaks a tie between pins made at the same moment, as an import makes them.
     pins: run(
       Effect.flatMap(
-        sql`SELECT n.* FROM pins p JOIN notes n ON n.id = p.note_id ORDER BY p.pinned_at, p.rowid`,
+        sql`SELECT ${sql.literal(NOTE_COLUMNS)} FROM pins p JOIN notes n ON n.id = p.note_id
+            ORDER BY p.pinned_at, p.rowid`,
         (rows) => Effect.forEach(rows, decodeNote),
       ),
     ),

@@ -33,6 +33,7 @@ export type ExportQuery = Omit<ListQuery, "limit" | "offset">;
 
 type Parts = {
   list: ReturnType<typeof makeNotes>["list"];
+  checkParent: ReturnType<typeof makeNotes>["checkParent"];
   views: ReturnType<typeof makeViews>["views"];
   hookSelections: ReturnType<typeof makeHooks>["hookSelections"];
   pinRows: ReturnType<typeof makePins>["pinRows"];
@@ -41,7 +42,8 @@ type Parts = {
   importHookSelection: ReturnType<typeof makeHooks>["importHookSelection"];
 };
 
-const isFiltered = (q: ExportQuery) => Boolean(q.q?.trim() || q.kind || q.author || q.tags?.length);
+const isFiltered = (q: ExportQuery) =>
+  Boolean(q.q?.trim() || q.kind || q.author || q.tags?.length || q.parent);
 
 const tally = (): ImportTally => ({ created: 0, skipped: 0 });
 
@@ -71,7 +73,7 @@ export const makeTransfer = (sql: SqlClient.SqlClient, parts: Parts) => {
         for (let offset = 0; ; offset += PAGE) {
           const page = yield* parts.list({ ...query, limit: PAGE, offset });
           const revisions = history ? yield* revisionsOf(page.map((n) => n.id)) : undefined;
-          for (const { progress: _, ...note } of page)
+          for (const { progress: _, subpages: __, ...note } of page)
             notes.push(revisions ? { ...note, revisions: revisions.get(note.id) ?? [] } : note);
           if (page.length < PAGE) break;
         }
@@ -161,6 +163,20 @@ export const makeTransfer = (sql: SqlClient.SqlClient, parts: Parts) => {
           const { id, created } = yield* importNote(note, importer);
           if (created) imported.add(id);
           count(result, created ? "created" : "skipped");
+        }
+        // Parents once every note is in, since an archive may list a page after what is under it.
+        // Only for the notes created now; one that already existed keeps its place.
+        for (const note of archive.notes) {
+          const id = note.id;
+          if (!id || !note.parent_id || !imported.has(id)) continue;
+          yield* parts.checkParent(id, note.parent_id).pipe(
+            Effect.andThen(sql`UPDATE notes SET parent_id = ${note.parent_id} WHERE id = ${id}`),
+            Effect.catchTag("InvalidParent", (e) =>
+              Effect.sync(
+                () => void result.failed.push({ item: `parent of ${id}`, message: e.reason }),
+              ),
+            ),
+          );
         }
         for (const view of archive.views) count(result.views, yield* parts.importView(view));
 

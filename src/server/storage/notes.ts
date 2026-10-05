@@ -9,9 +9,9 @@ import type { Note, NoteInput, Tag } from "@/shared/domain";
 import { newId } from "@/shared/ids";
 import { deriveTitle } from "@/shared/title";
 
-import { NoteChanged, NoteExists, NoteNotFound } from "./errors";
+import { InvalidParent, NoteChanged, NoteExists, NoteNotFound } from "./errors";
 import { type makeRevisions, sameContent } from "./revisions";
-import { decodeNote } from "./rows";
+import { decodeNote, NOTE_COLUMNS } from "./rows";
 import { nowIso, run } from "./sql";
 
 export type ListQuery = {
@@ -22,6 +22,8 @@ export type ListQuery = {
   author?: string;
   /** Notes must carry every one of these. */
   tags?: readonly string[];
+  /** Only the notes under this page; `none` for those at the top. */
+  parent?: string;
   limit?: number;
   offset?: number;
 };
@@ -36,8 +38,10 @@ export const makeNotes = (
   record: ReturnType<typeof makeRevisions>["record"],
 ) => {
   const findNote = (id: string) =>
-    Effect.flatMap(sql`SELECT * FROM notes WHERE id = ${id}`, (rows) =>
-      rows[0] ? Effect.map(decodeNote(rows[0]), Option.some) : Effect.succeed(Option.none()),
+    Effect.flatMap(
+      sql`SELECT ${sql.literal(NOTE_COLUMNS)} FROM notes n WHERE n.id = ${id}`,
+      (rows) =>
+        rows[0] ? Effect.map(decodeNote(rows[0]), Option.some) : Effect.succeed(Option.none()),
     );
 
   const getNote = (id: string) =>
@@ -45,7 +49,27 @@ export const makeNotes = (
       Option.isSome(found) ? Effect.succeed(found.value) : Effect.fail(new NoteNotFound({ id })),
     );
 
-  const list = ({ q, kind, author, tags = [], limit = 50, offset = 0 }: ListQuery = {}) => {
+  /**
+   * Fails with InvalidParent unless `parent` exists and is neither `id` nor a page under it,
+   * which would make a loop no tree could show.
+   */
+  const checkParent = (id: string, parent: string) =>
+    Effect.gen(function* () {
+      if (parent === id)
+        return yield* new InvalidParent({ reason: "A note can't be under itself" });
+      if (!(yield* sql`SELECT 1 FROM notes WHERE id = ${parent}`).length)
+        return yield* new InvalidParent({ reason: `No note has the id ${parent}` });
+      const above = yield* sql`
+        WITH RECURSIVE up(id) AS (
+          SELECT parent_id FROM notes WHERE id = ${parent}
+          UNION SELECT n.parent_id FROM notes n JOIN up ON n.id = up.id
+        )
+        SELECT 1 FROM up WHERE id = ${id} LIMIT 1`;
+      if (above.length)
+        return yield* new InvalidParent({ reason: "That page is under this note already" });
+    });
+
+  const list = ({ q, kind, author, tags = [], parent, limit = 50, offset = 0 }: ListQuery = {}) => {
     const where = [];
     let from = sql.literal("notes n");
     if (q?.trim()) {
@@ -65,10 +89,12 @@ export const makeNotes = (
     }
     for (const tag of tags)
       where.push(sql`EXISTS (SELECT 1 FROM json_each(n.tags) WHERE value = ${tag.toLowerCase()})`);
+    if (parent)
+      where.push(parent === "none" ? sql`n.parent_id IS NULL` : sql`n.parent_id = ${parent}`);
     const filter = where.length ? sql`WHERE ${sql.and(where)}` : sql.literal("");
     return run(
       Effect.flatMap(
-        sql`SELECT n.* FROM ${from} ${filter}
+        sql`SELECT ${sql.literal(NOTE_COLUMNS)} FROM ${from} ${filter}
             ORDER BY n.updated_at DESC LIMIT ${Math.min(limit, 500)} OFFSET ${offset}`,
         (rows) => Effect.forEach(rows, decodeNote),
       ),
@@ -90,10 +116,13 @@ export const makeNotes = (
           created_at: now,
           updated_at: now,
           progress: progress(body),
+          parent_id: input.parent_id ?? null,
+          subpages: 0,
         };
         // A client retrying a create whose response it never got learns it already succeeded.
         if (Option.isSome(yield* findNote(note.id))) return yield* new NoteExists({ id: note.id });
-        const { progress: _, ...row } = note;
+        if (note.parent_id) yield* checkParent(note.id, note.parent_id);
+        const { progress: _, subpages: __, ...row } = note;
         yield* sql`INSERT INTO notes ${sql.insert({ ...row, tags: JSON.stringify(note.tags) })}`;
         yield* record(note, author);
         return note;
@@ -111,6 +140,7 @@ export const makeNotes = (
       Effect.gen(function* () {
         const cur = yield* getNote(id);
         if (!ifMatch(cur)) return yield* new NoteChanged({ id });
+        if (patch.parent_id) yield* checkParent(id, patch.parent_id);
         const now = yield* Clock.currentTimeMillis;
         const next: Note = {
           ...cur,
@@ -125,12 +155,14 @@ export const makeNotes = (
           // version clients send back in If-Match, so two writes must never share one.
           updated_at: new Date(Math.max(now, Date.parse(cur.updated_at) + 1)).toISOString(),
           progress: progress(patch.body ?? cur.body),
+          parent_id: patch.parent_id !== undefined ? patch.parent_id : cur.parent_id,
         };
         yield* sql`UPDATE notes SET ${sql.update({
           title: next.title,
           body: next.body,
           tags: JSON.stringify(next.tags),
           kind: next.kind,
+          parent_id: next.parent_id,
           updated_at: next.updated_at,
         })} WHERE id = ${id}`;
         if (!sameContent(cur, next)) yield* record(next, author);
@@ -150,6 +182,7 @@ export const makeNotes = (
 
   return {
     list,
+    checkParent,
     get: (id: string) => run(getNote(id)),
     create,
     update,

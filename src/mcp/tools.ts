@@ -27,6 +27,12 @@ const limit = Schema.optional(
   described(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 })), "Default 20"),
 );
 const id = Schema.String;
+const parentId = Schema.optional(
+  described(
+    Schema.NullOr(Schema.String),
+    "The id of the page to put it under (a project's page, say); null moves it to the top",
+  ),
+);
 
 // Every tool answers with the API's JSON, and fails with its error message.
 const tool = <const Name extends string, Fields extends Schema.Struct.Fields>(
@@ -56,6 +62,9 @@ const Search = tool(
     author: Schema.optional(
       described(Schema.String, "human, agent (anyone who isn't the human), or an author's name"),
     ),
+    parent: Schema.optional(
+      described(Schema.String, "Only the notes under this page's id; none for those at the top"),
+    ),
     limit,
   },
 )
@@ -69,7 +78,7 @@ const Get = tool("scratchpad_get", "Get one scratchpad note with its full markdo
 const Create = tool(
   "scratchpad_create",
   "Create a scratchpad note (markdown). Title defaults to the body's first line.",
-  { body: Schema.String, title: Schema.optional(Schema.String), tags, kind },
+  { body: Schema.String, title: Schema.optional(Schema.String), tags, kind, parent_id: parentId },
 ).annotate(Tool.Title, "Create note");
 
 const Append = tool(
@@ -80,13 +89,14 @@ const Append = tool(
 
 const Update = tool(
   "scratchpad_update",
-  "Replace a note's title, body, tags or kind. Omitted fields are unchanged.",
+  "Replace a note's title, body, tags or kind, or move it under another page. Omitted fields are unchanged.",
   {
     id,
     title: Schema.optional(Schema.String),
     body: Schema.optional(Schema.String),
     tags,
     kind,
+    parent_id: parentId,
   },
 )
   .annotate(Tool.Title, "Update note")

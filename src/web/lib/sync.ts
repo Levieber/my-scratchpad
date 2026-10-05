@@ -21,6 +21,7 @@ export function mergeFields(
       body: body.text,
       tags: pick("tags"),
       kind: pick("kind"),
+      parent_id: pick("parent_id"),
     },
     conflict: body.conflict,
   };
@@ -43,6 +44,24 @@ export type Outcome = {
   conflict: boolean;
 };
 
+/**
+ * An edit as sent: its parent only when the edit moved the note. Every edit carries where the
+ * note was, and sending that back would refuse an edit to a note whose page was deleted since.
+ */
+const moved = ({ parent_id, ...rest }: Fields, base: Fields): NoteInput =>
+  parent_id === undefined || same(parent_id, base.parent_id) ? rest : { ...rest, parent_id };
+
+/** A create; under a page deleted meanwhile, at the top rather than not at all. */
+async function create(remote: Remote, input: NoteInput) {
+  try {
+    return await remote.create(input);
+  } catch (e) {
+    if (!isApiError(e, "invalidParent")) throw e;
+    const { parent_id: _, ...top } = input;
+    return remote.create(top);
+  }
+}
+
 async function push(entry: Pending, remote: Remote): Promise<Outcome> {
   const done = (note: Note | null, merged = false, conflict = false): Outcome => ({
     sent: entry,
@@ -63,7 +82,7 @@ async function push(entry: Pending, remote: Remote): Promise<Outcome> {
     // Started and cleared again before the server saw it: nothing to create.
     if (!fields.body.trim() && !fields.title.trim()) return done(null);
     try {
-      return done(await remote.create({ id, ...fields }));
+      return done(await create(remote, { id, ...fields }));
     } catch (e) {
       if (!isApiError(e, "noteExists")) throw e;
       // An earlier attempt got through but its answer was lost; this edit is newer.
@@ -79,10 +98,10 @@ async function push(entry: Pending, remote: Remote): Promise<Outcome> {
   // the note is busy, and the next sync tries again.
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      return done(await remote.update(id, write, version), merged, conflict);
+      return done(await remote.update(id, moved(write, base), version), merged, conflict);
     } catch (e) {
       // Deleted elsewhere while edited here: bring it back rather than lose the edit.
-      if (isApiError(e, "noteNotFound")) return done(await remote.create({ id, ...fields }));
+      if (isApiError(e, "noteNotFound")) return done(await create(remote, { id, ...fields }));
       if (!isApiError(e, "noteChanged")) throw e;
       const theirs = await remote.get(id);
       ({ fields: write, conflict } = mergeFields(base, fields, theirs));

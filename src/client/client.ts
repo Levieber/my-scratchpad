@@ -37,6 +37,8 @@ export type ListParams = {
   author?: string;
   /** Notes must carry every one of these. */
   tag?: readonly string[];
+  /** Only the notes under this page; `none` for those at the top. */
+  parent?: string;
   limit?: number;
   offset?: number;
 };

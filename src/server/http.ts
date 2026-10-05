@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import type {
   DatabaseUnavailable,
   HookLimit,
+  InvalidParent,
   InvalidViewOptions,
   NoteChanged,
   NoteExists,
@@ -43,6 +44,7 @@ export type Failure =
   | RevisionNotFound
   | ViewNotFound
   | ViewExists
+  | InvalidParent
   | InvalidViewOptions
   | PinLimit
   | HookLimit
@@ -167,12 +169,16 @@ export const readListQuery = (p: URLSearchParams) =>
   Effect.suspend((): Effect.Effect<ListQuery, HttpError> => {
     const kind = p.get("kind");
     if (kind !== null && !isKind(kind)) return Effect.fail(kindError());
+    const parent = p.get("parent");
+    if (parent !== null && parent !== "none" && !/^[A-Za-z0-9_-]{8,64}$/.test(parent))
+      return Effect.fail(refuse("invalidParam", 400, "parent must be a note id, or none"));
     const parsed = parseQuery(p.get("q") ?? "");
     return Effect.succeed({
       q: parsed.text || undefined,
       kind: kind ?? parsed.kind,
       author: p.get("author") ?? parsed.author,
       tags: [...p.getAll("tag"), ...parsed.tags],
+      ...(parent !== null && { parent }),
       ...page(p),
     });
   });

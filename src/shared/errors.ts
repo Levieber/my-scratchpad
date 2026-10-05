@@ -19,6 +19,8 @@ export const ERROR_MESSAGES = {
   revisionNotFound: "Revision not found",
   viewNotFound: "View not found",
   viewExists: "A view with this name already exists",
+  invalidParent:
+    "The parent must be an existing note, and neither the note itself nor a page under it",
   invalidLayout: "Unknown layout",
   invalidViewOptions: "A view's options have the wrong shape",
   pinLimit: `At most ${MAX_PINS} notes can be pinned; unpin one first`,

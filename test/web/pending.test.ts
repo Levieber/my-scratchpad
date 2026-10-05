@@ -15,6 +15,8 @@ describe("withPending", () => {
     created_at: "t0",
     updated_at: "t1",
     progress: { done: 0, total: 0 },
+    parent_id: null,
+    subpages: 0,
   };
 
   test("shows pending edits, hides pending deletes, and puts new notes first", () => {

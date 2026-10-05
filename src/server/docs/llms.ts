@@ -15,10 +15,10 @@ Auth: if the server has PAD_TOKEN set, send \`Authorization: Bearer <token>\`.
 Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 
 ## Endpoints
-- GET    /api/notes?q=&kind=&author=&tag=&limit=&offset=   list / full-text search
-- POST   /api/notes            {title?, body, tags?, kind?, id?}  (or text/plain body)
+- GET    /api/notes?q=&kind=&author=&tag=&parent=&limit=&offset=   list / full-text search; parent=<id> (or none) lists the pages under it
+- POST   /api/notes            {title?, body, tags?, kind?, id?, parent_id?}  (or text/plain body)
 - GET    /api/notes/{id}
-- PATCH  /api/notes/{id}       {title?, body?, tags?, kind?}
+- PATCH  /api/notes/{id}       {title?, body?, tags?, kind?, parent_id?}  (parent_id null: to the top)
 - POST   /api/notes/{id}/append {text}  (or text/plain)
 - DELETE /api/notes/{id}
 - GET    /api/notes/{id}/revisions         history, newest first (who changed it, lines +/-)
@@ -33,6 +33,7 @@ Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 - GET    /api/pins, PUT /api/pins/{id}, DELETE /api/pins/{id}   the user's pinned notes (at most ${MAX_PINS}): what matters most right now
 
 Every note carries \`progress: {done, total}\`, counted from its markdown checkboxes (outside code fences; an empty \`- [ ]\` is a placeholder, not a task).
+Notes nest as pages: \`parent_id\` is the page a note is under (null at the top) and \`subpages\` how many are under it. To file notes under a project page, create them with its \`parent_id\`.
 
 ## Note bodies
 ${DIALECT}

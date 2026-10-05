@@ -25,6 +25,8 @@ const Note = {
     "created_at",
     "updated_at",
     "progress",
+    "parent_id",
+    "subpages",
   ],
   properties: {
     id: { type: "string" },
@@ -45,6 +47,12 @@ const Note = {
       properties: { done: { type: "integer" }, total: { type: "integer" } },
       readOnly: true,
     },
+    parent_id: {
+      type: ["string", "null"],
+      description:
+        "The page it is under; null at the top. Its place, not its content: moving it changes updated_at but adds no revision",
+    },
+    subpages: { type: "integer", description: "How many notes are under it", readOnly: true },
   },
 };
 
@@ -61,6 +69,11 @@ const NoteInput = {
     body: { type: "string" },
     tags: { type: "array", items: { type: "string" } },
     kind: { ...kind, default: "note" },
+    parent_id: {
+      type: ["string", "null"],
+      description:
+        "The page to put it under; null moves it to the top. 400 invalidParent if that note doesn't exist, or is this one or a page under it",
+    },
   },
 };
 
@@ -261,11 +274,12 @@ const ExportedRevision = {
   },
 };
 
-// A note as exported: the note without `progress` (derived, so never written), and its history.
-const { progress: _progress, ...exportedProperties } = Note.properties;
+// A note as exported: the note without what is derived on each read (so never written), and its
+// history.
+const { progress: _progress, subpages: _subpages, ...exportedProperties } = Note.properties;
 const ExportedNote = {
   type: "object",
-  required: Note.required.filter((name) => name !== "progress"),
+  required: Note.required.filter((name) => name !== "progress" && name !== "subpages"),
   properties: {
     ...exportedProperties,
     revisions: {
@@ -384,6 +398,12 @@ const listFilters = [
     schema: { type: "array", items: { type: "string" } },
     explode: true,
     description: "Repeat to require several tags",
+  },
+  {
+    name: "parent",
+    in: "query",
+    schema: { type: "string" },
+    description: "Only the notes directly under this page; `none` for those at the top",
   },
 ];
 

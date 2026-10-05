@@ -144,6 +144,62 @@ describe("notes API", () => {
     expect(await bodies(`q=${encodeURIComponent("author:agent claude")}`)).toEqual(["from claude"]);
   });
 
+  test("pages: notes under notes, listed by parent, counted, moved, and left at the top by a delete", async () => {
+    const post = async (body: unknown) => (await call("POST", "/api/notes", body)).data as Note;
+    const project = await post({ body: "# Project" });
+    const spec = await post({ body: "# Spec", parent_id: project.id });
+    const detail = await post({ body: "# Detail", parent_id: spec.id });
+    await post({ body: "# Elsewhere" });
+
+    expect(spec.parent_id).toBe(project.id);
+    expect((await call("GET", `/api/notes/${project.id}`)).data.subpages).toBe(1);
+    const titles = async (query: string) =>
+      ((await call("GET", `/api/notes?${query}`)).data as Note[]).map((n) => n.title).toSorted();
+    expect(await titles(`parent=${project.id}`)).toEqual(["Spec"]);
+    expect(await titles("parent=none")).toEqual(["Elsewhere", "Project"]);
+
+    // A move changes the note's version, but not its history: that is content.
+    const before = (await call("GET", `/api/notes/${detail.id}/revisions`)).data.length;
+    const moved = await call("PATCH", `/api/notes/${detail.id}`, { parent_id: project.id });
+    expect(moved.data).toMatchObject({ parent_id: project.id });
+    expect(moved.data.updated_at > detail.updated_at).toBe(true);
+    expect((await call("GET", `/api/notes/${detail.id}/revisions`)).data).toHaveLength(before);
+    expect(await titles(`parent=${project.id}`)).toEqual(["Detail", "Spec"]);
+
+    await call("DELETE", `/api/notes/${project.id}`);
+    expect((await call("GET", `/api/notes/${spec.id}`)).data.parent_id).toBeNull();
+    expect(await titles("parent=none")).toEqual(["Detail", "Elsewhere", "Spec"]);
+  });
+
+  test("pages: a parent must exist, and can't be the note or a page under it", async () => {
+    const post = async (body: unknown) => (await call("POST", "/api/notes", body)).data as Note;
+    const top = await post({ body: "top" });
+    const under = await post({ body: "under", parent_id: top.id });
+    const cases: [string, string, unknown, number, string][] = [
+      ["POST", "/api/notes", { body: "x", parent_id: "missing-0001" }, 400, "invalidParent"],
+      ["PATCH", `/api/notes/${top.id}`, { parent_id: top.id }, 400, "invalidParent"],
+      ["PATCH", `/api/notes/${top.id}`, { parent_id: under.id }, 400, "invalidParent"],
+      ["PATCH", `/api/notes/${top.id}`, { parent_id: 5 }, 400, "invalidBody"],
+      ["GET", "/api/notes?parent=x", undefined, 400, "invalidParam"],
+    ];
+    for (const [method, path, body, status, code] of cases) {
+      const res = await call(method, path, body);
+      expect([method, path, res.status, res.data.error]).toEqual([method, path, status, code]);
+    }
+    expect(
+      (await call("PATCH", `/api/notes/${under.id}`, { parent_id: null })).data.parent_id,
+    ).toBeNull();
+
+    const doc = (await call("GET", "/openapi.json")).data;
+    expect(Object.keys(doc.components.schemas.Note.properties)).toEqual(
+      expect.arrayContaining(["parent_id", "subpages"]),
+    );
+    expect(doc.paths["/api/notes"].get.parameters.map((p: { name: string }) => p.name)).toContain(
+      "parent",
+    );
+    expect(doc.components.schemas.Error.properties.error.enum).toContain("invalidParent");
+  });
+
   test("saved views: create, list by name, delete", async () => {
     const made = await call("POST", "/api/views", {
       name: " Agent logs ",

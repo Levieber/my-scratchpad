@@ -14,6 +14,8 @@ const note = (id: string, tags: string[], progress = { done: 0, total: 0 }): Not
   created_at: "2026-01-01T00:00:00.000Z",
   updated_at: "2026-01-01T00:00:00.000Z",
   progress,
+  parent_id: null,
+  subpages: 0,
 });
 
 const shape = (g: GroupBy, notes: Note[]) =>

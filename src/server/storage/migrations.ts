@@ -142,6 +142,15 @@ export const MIGRATIONS: Migration[] = [
       "ALTER TABLE views ADD COLUMN options TEXT NOT NULL DEFAULT '{}'",
     ],
   },
+  {
+    // Pages under pages. Deleting a page leaves what was under it at the top rather than deleting
+    // it: a note is never lost to a delete it wasn't the target of.
+    id: "0011.note_parents",
+    statements: [
+      "ALTER TABLE notes ADD COLUMN parent_id TEXT REFERENCES notes(id) ON DELETE SET NULL",
+      "CREATE INDEX notes_parent ON notes(parent_id)",
+    ],
+  },
 ];
 
 /**

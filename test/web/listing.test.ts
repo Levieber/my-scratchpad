@@ -13,6 +13,8 @@ const note = (patch: Partial<Note>): Note => ({
   created_at: "2026-09-25T12:00:00.000Z",
   updated_at: "2026-09-25T12:00:00.000Z",
   progress: { done: 0, total: 0 },
+  parent_id: null,
+  subpages: 0,
   ...patch,
 });
 

@@ -16,8 +16,14 @@ const NoteRow = Schema.Struct({
   author: Schema.String,
   created_at: Schema.String,
   updated_at: Schema.String,
+  parent_id: Schema.NullOr(Schema.String),
+  subpages: Schema.Number,
 });
 const RevisionRow = Schema.Struct({ ...FullRevision.fields, tags: StoredTags });
+
+/** A note's columns from `notes n`, with what is derived from other rows. */
+export const NOTE_COLUMNS =
+  "n.*, (SELECT COUNT(*) FROM notes c WHERE c.parent_id = n.id) AS subpages";
 
 // A row that doesn't decode means the database is corrupt, not that the caller erred.
 export const decodeNote = (row: unknown): Effect.Effect<Note> =>

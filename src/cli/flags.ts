@@ -16,5 +16,10 @@ export const author = Flag.String("author").pipe(
 );
 export const limit = Flag.Int("limit").pipe(Flag.withAlias("n"), Flag.optional);
 export const title = Flag.String("title").pipe(Flag.withAlias("t"), Flag.optional);
+/** The page a note goes under, or (`none`) the top. */
+export const parent = Flag.String("parent").pipe(
+  Flag.withDescription("A page's id to put it under, or none for the top"),
+  Flag.optional,
+);
 export const id = Argument.String("id");
 export const words = (name: string) => Argument.String(name).pipe(Argument.variadic());
