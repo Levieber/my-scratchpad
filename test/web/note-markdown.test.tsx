@@ -101,9 +101,19 @@ describe("rendering is a trust boundary", () => {
   });
 
   test("syntax the renderer doesn't know reads as plain text", () => {
-    const html = render("See [[another note]] and {{pad:thing}}.");
-    expect(html).toContain("[[another note]]");
-    expect(html).toContain("{{pad:thing}}");
+    expect(render("See {{pad:thing}}.")).toContain("{{pad:thing}}");
+  });
+
+  test("a link to a note opens it here; in code it stays as written", () => {
+    const linked = renderToStaticMarkup(
+      <NoteMarkdown body={"See [[Launch plan|the plan]] and `[[x]]`."} onOpenLink={() => {}} />,
+    );
+    expect(linked).toMatch(/<button type="button"[^>]*>the plan<\/button>/);
+    expect(linked).toContain("<code");
+    expect(linked).toContain("[[x]]");
+    expect(linked).not.toContain("href");
+    // Where links are only shown (a card's glimpse), there is nothing to press.
+    expect(render("See [[Launch plan]].")).not.toContain("<button");
   });
 
   test("addresses become links that open outside the app", () => {

@@ -121,6 +121,7 @@ export const api = {
     return req<Note[]>("GET", `/api/notes?${p}`);
   },
   get: (id: string) => req<Note>("GET", `/api/notes/${id}`),
+  backlinks: (id: string) => req<Note[]>("GET", `/api/notes/${id}/backlinks`),
   create: (input: NoteInput) => req<Note>("POST", "/api/notes", input),
   /** With `ifMatch` (the updated_at the edit started from), refused if the note changed since. */
   update: (id: string, patch: NoteInput, ifMatch?: string) =>

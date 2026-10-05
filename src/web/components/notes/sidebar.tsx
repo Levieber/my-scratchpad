@@ -41,7 +41,7 @@ export function Sidebar({
       <header className="flex items-center gap-2">
         <h1 className="flex-1 text-[1.0625rem] font-bold tracking-[-0.01em]">Scratchpad</h1>
         <Hint label="New note (Ctrl+Alt+N)">
-          <Button aria-keyshortcuts="Control+Alt+N" onClick={newNote}>
+          <Button aria-keyshortcuts="Control+Alt+N" onClick={() => newNote()}>
             + New
           </Button>
         </Hint>

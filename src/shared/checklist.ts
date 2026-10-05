@@ -47,6 +47,12 @@ function fenceWalker() {
   };
 }
 
+/** Each line of `body`, or "" for one that is a fence or inside one: what isn't code. */
+export function outsideFences(body: string): string[] {
+  const fences = fenceWalker();
+  return body.split("\n").map((text) => (fences.isCode(text) ? "" : text));
+}
+
 /** Where a code fence that `lines` leave open starts, or null: cutting there keeps code whole. */
 export function unclosedFence(lines: readonly string[]): number | null {
   const fences = fenceWalker();

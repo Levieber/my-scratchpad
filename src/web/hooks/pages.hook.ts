@@ -1,6 +1,9 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 
+import { sameTitle } from "@/shared/links";
+import { openNote } from "@/web/hooks/editor.hook";
+import { newNote } from "@/web/hooks/focus";
 import { listedNote } from "@/web/hooks/notes.hook";
 import { usePending } from "@/web/hooks/pending.hook";
 import { api, type Note, Unauthorized } from "@/web/lib/api";
@@ -68,4 +71,42 @@ export function usePath(note: Note | null) {
     refetchInterval: POLL_MS,
   });
   return parent ? (data ?? EMPTY) : EMPTY;
+}
+
+/** The note `[[target]]` names: the one with that id, else the latest with that title. */
+async function resolveLink(target: string): Promise<string | null> {
+  if (/^[A-Za-z0-9_-]{8,64}$/.test(target))
+    try {
+      return (await noteFor(target)).id;
+    } catch {}
+  const titled = (notes: Note[]) => notes.find((n) => sameTitle(n.title, target))?.id ?? null;
+  try {
+    // The list is latest first, so the first with the title is the one a title names.
+    return titled(await api.list({ q: target, limit: 50 }));
+  } catch (e) {
+    if (e instanceof Unauthorized) throw e;
+    // Offline: what the lists read before hold.
+    return titled(
+      queryClient
+        .getQueriesData<Note[]>({ queryKey: [...keys.notes, "list"] })
+        .flatMap(([, list]) => list ?? []),
+    );
+  }
+}
+
+/** Follows a link to a note; one to a title nobody has yet starts that note. */
+export async function openLink(target: string) {
+  const id = await resolveLink(target);
+  if (id) return openNote(id);
+  newNote(`# ${target}\n\n`);
+}
+
+/** The notes linking to `note` (`[[its title]]`, `[[its id]]`), latest first. */
+export function useBacklinks(note: Note) {
+  const { data } = useQuery({
+    queryKey: keys.backlinks(note.id),
+    queryFn: () => api.backlinks(note.id),
+    refetchInterval: POLL_MS,
+  });
+  return data ?? EMPTY;
 }

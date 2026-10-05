@@ -4,10 +4,17 @@
 // New syntax is additive only: each pad extension gets the next dialect version, reads as plain
 // text wherever it isn't understood, and changing what existing syntax means is a breaking change.
 
-/** Pad's own syntax beyond CommonMark and GFM, oldest first. Empty: none yet. */
-export const PAD_EXTENSIONS: readonly { since: number; syntax: string; meaning: string }[] = [];
+/** Pad's own syntax beyond CommonMark and GFM, oldest first. */
+export const PAD_EXTENSIONS: readonly { since: number; syntax: string; meaning: string }[] = [
+  {
+    since: 2,
+    syntax: "[[Note title]]",
+    meaning:
+      "a link to another note by its title (ignoring case; the latest updated if two share it) or by its id, as `[[id]]`; `[[target|text]]` reads as text; inside code it is text",
+  },
+];
 
-export const DIALECT_VERSION = 1;
+export const DIALECT_VERSION = 2;
 
 export const DIALECT = [
   `Markdown, dialect v${DIALECT_VERSION}: CommonMark, plus GFM task lists (\`- [ ]\`, \`- [x]\`), tables, strikethrough and autolinks.`,

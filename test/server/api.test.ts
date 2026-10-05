@@ -200,6 +200,29 @@ describe("notes API", () => {
     expect(doc.components.schemas.Error.properties.error.enum).toContain("invalidParent");
   });
 
+  test("backlinks: by id or title, outside code, and a title names the latest note with it", async () => {
+    const post = async (body: string) => (await call("POST", "/api/notes", { body })).data as Note;
+    const plan = await post("# Launch plan");
+    const byTitle = await post("# Kickoff\nSee [[launch PLAN]].");
+    const byId = await post(`# Review\nAgainst [[${plan.id}|the plan]].`);
+    await post("# Example\n`[[Launch plan]]` is how you link.\n```\n[[Launch plan]]\n```");
+    await post("# Itself\n[[Itself]]");
+
+    const names = async (id: string) =>
+      ((await call("GET", `/api/notes/${id}/backlinks`)).data as Note[]).map((n) => n.title);
+    expect(await names(plan.id)).toEqual(["Review", "Kickoff"]);
+    expect(byTitle.id).toBeTruthy();
+    expect(byId.id).toBeTruthy();
+
+    // A newer note with the same title is what [[Launch plan]] names now; the id still links.
+    await post("# Launch plan\nthe second one");
+    expect(await names(plan.id)).toEqual(["Review"]);
+    expect((await call("GET", "/api/notes/missing-0001/backlinks")).status).toBe(404);
+    expect(Object.keys((await call("GET", "/openapi.json")).data.paths)).toContain(
+      "/api/notes/{id}/backlinks",
+    );
+  });
+
   test("saved views: create, list by name, delete", async () => {
     const made = await call("POST", "/api/views", {
       name: " Agent logs ",

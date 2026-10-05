@@ -21,6 +21,7 @@ Attribution: send \`X-Pad-Author: <agent-name>\` on writes.
 - PATCH  /api/notes/{id}       {title?, body?, tags?, kind?, parent_id?}  (parent_id null: to the top)
 - POST   /api/notes/{id}/append {text}  (or text/plain)
 - DELETE /api/notes/{id}
+- GET    /api/notes/{id}/backlinks         the notes that link to it with [[its title]] or [[its id]]
 - GET    /api/notes/{id}/revisions         history, newest first (who changed it, lines +/-)
 - GET    /api/notes/{id}/revisions/{rev}   one revision with its body
 - GET    /api/notes/{id}/diff?from=&to=&since=   unified diff; default the latest change
