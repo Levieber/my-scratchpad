@@ -96,7 +96,7 @@ export const makeNotes = (
     return run(
       Effect.flatMap(
         sql`SELECT ${sql.literal(NOTE_COLUMNS)} FROM ${from} ${filter}
-            ORDER BY n.updated_at DESC LIMIT ${Math.min(limit, 500)} OFFSET ${offset}`,
+            ORDER BY n.updated_at DESC, n.rowid DESC LIMIT ${Math.min(limit, 500)} OFFSET ${offset}`,
         (rows) => Effect.forEach(rows, decodeNote),
       ),
     );
@@ -190,10 +190,11 @@ export const makeNotes = (
     run(
       Effect.gen(function* () {
         const note = yield* getNote(id);
-        const [owner] = yield* sql<{ id: string }>`
-          SELECT id FROM notes WHERE title = ${note.title.trim()} COLLATE NOCASE
-          ORDER BY updated_at DESC, rowid DESC LIMIT 1`;
-        const byTitle = owner?.id === id;
+        // Titles are compared as the PWA does (sameTitle), not by SQLite's NOCASE, which folds
+        // ASCII only: "Ção" and "ção" are one title to a link.
+        const titles = yield* sql<{ id: string; title: string }>`
+          SELECT id, title FROM notes ORDER BY updated_at DESC, rowid DESC`;
+        const byTitle = titles.find((t) => sameTitle(t.title, note.title))?.id === id;
         const rows = yield* sql`
           SELECT ${sql.literal(NOTE_COLUMNS)} FROM notes n
           WHERE n.id != ${id} AND instr(n.body, '[[') > 0

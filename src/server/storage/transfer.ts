@@ -80,7 +80,11 @@ export const makeTransfer = (sql: SqlClient.SqlClient, parts: Parts) => {
         const whole = !isFiltered(query);
         const ids = new Set(notes.map((n) => n.id));
         return {
-          notes,
+          // A parent is "by its id in the same archive": one this export left out would only
+          // fail on import, so the note goes at the top.
+          notes: notes.map((n) =>
+            n.parent_id && !ids.has(n.parent_id) ? { ...n, parent_id: null } : n,
+          ),
           views: whole ? yield* parts.views : [],
           pins: (yield* parts.pinRows).filter((p) => whole || ids.has(p.note_id)),
           hook_selections: whole ? yield* parts.hookSelections : [],
