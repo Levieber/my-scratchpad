@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 
 import { NoteBoard } from "@/web/components/notes/note-board";
 import { NoteList } from "@/web/components/notes/note-list";
+import { PageTree } from "@/web/components/notes/page-tree";
 import { useLayout } from "@/web/hooks/layout.hook";
 import { useListed } from "@/web/hooks/listed.hook";
 import { useWide } from "@/web/hooks/wide.hook";
@@ -13,8 +14,8 @@ const NoteTable = lazy(() =>
 
 /**
  * The notes in the layout chosen for the search. Beside an open note the column is for moving
- * between notes, so it is the list; so is a phone's screen in place of the table, which needs
- * the room.
+ * between notes, so it is the list, or the pages' tree, which is made for that; a phone's screen
+ * shows the list in place of the table, which needs the room.
  */
 export function Notes({
   beside,
@@ -24,7 +25,7 @@ export function Notes({
   const listed = useListed();
   const { layout, unknown } = useLayout();
   const wide = useWide();
-  const shown = beside || (layout === "table" && !wide) ? "list" : layout;
+  const shown = (beside && layout !== "pages") || (layout === "table" && !wide) ? "list" : layout;
   return (
     <nav className="flex-1 overflow-y-auto" aria-label="Notes" data-layout={shown}>
       {unknown && !beside && (
@@ -33,7 +34,9 @@ export function Notes({
           is a list.
         </p>
       )}
-      {shown === "board" ? (
+      {shown === "pages" ? (
+        <PageTree listed={listed} />
+      ) : shown === "board" ? (
         <NoteBoard listed={listed} />
       ) : shown === "table" ? (
         <Suspense>

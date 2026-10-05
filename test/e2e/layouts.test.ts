@@ -215,6 +215,63 @@ describeE2E("layouts", () => {
     );
   }, 20_000);
 
+  test("pages: open a page from the keyboard, follow its breadcrumbs, add a subpage", async () => {
+    const page = await app.api.create({ title: "Pages project", body: "the project" });
+    const spec = await app.api.create({ title: "Pages spec", body: "x", parent_id: page.id });
+    const p = await app.open(1280, "/?layout=pages");
+    await shownAs(p, "pages");
+    // Its name says what it will do next, so it is found by the part that stays.
+    const toggle = p.getByRole("button", { name: /the pages under "Pages project"/ });
+    await toggle.focus();
+    await p.keyboard.press("Enter");
+    await eventually(async () => expect(await toggle.getAttribute("aria-expanded")).toBe("true"));
+    await p.getByRole("button", { name: "Pages spec", exact: true }).click();
+    // Beside the open note the tree stays: it is how one moves between pages.
+    await shownAs(p, "pages");
+
+    const crumbs = p.getByRole("navigation", { name: "Breadcrumb" });
+    await crumbs.getByRole("button", { name: "Pages project" }).click();
+    await eventually(async () =>
+      expect(await p.getByPlaceholder("Title").inputValue()).toBe("Pages project"),
+    );
+    const subpages = p.getByRole("navigation", { name: "Subpages" });
+    await subpages.getByRole("button", { name: "Pages spec" }).waitFor();
+
+    await subpages.getByRole("button", { name: "Subpage" }).click();
+    await p.keyboard.type("Pages notes, filed under the project");
+    await eventually(async () => {
+      const under = (await (
+        await fetch(new URL(`/api/notes?parent=${page.id}`, app.server.url))
+      ).json()) as { id: string }[];
+      expect(under.map((n) => n.id).toSorted()).toHaveLength(2);
+      expect(under.map((n) => n.id)).toContain(spec.id);
+    }, 10_000);
+  }, 25_000);
+
+  test("pages: a subpage made offline is filed under its page once back online", async () => {
+    const page = await app.api.create({ title: "Offline project", body: "x" });
+    const p = await app.open(1280);
+    await p
+      .getByRole("button", { name: /^Offline project/ })
+      .first()
+      .click();
+    await p.getByRole("navigation", { name: "Subpages" }).waitFor();
+    await p.context().setOffline(true);
+    await p
+      .getByRole("navigation", { name: "Subpages" })
+      .getByRole("button", { name: "Subpage" })
+      .click();
+    await p.keyboard.type("written on the train");
+    await p.getByRole("navigation", { name: "Breadcrumb" }).waitFor({ timeout: 10_000 });
+    await p.context().setOffline(false);
+    await eventually(async () => {
+      const under = (await (
+        await fetch(new URL(`/api/notes?parent=${page.id}`, app.server.url))
+      ).json()) as { body: string }[];
+      expect(under.map((n) => n.body)).toEqual(["written on the train"]);
+    }, 10_000);
+  }, 25_000);
+
   test("a layout this app doesn't know shows as the list, and says so", async () => {
     const page = await app.open(1280, "/?layout=calendar");
     await shownAs(page, "list");

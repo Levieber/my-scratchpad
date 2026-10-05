@@ -5,7 +5,7 @@ import { QueryCache, QueryClient } from "@tanstack/react-query";
 
 import { type Note, Offline, Unauthorized } from "@/web/lib/api";
 import { handle } from "@/web/lib/failures";
-import { withSettled } from "@/web/lib/pending";
+import { withSettled, withSettledUnder } from "@/web/lib/pending";
 import type { Outcome } from "@/web/lib/sync";
 
 // Every key starts with the server, so a cache never answers for another one.
@@ -17,6 +17,10 @@ export const keys = {
   notes: [server, "notes"] as const,
   list: (q: string, limit: number) => [server, "notes", "list", q, limit] as const,
   note: (id: string) => [server, "notes", "one", id] as const,
+  /** The notes under a page (`none`: at the top). */
+  children: (parent: string) => [server, "notes", "children", parent] as const,
+  /** The pages above a note under `parent`, from the top down. */
+  path: (id: string, parent: string) => [server, "notes", "path", id, parent] as const,
   revisions: (id: string) => [server, "revisions", id] as const,
   diff: (id: string, to: number) => [server, "revisions", id, "diff", to] as const,
   revision: (id: string, rev: number) => [server, "revisions", id, rev] as const,
@@ -62,6 +66,10 @@ export function settle(outcome: Outcome) {
     queryKey: [...keys.notes, "list"],
   }))
     if (list) queryClient.setQueryData(key, withSettled(list, outcome, !key[3]));
+  for (const [key, list] of queryClient.getQueriesData<Note[]>({
+    queryKey: [...keys.notes, "children"],
+  }))
+    if (list) queryClient.setQueryData(key, withSettledUnder(list, String(key[3]), outcome));
   queryClient.setQueryData<Note[]>(keys.pins, (pins) => pins && withSettled(pins, outcome, false));
   const { sent, note } = outcome;
   if (note) queryClient.setQueryData(keys.note(note.id), note);

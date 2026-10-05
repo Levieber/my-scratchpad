@@ -193,6 +193,26 @@ describe("EditorSession", () => {
     expect(state()).not.toBe(before);
   });
 
+  test("a subpage is created under its page; an edit keeps a note where it is", async () => {
+    const { server, session, seed } = setup();
+    const page = await seed("page");
+    session.create("", page.id);
+    session.edit({ body: "under the page" });
+    await settle();
+    const [made] = [...server.notes.values()].filter((n) => n.body === "under the page");
+    expect(made?.parent_id).toBe(page.id);
+
+    // Moved by someone else meanwhile: the edit here doesn't move it back.
+    await session.open(async () => server.notes.get(made!.id)!);
+    server.edit(made!.id, { parent_id: null });
+    session.edit({ body: "under the page, edited" });
+    await settle();
+    expect(server.notes.get(made!.id)).toMatchObject({
+      body: "under the page, edited",
+      parent_id: null,
+    });
+  });
+
   describe("retag (a board's move)", () => {
     test("a note not open goes through the outbox, keeping an edit already waiting", async () => {
       const { server, outbox, session, seed } = setup();
