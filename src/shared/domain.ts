@@ -8,7 +8,8 @@ import { type Layout, TABLE_COLUMNS } from "./layouts";
 export const Kind = Schema.Literals(KIND_NAMES);
 
 /** What the API accepts as a client-chosen id: URL-safe and long enough not to collide by accident. */
-export const NoteId = Schema.String.pipe(Schema.check(Schema.isPattern(/^[A-Za-z0-9_-]{8,64}$/)));
+export const NOTE_ID = /^[A-Za-z0-9_-]{8,64}$/;
+export const NoteId = Schema.String.pipe(Schema.check(Schema.isPattern(NOTE_ID)));
 
 export const Progress = Schema.Struct({ done: Schema.Number, total: Schema.Number });
 export type Progress = typeof Progress.Type;

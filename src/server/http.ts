@@ -20,7 +20,7 @@ import type {
   ViewNotFound,
 } from "@/server/storage/errors";
 import type { ListQuery } from "@/server/storage/notes";
-import { type Note, NoteInput } from "@/shared/domain";
+import { NOTE_ID, type Note, NoteInput } from "@/shared/domain";
 import { ERROR_MESSAGES, type ErrorBody, type ErrorCode } from "@/shared/errors";
 import { isKind, KIND_NAMES } from "@/shared/kinds";
 import { parseQuery } from "@/shared/query";
@@ -170,7 +170,7 @@ export const readListQuery = (p: URLSearchParams) =>
     const kind = p.get("kind");
     if (kind !== null && !isKind(kind)) return Effect.fail(kindError());
     const parent = p.get("parent");
-    if (parent !== null && parent !== "none" && !/^[A-Za-z0-9_-]{8,64}$/.test(parent))
+    if (parent !== null && parent !== "none" && !NOTE_ID.test(parent))
       return Effect.fail(refuse("invalidParam", 400, "parent must be a note id, or none"));
     const parsed = parseQuery(p.get("q") ?? "");
     return Effect.succeed({

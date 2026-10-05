@@ -23,6 +23,32 @@ describeE2E("links between notes", () => {
     );
   }, 20_000);
 
+  test("a link finds its note among more than a screenful of newer notes that mention the title", async () => {
+    await app.api.create({ title: "Ideas", body: "the first one" });
+    for (let i = 0; i < 55; i++)
+      await app.api.create({ body: `# Brainstorm ${i}\nIdeas for ${i}` });
+    await app.api.create({ title: "Idea hub", body: "Start from [[Ideas]]." });
+    const page = await app.open();
+    await openNote(page, "Idea hub");
+    await page.getByRole("tabpanel").getByRole("button", { name: "Ideas" }).click();
+    await eventually(async () =>
+      expect(await page.getByPlaceholder("Title").inputValue()).toBe("Ideas"),
+    );
+  }, 30_000);
+
+  test("a link to a title shaped like an id opens its note without an error toast", async () => {
+    await app.api.create({ title: "Groceries", body: "milk" });
+    await app.api.create({ title: "Shopping hub", body: "Buy from [[Groceries]]." });
+    const page = await app.open();
+    await openNote(page, "Shopping hub");
+    await page.getByRole("tabpanel").getByRole("button", { name: "Groceries" }).click();
+    await eventually(async () =>
+      expect(await page.getByPlaceholder("Title").inputValue()).toBe("Groceries"),
+    );
+    // Looking for a note with that id is a guess that fails quietly: nothing to tell the person.
+    expect(await page.locator("[data-sonner-toast]").count()).toBe(0);
+  }, 20_000);
+
   test("a link to a title nobody has yet starts that note", async () => {
     await app.api.create({ title: "Link to nowhere", body: "Ideas: [[Someday project]]" });
     const page = await app.open();

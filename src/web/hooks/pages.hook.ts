@@ -1,19 +1,20 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 
+import { NOTE_ID } from "@/shared/domain";
 import { sameTitle } from "@/shared/links";
 import { openNote } from "@/web/hooks/editor.hook";
 import { newNote } from "@/web/hooks/focus";
 import { listedNote } from "@/web/hooks/notes.hook";
 import { usePending } from "@/web/hooks/pending.hook";
-import { api, type Note, Unauthorized } from "@/web/lib/api";
+import { api, ApiError, type Note, Unauthorized } from "@/web/lib/api";
 import { pendingUnder } from "@/web/lib/pending";
 import { keys, POLL_MS, queryClient } from "@/web/lib/queries";
 
 const EMPTY: never[] = [];
 
 // A page holds few notes; more than this and a page has become a list, which a search serves.
-const MOST = 200;
+export const MOST = 200;
 
 /** The notes under `parent` (`none`: at the top), by title, including those not synced yet. */
 export function useSubpages(parent: string | null, enabled = true) {
@@ -73,16 +74,36 @@ export function usePath(note: Note | null) {
   return parent ? (data ?? EMPTY) : EMPTY;
 }
 
-/** The note `[[target]]` names: the one with that id, else the latest with that title. */
-async function resolveLink(target: string): Promise<string | null> {
-  if (/^[A-Za-z0-9_-]{8,64}$/.test(target))
-    try {
-      return (await noteFor(target)).id;
-    } catch {}
+// A title is looked up in the search's pages, latest first: a note may be older than a screenful
+// of notes that mention its title. Past this many, a link is to a title nobody has.
+const TITLE_PAGE = 100;
+const TITLE_PAGES = 10;
+
+/** The note with this id, if `target` is one: a guess, so a refusal is only "no". */
+async function noteWithId(target: string): Promise<string | null> {
+  if (!NOTE_ID.test(target)) return null;
+  try {
+    // Not through the query cache, whose failures are shown: most titles that look like an id
+    // (one long word) are only titles.
+    return (await api.get(target)).id;
+  } catch (e) {
+    if (e instanceof Unauthorized) throw e;
+    if (e instanceof ApiError) return null;
+    // Offline: a note this device has read.
+    return queryClient.getQueryData<Note>(keys.note(target))?.id ?? listedNote(target)?.id ?? null;
+  }
+}
+
+/** The latest note titled `target`, which the search lists first. */
+async function noteTitled(target: string): Promise<string | null> {
   const titled = (notes: Note[]) => notes.find((n) => sameTitle(n.title, target))?.id ?? null;
   try {
-    // The list is latest first, so the first with the title is the one a title names.
-    return titled(await api.list({ q: target, limit: 50 }));
+    for (let page = 0; page < TITLE_PAGES; page++) {
+      const notes = await api.list({ q: target, limit: TITLE_PAGE, offset: page * TITLE_PAGE });
+      const id = titled(notes);
+      if (id || notes.length < TITLE_PAGE) return id;
+    }
+    return null;
   } catch (e) {
     if (e instanceof Unauthorized) throw e;
     // Offline: what the lists read before hold.
@@ -93,6 +114,10 @@ async function resolveLink(target: string): Promise<string | null> {
     );
   }
 }
+
+/** The note `[[target]]` names: the one with that id, else the latest with that title. */
+const resolveLink = async (target: string) =>
+  (await noteWithId(target)) ?? (await noteTitled(target));
 
 /** Follows a link to a note; one to a title nobody has yet starts that note. */
 export async function openLink(target: string) {
