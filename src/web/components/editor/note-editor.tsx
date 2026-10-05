@@ -3,6 +3,7 @@
 import { lazy, Suspense, useCallback } from "react";
 
 import { WriteView } from "@/web/components/editor/write-view";
+import { renderEmbed } from "@/web/components/notes/embedded-view";
 import { openLink } from "@/web/hooks/pages.hook";
 import { toggleTask } from "@/web/lib/checklist-edit";
 import type { EditorMode } from "@/web/lib/editor-session";
@@ -44,6 +45,7 @@ function ReadView({ value, onChange, readOnly }: NoteEditorProps) {
             body={value}
             onToggle={readOnly ? undefined : toggle}
             onOpenLink={followLink}
+            renderEmbed={renderEmbed}
           />
         </Suspense>
       ) : (

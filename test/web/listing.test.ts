@@ -19,6 +19,14 @@ const note = (patch: Partial<Note>): Note => ({
 });
 
 describe("preview", () => {
+  test("leaves out what an embedded view's block says to show", () => {
+    const n = note({
+      title: "Plan",
+      body: "Open work:\n```pad-view\nquery: #todo\n```\nThen ship.",
+    });
+    expect(preview(n)).toBe("Open work: · Then ship.");
+  });
+
   test("skips a first line that repeats the title", () => {
     const n = note({ title: "SEO checklist", body: "SEO checklist\n\nA generic checklist." });
     expect(preview(n)).toBe("A generic checklist.");

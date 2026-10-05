@@ -3,9 +3,15 @@
 // body is shown as text and `javascript:` links are dropped by the renderer; the PWA's CSP
 // (server/pages.ts) is the second line.
 import { Markdown } from "@tanstack/markdown/react";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 
-import { elements, LinkActions, TaskActions } from "@/web/components/editor/markdown-elements";
+import type { Embed } from "@/shared/embeds";
+import {
+  elements,
+  EmbedRenderer,
+  LinkActions,
+  TaskActions,
+} from "@/web/components/editor/markdown-elements";
 import { highlight } from "@/web/lib/highlight";
 import { readNote } from "@/web/lib/note-markdown";
 
@@ -13,12 +19,15 @@ export function NoteMarkdown({
   body,
   onToggle,
   onOpenLink,
+  renderEmbed,
 }: {
   body: string;
   /** Ticks or unticks the `n`th task; absent, the boxes are read-only. */
   onToggle?: (n: number) => void;
   /** Follows a link to another note; absent, links are only shown. */
   onOpenLink?: (target: string) => void;
+  /** Shows an embedded view live; absent, it is shown as the block it is written as. */
+  renderEmbed?: (embed: Embed) => ReactNode;
 }) {
   const { document, editable } = useMemo(() => readNote(body), [body]);
   const actions = useMemo(
@@ -28,9 +37,11 @@ export function NoteMarkdown({
   return (
     <TaskActions.Provider value={actions}>
       <LinkActions.Provider value={onOpenLink ?? null}>
-        <Markdown components={elements} highlighter={highlight}>
-          {document}
-        </Markdown>
+        <EmbedRenderer.Provider value={renderEmbed ?? null}>
+          <Markdown components={elements} highlighter={highlight}>
+            {document}
+          </Markdown>
+        </EmbedRenderer.Provider>
       </LinkActions.Provider>
     </TaskActions.Provider>
   );

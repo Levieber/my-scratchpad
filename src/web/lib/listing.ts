@@ -1,6 +1,7 @@
 // Pure helpers behind the note list, kept apart from React so they can be tested directly.
 import { unclosedFence } from "@/shared/checklist";
 import type { Note } from "@/shared/domain";
+import { EMBED_LANG } from "@/shared/embeds";
 import type { TableColumn } from "@/shared/layouts";
 
 import type { Tag } from "./api";
@@ -31,7 +32,7 @@ const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLow
  * title again, which would spend the preview repeating what the list already shows.
  */
 export function preview(note: Note, max = 240): string {
-  const lines = note.body
+  const lines = withoutEmbeds(note.body)
     .split("\n")
     .filter((l) => !/^\s*```/.test(l))
     .map(stripLine)
@@ -40,6 +41,13 @@ export function preview(note: Note, max = 240): string {
   const text = lines.join(" · ");
   return text.length > max ? text.slice(0, max - 1) + "…" : text;
 }
+
+// An embedded view's lines say what to show, not anything to read: a one-line glimpse skips them.
+const EMBED_BLOCK = new RegExp(
+  `^\\s*\`\`\`${EMBED_LANG}\\b[^\\n]*\\n[\\s\\S]*?^\\s*\`\`\`\\s*$`,
+  "gm",
+);
+const withoutEmbeds = (body: string) => body.replace(EMBED_BLOCK, "");
 
 /**
  * The start of a note's body, for a card to render: without a first line repeating the title, at

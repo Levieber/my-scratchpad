@@ -12,9 +12,15 @@ export const PAD_EXTENSIONS: readonly { since: number; syntax: string; meaning: 
     meaning:
       "a link to another note by its title (ignoring case; the latest updated if two share it) or by its id, as `[[id]]`; `[[target|text]]` reads as text; inside code it is text",
   },
+  {
+    since: 3,
+    syntax: "```pad-view",
+    meaning:
+      "a fenced block that shows a search's notes live: `query: <search>` or `view: <saved view's name>`, then optionally `layout: list|grid` and `limit: <n>` (default 10, at most 50), one `key: value` per line; versioned on the fence (`pad-view v2`); elsewhere it is a code block",
+  },
 ];
 
-export const DIALECT_VERSION = 2;
+export const DIALECT_VERSION = 3;
 
 export const DIALECT = [
   `Markdown, dialect v${DIALECT_VERSION}: CommonMark, plus GFM task lists (\`- [ ]\`, \`- [x]\`), tables, strikethrough and autolinks.`,
