@@ -19,6 +19,8 @@ export const keys = {
   note: (id: string) => [server, "notes", "one", id] as const,
   /** The notes under a page (`none`: at the top). */
   children: (parent: string) => [server, "notes", "children", parent] as const,
+  /** The notes linking to a note. */
+  backlinks: (id: string) => [server, "notes", "backlinks", id] as const,
   /** The pages above a note under `parent`, from the top down. */
   path: (id: string, parent: string) => [server, "notes", "path", id, parent] as const,
   revisions: (id: string) => [server, "revisions", id] as const,

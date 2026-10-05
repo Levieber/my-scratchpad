@@ -2,8 +2,8 @@ import { ChevronRightIcon, PlusIcon } from "lucide-react";
 
 import { Button } from "@/web/components/ui/button";
 import { openNote } from "@/web/hooks/editor.hook";
-import { newSubpage } from "@/web/hooks/focus";
-import { usePath, useSubpages } from "@/web/hooks/pages.hook";
+import { newNote } from "@/web/hooks/focus";
+import { useBacklinks, usePath, useSubpages } from "@/web/hooks/pages.hook";
 import type { Note } from "@/web/lib/api";
 
 const link =
@@ -48,11 +48,31 @@ export function Subpages({ note }: { note: Note }) {
         variant="ghost"
         size="xs"
         className="font-normal text-muted-foreground"
-        onClick={() => newSubpage(note.id)}
+        onClick={() => newNote("", note.id)}
       >
         <PlusIcon />
         Subpage
       </Button>
+    </nav>
+  );
+}
+
+/** The notes that link to the open note; nothing when none does. */
+export function LinkedFrom({ note }: { note: Note }) {
+  const linking = useBacklinks(note);
+  if (!linking.length) return null;
+  return (
+    <nav aria-label="Linked from" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      <span className="text-muted-foreground">Linked from:</span>
+      {linking.map((n) => (
+        <button
+          key={n.id}
+          className={`${link} min-h-6 max-w-56 text-muted-foreground`}
+          onClick={() => void openNote(n.id)}
+        >
+          {n.title}
+        </button>
+      ))}
     </nav>
   );
 }

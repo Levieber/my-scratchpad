@@ -7,6 +7,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { progress } from "@/shared/checklist";
 import type { Note, NoteInput, Tag } from "@/shared/domain";
 import { newId } from "@/shared/ids";
+import { noteLinks, sameTitle } from "@/shared/links";
 import { deriveTitle } from "@/shared/title";
 
 import { InvalidParent, NoteChanged, NoteExists, NoteNotFound } from "./errors";
@@ -180,8 +181,35 @@ export const makeNotes = (
       }).pipe(sql.withTransaction),
     );
 
+  /**
+   * The notes linking to `id`, latest first: by its id, or by its title when no note updated
+   * later shares it (a title names the latest note with it). Read with the same parser as the
+   * PWA's links, from the bodies that hold a link at all, so the two never disagree.
+   */
+  const backlinks = (id: string) =>
+    run(
+      Effect.gen(function* () {
+        const note = yield* getNote(id);
+        const [owner] = yield* sql<{ id: string }>`
+          SELECT id FROM notes WHERE title = ${note.title.trim()} COLLATE NOCASE
+          ORDER BY updated_at DESC, rowid DESC LIMIT 1`;
+        const byTitle = owner?.id === id;
+        const rows = yield* sql`
+          SELECT ${sql.literal(NOTE_COLUMNS)} FROM notes n
+          WHERE n.id != ${id} AND instr(n.body, '[[') > 0
+          ORDER BY n.updated_at DESC, n.rowid DESC`;
+        const linking = yield* Effect.forEach(rows, decodeNote);
+        return linking.filter((n) =>
+          noteLinks(n.body).some(
+            ({ target }) => target === id || (byTitle && sameTitle(target, note.title)),
+          ),
+        );
+      }),
+    );
+
   return {
     list,
+    backlinks,
     checkParent,
     get: (id: string) => run(getNote(id)),
     create,

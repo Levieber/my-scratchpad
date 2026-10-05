@@ -103,6 +103,8 @@ const make = Effect.fnUntraced(function* ({
   return {
     list: (q: ListParams = {}) => req<Note[]>("GET", `/api/notes${query(q)}`),
     get: (id: string) => req<Note>("GET", note(id)),
+    /** The notes linking to it with `[[its title]]` or `[[its id]]`. */
+    backlinks: (id: string) => req<Note[]>("GET", `${note(id)}/backlinks`),
     create: (input: NoteInput) => req<Note>("POST", "/api/notes", input),
     update: (id: string, patch: NoteInput) => req<Note>("PATCH", note(id), patch),
     append: (id: string, text: string) => req<Note>("POST", `${note(id)}/append`, { text }),

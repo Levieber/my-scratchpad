@@ -100,6 +100,10 @@ export const routes = (
           }),
         }),
 
+        resource("/api/notes/:id/backlinks", {
+          GET: Effect.map(Effect.flatMap(routeId, store.backlinks), (notes) => json(notes)),
+        }),
+
         resource("/api/notes/:id/revisions", {
           GET: Effect.gen(function* () {
             const id = yield* routeId;

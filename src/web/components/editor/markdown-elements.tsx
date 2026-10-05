@@ -1,11 +1,22 @@
 import type { MarkdownComponents } from "@tanstack/markdown/react";
-import { type ComponentProps, createContext, createElement, type JSX, useContext } from "react";
+import {
+  type ComponentProps,
+  createContext,
+  createElement,
+  type JSX,
+  type ReactNode,
+  useContext,
+} from "react";
 
 import { Checkbox } from "@/web/components/ui/checkbox";
+import { NOTE_LINK_TAG } from "@/web/lib/note-links";
 import { TASK_TAG } from "@/web/lib/note-markdown";
 
 /** What the Read view lets a reader do to the note; null when its boxes can't be mapped to lines. */
 export const TaskActions = createContext<{ toggle: (n: number) => void } | null>(null);
+
+/** Following a link to another note; null where links are only shown (a card's glimpse). */
+export const LinkActions = createContext<((target: string) => void) | null>(null);
 
 type TaskProps = { "data-index": string; "data-checked": string; "aria-label": string };
 
@@ -35,6 +46,24 @@ function Link({ href, children, ...props }: ComponentProps<"a">) {
     >
       {children}
     </a>
+  );
+}
+
+// A link to another note opens it here, unlike an address: dotted, to tell the two apart.
+function NoteLink({
+  "data-target": target,
+  children,
+}: {
+  "data-target": string;
+  children?: ReactNode;
+}) {
+  const open = useContext(LinkActions);
+  const look = "text-primary underline decoration-dotted underline-offset-2";
+  if (!open) return <span className={look}>{children}</span>;
+  return (
+    <button type="button" className={`${look} cursor-pointer`} onClick={() => open(target)}>
+      {children}
+    </button>
   );
 }
 
@@ -88,4 +117,5 @@ export const elements: MarkdownComponents = {
   a: Link,
   img: Image,
   [TASK_TAG]: TaskBox,
+  [NOTE_LINK_TAG]: NoteLink,
 };

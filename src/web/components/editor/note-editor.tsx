@@ -3,6 +3,7 @@
 import { lazy, Suspense, useCallback } from "react";
 
 import { WriteView } from "@/web/components/editor/write-view";
+import { openLink } from "@/web/hooks/pages.hook";
 import { toggleTask } from "@/web/lib/checklist-edit";
 import type { EditorMode } from "@/web/lib/editor-session";
 
@@ -25,6 +26,8 @@ const NoteMarkdown = lazy(() =>
   import("@/web/components/editor/note-markdown").then((m) => ({ default: m.NoteMarkdown })),
 );
 
+const followLink = (target: string) => void openLink(target);
+
 function ReadView({ value, onChange, readOnly }: NoteEditorProps) {
   const toggle = useCallback(
     (n: number) => {
@@ -37,7 +40,11 @@ function ReadView({ value, onChange, readOnly }: NoteEditorProps) {
     <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-input px-3.5 py-2.5 text-base/[1.6] break-words">
       {value.trim() ? (
         <Suspense fallback={<p className="text-xs text-muted-foreground">Loading…</p>}>
-          <NoteMarkdown body={value} onToggle={readOnly ? undefined : toggle} />
+          <NoteMarkdown
+            body={value}
+            onToggle={readOnly ? undefined : toggle}
+            onOpenLink={followLink}
+          />
         </Suspense>
       ) : (
         <p className="text-muted-foreground">Nothing here yet: open Write to start.</p>

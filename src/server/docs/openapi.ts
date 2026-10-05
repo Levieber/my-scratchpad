@@ -526,6 +526,21 @@ export const openapi = {
         responses: { 200: noteResponse("Note"), 404: notFound },
       },
     },
+    "/api/notes/{id}/backlinks": {
+      parameters: [idParam],
+      get: {
+        operationId: "listBacklinks",
+        summary:
+          "The notes that link to this one, latest first: `[[its id]]`, or `[[its title]]` when it is the latest note with that title (see the body's dialect)",
+        responses: {
+          200: {
+            description: "Notes",
+            ...json({ type: "array", items: { $ref: "#/components/schemas/Note" } }),
+          },
+          404: notFound,
+        },
+      },
+    },
     "/api/notes/{id}/revisions": {
       parameters: [idParam],
       get: {

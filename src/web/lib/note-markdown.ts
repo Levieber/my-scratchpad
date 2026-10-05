@@ -7,6 +7,7 @@ import { parseMarkdown } from "@tanstack/markdown/parser";
 
 import { tasks } from "@/shared/checklist";
 import { autolinks } from "@/web/lib/autolinks";
+import { noteLinks } from "@/web/lib/note-links";
 
 /** The element the document asks for in place of a task's checkbox. */
 export const TASK_TAG = "pad-task";
@@ -67,7 +68,7 @@ function numberTasks(blocks: BlockNode[], found: boolean[]) {
 }
 
 export function readNote(body: string): ReadNote {
-  const document = parseMarkdown(body, { extensions: [autolinks] });
+  const document = parseMarkdown(body, { extensions: [autolinks, noteLinks] });
   const rendered: boolean[] = [];
   numberTasks(document.children, rendered);
   const source = tasks(body);

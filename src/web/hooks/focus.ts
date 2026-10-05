@@ -12,14 +12,13 @@ export function focusSearch() {
   searchRef.current?.select();
 }
 
-/** A new note, with the cursor in its body: rendered first, so the body is there to focus. */
-export function newNote() {
-  flushSync(() => session.create());
-  bodyRef.current?.focus();
-}
-
-/** A new note under the page `parent`, the same way. */
-export function newSubpage(parent: string) {
-  flushSync(() => session.create("", parent));
-  bodyRef.current?.focus();
+/**
+ * A new note, holding `body`, under the page `parent` if one is given, with the cursor at the end
+ * of its body: rendered first, so the body is there to focus.
+ */
+export function newNote(body = "", parent: string | null = null) {
+  flushSync(() => session.create(body, parent));
+  const field = bodyRef.current;
+  field?.focus();
+  field?.setSelectionRange(body.length, body.length);
 }
