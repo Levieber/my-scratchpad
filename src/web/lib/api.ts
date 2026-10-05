@@ -113,11 +113,12 @@ async function req<T>(
 export const api = {
   // Kind, author and tags travel inside `q` as operators (shared/query.ts).
   /** `parent`: only the notes under that page; `none` for those at the top. */
-  list: (q: { q?: string; parent?: string; limit?: number }) => {
+  list: (q: { q?: string; parent?: string; limit?: number; offset?: number }) => {
     const p = new URLSearchParams();
     if (q.q) p.set("q", q.q);
     if (q.parent) p.set("parent", q.parent);
     if (q.limit) p.set("limit", String(q.limit));
+    if (q.offset) p.set("offset", String(q.offset));
     return req<Note[]>("GET", `/api/notes?${p}`);
   },
   get: (id: string) => req<Note>("GET", `/api/notes/${id}`),

@@ -5,7 +5,7 @@ import { NoteMenu } from "@/web/components/notes/note-menu";
 import { NoteMarks } from "@/web/components/notes/note-meta";
 import { openNote } from "@/web/hooks/editor.hook";
 import type { Listed } from "@/web/hooks/listed.hook";
-import { useSubpages } from "@/web/hooks/pages.hook";
+import { MOST, useSubpages } from "@/web/hooks/pages.hook";
 import { useStore } from "@/web/hooks/store.hook";
 import type { Note } from "@/web/lib/api";
 import { Store } from "@/web/lib/store";
@@ -54,7 +54,19 @@ function Branch({
   const notes = useSubpages(parent);
   if (parent === null && notes.length === 0)
     return <li className="p-2.5 text-xs text-muted-foreground">No notes yet.</li>;
-  return notes.map((n) => <PageNode key={n.id} note={n} depth={depth} currentId={currentId} />);
+  return (
+    <>
+      {notes.map((n) => (
+        <PageNode key={n.id} note={n} depth={depth} currentId={currentId} />
+      ))}
+      {notes.length >= MOST && (
+        // The server sends the latest; the rest would be missing without a word.
+        <li className="p-2.5 text-xs text-muted-foreground">
+          The {MOST} most recently changed are shown here: search for the rest.
+        </li>
+      )}
+    </>
+  );
 }
 
 function PageNode({

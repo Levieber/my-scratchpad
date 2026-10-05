@@ -1,4 +1,5 @@
 import { ARCHIVE_FORMAT, ARCHIVE_VERSION } from "@/shared/archive";
+import { NOTE_ID } from "@/shared/domain";
 import { ERROR_CODES } from "@/shared/errors";
 import { HOOK_NAMES, MAX_INCLUDE } from "@/shared/hooks";
 import { KIND_NAMES, KINDS } from "@/shared/kinds";
@@ -61,7 +62,7 @@ const NoteInput = {
   properties: {
     id: {
       type: "string",
-      pattern: "^[A-Za-z0-9_-]{8,64}$",
+      pattern: NOTE_ID.source,
       description:
         "Create only: choose the id yourself (e.g. a note written offline), which makes the create safe to retry: a second POST answers 409 noteExists",
     },
