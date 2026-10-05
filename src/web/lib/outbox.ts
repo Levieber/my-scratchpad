@@ -5,8 +5,17 @@
 import type { Kind } from "@/shared/kinds";
 import type { Note } from "@/web/lib/api";
 
-/** What the editor changes. */
-export type Fields = { title: string; body: string; tags: string[]; kind: Kind };
+/**
+ * What an edit sets. `parent_id` is the page a note goes under; an entry queued before pages
+ * existed has none, which leaves the note where it is.
+ */
+export type Fields = {
+  title: string;
+  body: string;
+  tags: string[];
+  kind: Kind;
+  parent_id?: string | null;
+};
 
 /** The server's version an edit started from: its content to merge against, its version for If-Match. */
 export type Base = Fields & { updated_at: string };
@@ -21,6 +30,7 @@ export const fieldsOf = (n: Fields): Fields => ({
   body: n.body,
   tags: n.tags,
   kind: n.kind,
+  parent_id: n.parent_id,
 });
 export const baseOf = (n: Note): Base => ({ ...fieldsOf(n), updated_at: n.updated_at });
 

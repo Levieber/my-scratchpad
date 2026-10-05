@@ -26,6 +26,10 @@ export const Note = Schema.Struct({
   updated_at: Schema.String,
   /** Derived from the body's checkboxes on every read, never stored. */
   progress: Progress,
+  /** The page it is under; null at the top. Its place, not its content: not in its history. */
+  parent_id: Schema.NullOr(Schema.String),
+  /** How many notes are under it, counted on every read. */
+  subpages: Schema.Number,
 });
 export type Note = typeof Note.Type;
 
@@ -36,6 +40,8 @@ export const NoteInput = Schema.Struct({
   body: Schema.optionalKey(Schema.String),
   tags: Schema.optionalKey(Tags),
   kind: Schema.optionalKey(Kind),
+  /** The page to put it under; null moves it to the top. Not itself, nor a page under it. */
+  parent_id: Schema.optionalKey(Schema.NullOr(NoteId)),
 });
 export type NoteInput = typeof NoteInput.Type;
 

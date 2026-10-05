@@ -78,6 +78,16 @@ describe("compiled pad", () => {
     expect((await run(["views", "add", "Bad", "x", "--layout", "calendar"])).code).not.toBe(0);
   });
 
+  test("files a note under a page, lists what is under it, and moves it to the top", async () => {
+    const page = (await run(["add", "Project page"])).out;
+    const sub = (await run(["add", "A subpage", "--parent", page])).out;
+    expect((await run(["ls", "--parent", page])).out).toContain(`${sub}  A subpage`);
+    expect((await run(["ls", "--parent", "none"])).out).toContain(`Project page +1 under`);
+    expect((await run(["show", sub])).out).toContain(`under ${page}`);
+    await run(["set", sub, "--parent", "none"]);
+    expect((await run(["ls", "--parent", page])).out).toBe("(no notes)");
+  });
+
   test("runs the SessionStart hook", async () => {
     const { code, out } = await run(["hook", "session-start"], JSON.stringify({ session_id: "s" }));
     expect(code).toBe(0);

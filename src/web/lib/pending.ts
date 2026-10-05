@@ -16,6 +16,8 @@ export function localNote(id: string, fields: Fields): Note {
     created_at: now,
     updated_at: now,
     progress: progress(fields.body),
+    parent_id: fields.parent_id ?? null,
+    subpages: 0,
   };
 }
 
@@ -29,7 +31,9 @@ export function withPending(notes: Note[], pending: readonly Pending[], withNew:
     .filter((n) => byId.get(n.id)?.op !== "delete")
     .map((n) => {
       const p = byId.get(n.id);
-      return p?.op === "save" ? { ...localNote(n.id, p.fields), ...pick(n) } : n;
+      if (p?.op !== "save") return n;
+      const parent_id = p.fields.parent_id === undefined ? n.parent_id : p.fields.parent_id;
+      return { ...localNote(n.id, p.fields), ...pick(n), parent_id };
     });
   if (!withNew) return shown;
   const known = new Set(notes.map((n) => n.id));
@@ -40,7 +44,12 @@ export function withPending(notes: Note[], pending: readonly Pending[], withNew:
 }
 
 // What a pending edit doesn't change about a listed note.
-const pick = ({ author, created_at, updated_at }: Note) => ({ author, created_at, updated_at });
+const pick = ({ author, created_at, updated_at, subpages }: Note) => ({
+  author,
+  created_at,
+  updated_at,
+  subpages,
+});
 
 /**
  * A list as the server has it once `outcome` landed: the saved note in place of the listed one

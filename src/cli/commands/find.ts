@@ -5,7 +5,7 @@ import * as Flag from "effect/cli/Flag";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
-import { author, kind, limit, tag, words } from "@/cli/flags";
+import { author, kind, limit, parent, tag, words } from "@/cli/flags";
 import { line } from "@/cli/format";
 import { out, reported } from "@/cli/root";
 import { ApiError, Client } from "@/client/client";
@@ -21,7 +21,7 @@ const findView = Effect.fn(function* (name: string) {
 
 export const ls = Command.make(
   "ls",
-  { query: words("query"), tag, kind, author, limit },
+  { query: words("query"), tag, kind, author, parent, limit },
   Effect.fn(function* (a) {
     // `@name` stands for a saved search's query, so it can be combined with more words.
     const expanded = yield* Effect.forEach(a.query, (word) =>
@@ -34,6 +34,7 @@ export const ls = Command.make(
       tag: a.tag,
       kind: Option.getOrUndefined(a.kind),
       author: Option.getOrUndefined(a.author),
+      parent: Option.getOrUndefined(a.parent),
       limit: Option.getOrUndefined(a.limit),
     });
     yield* out(notes, () => notes.map(line).join("\n") || "(no notes)");

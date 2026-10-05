@@ -90,6 +90,16 @@ describe("MCP server", () => {
     expect(history.data.map((r: { author: string }) => r.author)).toEqual(["claude-code"]);
   });
 
+  test("files a note under a page and finds it by the page", async () => {
+    const page = await call("scratchpad_create", { body: "# MCP project" });
+    const sub = await call("scratchpad_create", { body: "under it", parent_id: page.data.id });
+    expect(sub.data.parent_id).toBe(page.data.id);
+    const found = await call("scratchpad_search", { parent: page.data.id });
+    expect(found.data.map((n: { id: string }) => n.id)).toEqual([sub.data.id]);
+    const top = await call("scratchpad_search", { query: "MCP project", parent: "none" });
+    expect(top.data[0]).toMatchObject({ id: page.data.id, subpages: 1 });
+  });
+
   test("saves a view with its layout, and lists it", async () => {
     const saved = await call("scratchpad_save_view", {
       name: "MCP table",

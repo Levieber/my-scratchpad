@@ -26,6 +26,10 @@ export class ViewNotFound extends Schema.TaggedError<ViewNotFound>()("ViewNotFou
 export class ViewExists extends Schema.TaggedError<ViewExists>()("ViewExists", {
   name: Schema.String,
 }) {}
+/** A parent that doesn't exist, or would put a note under itself. */
+export class InvalidParent extends Schema.TaggedError<InvalidParent>()("InvalidParent", {
+  reason: Schema.String,
+}) {}
 /** A view's options, as written or as an edit would leave them, that its layouts can't read. */
 export class InvalidViewOptions extends Schema.TaggedError<InvalidViewOptions>()(
   "InvalidViewOptions",

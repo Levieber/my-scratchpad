@@ -315,6 +315,32 @@ describe("POST /api/import", () => {
     ]);
   });
 
+  test("pages keep their place, whatever order the archive lists them in; a loop fails alone", async () => {
+    const { call } = await boot();
+    const archive = {
+      format: "pad-export",
+      version: ARCHIVE_VERSION,
+      notes: [
+        { id: "child-00001", body: "child", parent_id: "parent-0001" },
+        { id: "parent-0001", body: "parent" },
+        { id: "loop-a-0001", body: "a", parent_id: "loop-b-0001" },
+        { id: "loop-b-0001", body: "b", parent_id: "loop-a-0001" },
+      ],
+    };
+    const result = (await call("POST", "/api/import", archive)).data;
+    expect(result).toMatchObject({ created: 4 });
+    expect(result.failed).toEqual([
+      { item: "parent of loop-b-0001", message: "That page is under this note already" },
+    ]);
+    expect((await call("GET", "/api/notes/child-00001")).data.parent_id).toBe("parent-0001");
+    expect((await call("GET", "/api/notes/loop-a-0001")).data.parent_id).toBe("loop-b-0001");
+
+    // And out again: an export carries the place, not the count derived from it.
+    const exported = (await call("GET", "/api/export")).data.notes as Record<string, unknown>[];
+    const child = exported.find((n) => n.id === "child-00001")!;
+    expect([child.parent_id, "subpages" in child]).toEqual(["parent-0001", false]);
+  });
+
   test("importing the same archive twice changes nothing the second time", async () => {
     const { call } = await boot();
     const archive = JSON.parse(await fixture("export-v2.json"));

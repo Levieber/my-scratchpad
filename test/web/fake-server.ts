@@ -23,6 +23,9 @@ export function fakeServer() {
     state.calls.push(call);
   };
   const missing = () => new ApiError(404, "noteNotFound", "Note not found");
+  const checkParent = (parent: string | null | undefined) => {
+    if (parent && !notes.has(parent)) throw new ApiError(400, "invalidParent", "No such parent");
+  };
   const server = {
     state,
     notes,
@@ -30,9 +33,13 @@ export function fakeServer() {
     edit(id: string, patch: Partial<Fields>) {
       notes.set(id, { ...notes.get(id)!, ...patch, updated_at: stamp() });
     },
+    /** What each write sent, in order, for a test to check what went over the wire. */
+    sent: [] as NoteInput[],
     remote: {
       create: async (input: NoteInput) => {
         guard("create");
+        server.sent.push(input);
+        checkParent(input.parent_id);
         const id = input.id!;
         if (notes.has(id)) throw new ApiError(409, "noteExists", "exists");
         const now = stamp();
@@ -44,14 +51,18 @@ export function fakeServer() {
           created_at: now,
           updated_at: now,
           progress: { done: 0, total: 0 },
+          parent_id: input.parent_id ?? null,
+          subpages: 0,
         } as Note;
         notes.set(id, note);
         return note;
       },
       update: async (id: string, patch: NoteInput, ifMatch?: string) => {
         guard("update");
+        server.sent.push(patch);
         const cur = notes.get(id);
         if (!cur) throw missing();
+        checkParent(patch.parent_id);
         if (ifMatch && ifMatch !== cur.updated_at)
           throw new ApiError(412, "noteChanged", "changed");
         const next = { ...cur, ...patch, updated_at: stamp() } as Note;

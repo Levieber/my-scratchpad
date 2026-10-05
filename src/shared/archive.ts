@@ -56,6 +56,8 @@ export const ArchiveNote = Schema.Struct({
   updated_at: Schema.optionalKey(Timestamp),
   /** Oldest first. Without them the note's history starts at its current content. */
   revisions: Schema.optionalKey(Schema.Array(ArchiveRevision)),
+  /** The page it was under, by its id in the same archive. */
+  parent_id: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 export type ArchiveNote = typeof ArchiveNote.Type;
 
@@ -78,8 +80,10 @@ export const ArchivePin = Schema.Struct({
 });
 export type ArchivePin = typeof ArchivePin.Type;
 
-/** A note as `GET /api/export` writes it: all of the note but its derived `progress`. */
-export type ExportedNote = Omit<Note, "progress"> & { revisions?: ArchiveRevision[] };
+/** A note as `GET /api/export` writes it: all of the note but what is derived on each read. */
+export type ExportedNote = Omit<Note, "progress" | "subpages"> & {
+  revisions?: ArchiveRevision[];
+};
 
 /** `GET /api/export`: what the importers above read back. */
 export type ExportArchive = {

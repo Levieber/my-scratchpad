@@ -43,6 +43,7 @@ export const resourceWith = (token: Redacted.Redacted | undefined) => {
         RevisionNotFound: () => Effect.succeed(errorJson("revisionNotFound", 404)),
         ViewNotFound: () => Effect.succeed(errorJson("viewNotFound", 404)),
         ViewExists: () => Effect.succeed(errorJson("viewExists", 409)),
+        InvalidParent: (e) => Effect.succeed(errorJson("invalidParent", 400, e.reason)),
         InvalidViewOptions: (e) =>
           Effect.succeed(errorJson("invalidViewOptions", 400, `options: ${e.reason}`)),
         PinLimit: () => Effect.succeed(errorJson("pinLimit", 409)),

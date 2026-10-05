@@ -6,7 +6,7 @@ import * as Command from "effect/cli/Command";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
-import { id, kind, tag, title, words } from "@/cli/flags";
+import { id, kind, parent, tag, title, words } from "@/cli/flags";
 import { full, line } from "@/cli/format";
 import { out, reported, textArg, usage } from "@/cli/root";
 import { ApiError, Client } from "@/client/client";
@@ -14,9 +14,13 @@ import { ApiError, Client } from "@/client/client";
 // No --tag means "leave the tags alone", not "no tags".
 const tagsOrUndefined = (tags: readonly string[]) => (tags.length ? [...tags] : undefined);
 
+// `--parent none` is the top; no flag leaves the note where it is.
+const parentOf = (flag: Option.Option<string>) =>
+  Option.match(flag, { onNone: () => undefined, onSome: (p) => (p === "none" ? null : p) });
+
 export const add = Command.make(
   "add",
-  { text: words("text"), title, tag, kind },
+  { text: words("text"), title, tag, kind, parent },
   Effect.fn(function* (a) {
     const body = yield* textArg(a.text);
     if (!body && Option.isNone(a.title))
@@ -26,6 +30,7 @@ export const add = Command.make(
       body,
       tags: tagsOrUndefined(a.tag),
       kind: Option.getOrUndefined(a.kind),
+      parent_id: parentOf(a.parent),
     });
     yield* out(n, () => n.id);
   }, reported),
@@ -78,16 +83,17 @@ export const edit = Command.make(
 
 export const set = Command.make(
   "set",
-  { id, title, tag, kind },
+  { id, title, tag, kind, parent },
   Effect.fn(function* (a) {
     const n = yield* (yield* Client).update(a.id, {
       title: Option.getOrUndefined(a.title),
       tags: tagsOrUndefined(a.tag),
       kind: Option.getOrUndefined(a.kind),
+      parent_id: parentOf(a.parent),
     });
     yield* out(n, () => line(n));
   }, reported),
-).pipe(Command.withDescription("Update metadata"));
+).pipe(Command.withDescription("Update metadata, or move it under a page (--parent)"));
 
 export const rm = Command.make(
   "rm",

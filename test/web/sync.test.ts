@@ -160,6 +160,53 @@ describe("Syncer", () => {
   });
 });
 
+describe("Syncer and pages", () => {
+  test("a move is sent; an edit that didn't move the note doesn't send its parent", async () => {
+    const { server, outbox, syncer } = setup();
+    const page = await server.remote.create({ id: "page-0001", ...fields({ body: "page" }) });
+    const note = await server.remote.create({ id: "note-0001", ...fields({ body: "note" }) });
+    server.sent.length = 0;
+    outbox.save(note.id, { ...fields({ body: "note" }), parent_id: page.id }, baseOf(note));
+    await syncer.run();
+    const moved = server.notes.get(note.id)!;
+    outbox.save(
+      note.id,
+      { ...fields({ body: "note, edited" }), parent_id: page.id },
+      baseOf(moved),
+    );
+    await syncer.run();
+    expect(server.sent).toEqual([
+      expect.objectContaining({ parent_id: page.id }),
+      expect.not.objectContaining({ parent_id: expect.anything() }),
+    ]);
+  });
+
+  test("an edit to a note whose page was deleted meanwhile still saves", async () => {
+    const { server, outbox, syncer } = setup();
+    const page = await server.remote.create({ id: "page-0002", ...fields({ body: "page" }) });
+    const note = await server.remote.create({
+      id: "note-0002",
+      ...fields({ body: "under" }),
+      parent_id: page.id,
+    });
+    outbox.save(
+      note.id,
+      { ...fields({ body: "under, edited" }), parent_id: page.id },
+      baseOf(note),
+    );
+    server.notes.delete(page.id);
+    expect(await syncer.run()).toEqual({ status: "done" });
+    expect(server.notes.get(note.id)?.body).toBe("under, edited");
+  });
+
+  test("a subpage made offline under a page deleted before it synced lands at the top", async () => {
+    const { server, outbox, syncer } = setup();
+    outbox.save("sub-00001", { ...fields({ body: "subpage" }), parent_id: "gone-0001" }, null);
+    expect(await syncer.run()).toEqual({ status: "done" });
+    expect(server.notes.get("sub-00001")).toMatchObject({ body: "subpage", parent_id: null });
+  });
+});
+
 describe("mergeFields", () => {
   test("the side that changed a field wins it", () => {
     const base = fields({ title: "T", tags: ["a"], body: "x" });
