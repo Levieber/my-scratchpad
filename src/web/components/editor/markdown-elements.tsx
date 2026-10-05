@@ -8,15 +8,32 @@ import {
   useContext,
 } from "react";
 
+import type { Embed } from "@/shared/embeds";
 import { Checkbox } from "@/web/components/ui/checkbox";
 import { NOTE_LINK_TAG } from "@/web/lib/note-links";
-import { TASK_TAG } from "@/web/lib/note-markdown";
+import { EMBED_TAG, TASK_TAG } from "@/web/lib/note-markdown";
 
 /** What the Read view lets a reader do to the note; null when its boxes can't be mapped to lines. */
 export const TaskActions = createContext<{ toggle: (n: number) => void } | null>(null);
 
 /** Following a link to another note; null where links are only shown (a card's glimpse). */
 export const LinkActions = createContext<((target: string) => void) | null>(null);
+
+/** Showing an embedded view live; null where it is shown as the block it is written as. */
+export const EmbedRenderer = createContext<((embed: Embed) => ReactNode) | null>(null);
+
+const PRE =
+  "my-2 overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm [&>code]:bg-transparent [&>code]:p-0 [&_.th-command]:text-primary [&_.th-comment]:text-muted-foreground [&_.th-comment]:italic [&_.th-deleted]:text-destructive [&_.th-function]:font-semibold [&_.th-heading]:font-semibold [&_.th-inserted]:text-success [&_.th-keyword]:text-primary [&_.th-literal]:text-destructive [&_.th-meta]:text-muted-foreground [&_.th-number]:text-destructive [&_.th-string]:text-success [&_.th-tag]:text-primary [&_.th-type]:font-semibold";
+
+function EmbedBlock(props: { "data-embed": string; "data-source": string }) {
+  const render = useContext(EmbedRenderer);
+  if (render) return render(JSON.parse(props["data-embed"]) as Embed);
+  return (
+    <pre className={PRE}>
+      <code>{props["data-source"]}</code>
+    </pre>
+  );
+}
 
 type TaskProps = { "data-index": string; "data-checked": string; "aria-label": string };
 
@@ -105,10 +122,7 @@ export const elements: MarkdownComponents = {
   li: styled("li", "my-0.5"),
   blockquote: styled("blockquote", "my-2 border-l-4 border-border pl-3 text-muted-foreground"),
   // Highlighted tokens (lib/highlight.ts) in the palette, so they follow light and dark.
-  pre: styled(
-    "pre",
-    "my-2 overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm [&>code]:bg-transparent [&>code]:p-0 [&_.th-command]:text-primary [&_.th-comment]:text-muted-foreground [&_.th-comment]:italic [&_.th-deleted]:text-destructive [&_.th-function]:font-semibold [&_.th-heading]:font-semibold [&_.th-inserted]:text-success [&_.th-keyword]:text-primary [&_.th-literal]:text-destructive [&_.th-meta]:text-muted-foreground [&_.th-number]:text-destructive [&_.th-string]:text-success [&_.th-tag]:text-primary [&_.th-type]:font-semibold",
-  ),
+  pre: styled("pre", PRE),
   code: styled("code", "rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]"),
   table: Table,
   th: styled("th", "border border-border bg-muted px-2 py-1 text-left font-semibold"),
@@ -118,4 +132,5 @@ export const elements: MarkdownComponents = {
   img: Image,
   [TASK_TAG]: TaskBox,
   [NOTE_LINK_TAG]: NoteLink,
+  [EMBED_TAG]: EmbedBlock,
 };

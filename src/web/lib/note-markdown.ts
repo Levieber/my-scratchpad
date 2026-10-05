@@ -6,11 +6,41 @@ import type { BlockNode, InlineNode, MarkdownDocument } from "@tanstack/markdown
 import { parseMarkdown } from "@tanstack/markdown/parser";
 
 import { tasks } from "@/shared/checklist";
+import { EMBED_LANG, readEmbed } from "@/shared/embeds";
 import { autolinks } from "@/web/lib/autolinks";
 import { noteLinks } from "@/web/lib/note-links";
 
 /** The element the document asks for in place of a task's checkbox. */
 export const TASK_TAG = "pad-task";
+
+/** The element the document asks for in place of a `pad-view` block it can show. */
+export const EMBED_TAG = "pad-embed";
+
+/**
+ * Each `pad-view` block this app can show, as an element in its place; its source goes with it,
+ * so where nothing shows views it is still the text it was. One it can't read stays code.
+ */
+function embedViews(blocks: BlockNode[]) {
+  blocks.forEach((block, i) => {
+    if (block.type === "code" && block.lang === EMBED_LANG) {
+      const embed = readEmbed(block.value, block.meta);
+      if (embed)
+        blocks[i] = {
+          type: "component",
+          name: "embed",
+          tagName: EMBED_TAG,
+          attributes: {},
+          properties: {
+            "data-embed": JSON.stringify(embed),
+            "data-source": block.value,
+          },
+          children: [],
+        };
+    } else if (block.type === "list") for (const item of block.items) embedViews(item.children);
+    else if (block.type === "blockquote" || block.type === "callout" || block.type === "component")
+      embedViews(block.children);
+  });
+}
 
 export type ReadNote = {
   document: MarkdownDocument;
@@ -71,6 +101,7 @@ export function readNote(body: string): ReadNote {
   const document = parseMarkdown(body, { extensions: [autolinks, noteLinks] });
   const rendered: boolean[] = [];
   numberTasks(document.children, rendered);
+  embedViews(document.children);
   const source = tasks(body);
   const editable =
     rendered.length === source.length && rendered.every((done, i) => done === source[i]!.done);

@@ -116,6 +116,36 @@ describe("rendering is a trust boundary", () => {
     expect(render("See [[Launch plan]].")).not.toContain("<button");
   });
 
+  test("a pad-view block shows live where the Read view does, and as its text elsewhere", () => {
+    const body = "Todo:\n\n```pad-view\nquery: #todo\nlayout: grid\n```\n\n- [ ] after";
+    const seen: unknown[] = [];
+    const live = renderToStaticMarkup(
+      <NoteMarkdown
+        body={body}
+        renderEmbed={(embed) => {
+          seen.push(embed);
+          return <section>live view</section>;
+        }}
+      />,
+    );
+    expect(seen).toEqual([{ query: "#todo", layout: "grid", limit: 10 }]);
+    expect(live).toContain("<section>live view</section>");
+    expect(render(body)).toMatch(/<pre[^>]*><code>query: #todo\nlayout: grid<\/code><\/pre>/);
+    // The block is code to the checklist too: the task after it is still the first.
+    expect(boxes(render(body))).toEqual([{ label: "after", checked: false, disabled: false }]);
+  });
+
+  test("a pad-view block of a version this app doesn't know stays code", () => {
+    const seen: unknown[] = [];
+    renderToStaticMarkup(
+      <NoteMarkdown
+        body={"```pad-view v9\nquery: x\n```"}
+        renderEmbed={(e) => void seen.push(e)}
+      />,
+    );
+    expect(seen).toEqual([]);
+  });
+
   test("addresses become links that open outside the app", () => {
     const html = render("<https://a.example/x> and https://b.example/y.");
     expect(html).toContain('href="https://a.example/x"');
