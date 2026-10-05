@@ -223,6 +223,18 @@ describe("notes API", () => {
     );
   });
 
+  test("backlinks name a title by the same case rules as the PWA, accents included", async () => {
+    const post = async (body: string) => (await call("POST", "/api/notes", { body })).data as Note;
+    const older = await post("# Ção");
+    const newer = await post("# ção");
+    await post("# Reader\nSee [[ÇÃO]].");
+    const names = async (id: string) =>
+      ((await call("GET", `/api/notes/${id}/backlinks`)).data as Note[]).map((n) => n.title);
+    // One title, whatever its case: it names the later note, and only that one.
+    expect(await names(older.id)).toEqual([]);
+    expect(await names(newer.id)).toEqual(["Reader"]);
+  });
+
   test("saved views: create, list by name, delete", async () => {
     const made = await call("POST", "/api/views", {
       name: " Agent logs ",

@@ -341,6 +341,41 @@ describe("POST /api/import", () => {
     expect([child.parent_id, "subpages" in child]).toEqual(["parent-0001", false]);
   });
 
+  test("an export narrowed to some notes leaves out the pages it doesn't hold, so it imports clean", async () => {
+    const from = await boot();
+    const page = (await from.call("POST", "/api/notes", { body: "# Project" })).data as Note;
+    await from.call("POST", "/api/notes", {
+      id: "tagged-0001",
+      body: "# Task",
+      tags: ["task"],
+      parent_id: page.id,
+    });
+
+    const narrowed = (await from.call("GET", "/api/export?q=%23task")).data;
+    expect(narrowed.notes.map((n: Note) => [n.id, n.parent_id])).toEqual([["tagged-0001", null]]);
+
+    const to = await boot();
+    const result = (await to.call("POST", "/api/import", narrowed)).data;
+    expect([result.created, result.failed]).toEqual([1, []]);
+  });
+
+  test("notes updated at the same moment list the later insert first, page after page", async () => {
+    const { call } = await boot();
+    const at = "2026-01-01T00:00:00.000Z";
+    const notes = ["a", "b", "c", "d"].map((x) => ({
+      id: `tied-${x}-0001`,
+      body: x,
+      updated_at: at,
+    }));
+    await call("POST", "/api/import", { format: "pad-export", version: ARCHIVE_VERSION, notes });
+    const ids = async (query: string) =>
+      ((await call("GET", `/api/notes?${query}`)).data as Note[]).map((n) => n.id);
+    const all = ["d", "c", "b", "a"].map((x) => `tied-${x}-0001`);
+    expect(await ids("")).toEqual(all);
+    // Paging through ties must see each note once, which an unordered tie can't promise.
+    expect([...(await ids("limit=2")), ...(await ids("limit=2&offset=2"))]).toEqual(all);
+  });
+
   test("importing the same archive twice changes nothing the second time", async () => {
     const { call } = await boot();
     const archive = JSON.parse(await fixture("export-v2.json"));
