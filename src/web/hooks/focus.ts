@@ -17,3 +17,9 @@ export function newNote() {
   flushSync(() => session.create());
   bodyRef.current?.focus();
 }
+
+/** A new note under the page `parent`, the same way. */
+export function newSubpage(parent: string) {
+  flushSync(() => session.create("", parent));
+  bodyRef.current?.focus();
+}

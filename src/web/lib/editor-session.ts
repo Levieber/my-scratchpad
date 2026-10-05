@@ -46,6 +46,8 @@ export class EditorSession {
    * waiting for a render. React gets a copy of it in the snapshot.
    */
   private latest = { current: null as Note | null, draft: emptyDraft, dirty: false };
+  // The page a new note goes under, until it is saved and its place is its own.
+  private parent: string | null = null;
   private ui = {
     open: false,
     saveState: "" as SaveState,
@@ -122,7 +124,7 @@ export class EditorSession {
     l.dirty = false;
     const { current, draft } = l;
     if (!current && !draft.body.trim() && !draft.title.trim()) return;
-    const fields = fromDraft(draft);
+    const fields = { ...fromDraft(draft), parent_id: current ? current.parent_id : this.parent };
     if (current) {
       this.outbox.save(current.id, fields, baseOf(current));
     } else {
@@ -174,9 +176,10 @@ export class EditorSession {
     this.set({ saveState: waiting ? "local" : "" });
   };
 
-  /** A new note, empty or holding `body`. */
-  create = (body = "") => {
+  /** A new note, empty or holding `body`, at the top or under the page `parent`. */
+  create = (body = "", parent: string | null = null) => {
     this.flush();
+    this.parent = parent;
     this.display(null, { ...emptyDraft, body });
     this.set({ saveState: "" });
   };

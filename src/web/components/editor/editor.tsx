@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 
 import { EditorToolbar } from "@/web/components/editor/editor-toolbar";
 import { NoteEditor } from "@/web/components/editor/note-editor";
+import { Breadcrumbs, Subpages } from "@/web/components/editor/page-links";
 import { Input } from "@/web/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/web/components/ui/tabs";
 import { useEditor, useLiveOpenNote } from "@/web/hooks/editor.hook";
@@ -31,6 +32,7 @@ export function Editor({
   useLiveOpenNote();
   return (
     <main className="flex min-h-0 flex-col gap-2.5 px-5 py-3.5 max-wide:px-4 max-wide:py-3">
+      <Breadcrumbs note={current} />
       <EditorToolbar listHidden={listHidden} onToggleList={onToggleList} />
       {showHistory && current ? (
         <Suspense
@@ -64,6 +66,8 @@ export function Editor({
           </TabsContent>
         </Tabs>
       )}
+      {/* A note the server hasn't seen yet has nothing under it, and nowhere to file under. */}
+      {current && !showHistory && <Subpages note={current} />}
       <footer className="flex justify-between gap-2 text-xs text-muted-foreground">
         <span>
           {current ? `by ${current.author} · created ${ago(current.created_at)}` : "new note"}

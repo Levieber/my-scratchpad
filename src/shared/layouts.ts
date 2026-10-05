@@ -13,6 +13,7 @@ export const LAYOUTS = [
   { key: "grid", label: "Grid", since: 1 },
   { key: "table", label: "Table", since: 1 },
   { key: "board", label: "Board", since: 1 },
+  { key: "pages", label: "Pages", since: 1 },
 ] as const;
 
 export type Layout = (typeof LAYOUTS)[number]["key"];

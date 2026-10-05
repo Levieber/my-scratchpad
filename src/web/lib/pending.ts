@@ -64,3 +64,23 @@ export function withSettled(notes: Note[], { sent, note }: Outcome, withNew: boo
   if (at >= 0) return notes.with(at, note);
   return withNew && sent.base === null ? [note, ...notes] : notes;
 }
+
+/** Whether `note` is under `parent` (a page's id, or `none` for the top). */
+export const isUnder = (note: Note, parent: string) => (note.parent_id ?? "none") === parent;
+
+/**
+ * The notes under `parent` as they will be once the outbox is sent: a note made here under it
+ * included, one moved away gone.
+ */
+export const pendingUnder = (notes: Note[], pending: readonly Pending[], parent: string) =>
+  withPending(notes, pending, true).filter((n) => isUnder(n, parent));
+
+/** The notes under `parent` once `outcome` landed: a note created or moved there in, one moved away out. */
+export function withSettledUnder(notes: Note[], parent: string, outcome: Outcome): Note[] {
+  const after = withSettled(notes, outcome, false);
+  const { note } = outcome;
+  if (!note) return after;
+  const listed = after.some((n) => n.id === note.id);
+  if (isUnder(note, parent)) return listed ? after : [note, ...after];
+  return listed ? after.filter((n) => n.id !== note.id) : after;
+}

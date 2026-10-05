@@ -1,3 +1,4 @@
+import type { Layout } from "@/shared/layouts";
 import { Filters } from "@/web/components/notes/filters";
 import { LayoutPicker } from "@/web/components/notes/layout-picker";
 import { ListFooter } from "@/web/components/notes/list-footer";
@@ -12,6 +13,8 @@ import { useLayout } from "@/web/hooks/layout.hook";
 import { useSearch } from "@/web/hooks/search.hook";
 import { cn } from "@/web/lib/utils";
 
+const WIDE = new Set<Layout>(["grid", "table", "board"]);
+
 /** The left column: search, filters, saved views, tags and the list. */
 export function Sidebar({
   layout,
@@ -24,7 +27,7 @@ export function Sidebar({
 }) {
   const { q, filter } = useSearch();
   // Cards and columns need more room than rows: the page widens for them.
-  const roomy = useLayout().layout !== "list";
+  const roomy = WIDE.has(useLayout().layout);
   return (
     <aside
       className={cn(
@@ -43,8 +46,10 @@ export function Sidebar({
           </Button>
         </Hint>
       </header>
-      <div className="flex gap-2">
+      {/* The picker goes under the search where both don't fit (a narrow phone). */}
+      <div className="flex flex-wrap gap-2">
         <Input
+          className="min-w-48 flex-1"
           ref={searchRef}
           type="search"
           aria-label="Search"
@@ -53,7 +58,7 @@ export function Sidebar({
           value={q}
           onChange={(e) => filter(e.target.value)}
         />
-        {/* Beside a note the column is always the list (notes.tsx): nothing to pick there. */}
+        {/* Beside a note the column keeps to what moves between notes (notes.tsx). */}
         {layout === "page" && <LayoutPicker />}
       </div>
       <Filters />

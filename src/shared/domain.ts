@@ -101,6 +101,7 @@ export const LAYOUT_OPTIONS = {
       ]),
     ),
   },
+  pages: {},
 } satisfies Record<Layout, Schema.Struct.Fields>;
 
 /**
@@ -112,6 +113,7 @@ export const KnownViewOptions = Schema.Struct({
   ...LAYOUT_OPTIONS.grid,
   ...LAYOUT_OPTIONS.table,
   ...LAYOUT_OPTIONS.board,
+  ...LAYOUT_OPTIONS.pages,
 });
 export type KnownViewOptions = typeof KnownViewOptions.Type;
 
