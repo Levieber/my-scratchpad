@@ -39,7 +39,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         setQ(next);
         setLimit(PAGE);
       },
-      loadMore: () => setLimit((l) => l + PAGE),
+      // From the limit on screen, not the latest: asked twice before the list grows (a scroll and
+      // a click), it still loads one page.
+      loadMore: () => setLimit(limit + PAGE),
     }),
     [q, asked, limit],
   );

@@ -38,7 +38,7 @@ function ReadView({ value, onChange, readOnly }: NoteEditorProps) {
     [value, onChange],
   );
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-input px-3.5 py-2.5 text-base/[1.6] break-words">
+    <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-input px-3.5 py-2.5 text-base/[1.6] wrap-break-word">
       {value.trim() ? (
         <Suspense fallback={<p className="text-xs text-muted-foreground">Loading…</p>}>
           <NoteMarkdown

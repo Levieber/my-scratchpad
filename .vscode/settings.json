@@ -1,6 +1,5 @@
 {
-  "typescript.preferences.autoImportFileExcludePatterns": ["repos/**"],
-  "javascript.preferences.autoImportFileExcludePatterns": ["repos/**"],
+  "js/ts.preferences.autoImportFileExcludePatterns": ["repos/**"],
 
   "files.exclude": {
     "repos/**": true
@@ -12,5 +11,9 @@
 
   "search.exclude": {
     "repos/**": true
+  },
+
+  "files.associations": {
+    "*.css": "tailwindcss"
   }
 }

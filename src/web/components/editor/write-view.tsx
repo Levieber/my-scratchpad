@@ -23,14 +23,12 @@ import { cn } from "@/web/lib/utils";
 
 type Edit = (sel: TextSel) => TextSel | null;
 
-const mod = /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘" : "Ctrl+";
-
-const TOOLS: { label: string; icon: LucideIcon; edit: Edit }[] = [
-  { label: `Bold (${mod}B)`, icon: BoldIcon, edit: (s) => wrap(s, "**") },
+const TOOLS: { label: string; keys?: string; icon: LucideIcon; edit: Edit }[] = [
+  { label: "Bold", keys: "Mod+B", icon: BoldIcon, edit: (s) => wrap(s, "**") },
   { label: "Heading", icon: HeadingIcon, edit: (s) => setLines(s, "heading") },
   { label: "Bulleted list", icon: ListIcon, edit: (s) => setLines(s, "bullet") },
   { label: "Checklist", icon: ListTodoIcon, edit: (s) => setLines(s, "task") },
-  { label: `Link (${mod}K)`, icon: LinkIcon, edit: link },
+  { label: "Link", keys: "Mod+K", icon: LinkIcon, edit: link },
 ];
 
 // Ctrl/⌘ + a key, in the body only. K here is a link; elsewhere it stays the search (shortcuts.hook.ts).
@@ -72,12 +70,16 @@ export function WriteView({ value, onChange, readOnly }: NoteEditorProps) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-0.5" role="toolbar" aria-label="Formatting">
-        {TOOLS.map(({ label, icon: Icon, edit }) => (
-          <Hint key={label} label={label}>
+        {TOOLS.map(({ label, keys, icon: Icon, edit }) => (
+          <Hint key={label} label={label} keys={keys}>
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label={label.replace(/ \(.*\)$/, "")}
+              aria-label={label}
+              // The handler takes Ctrl or ⌘ (Meta) for Mod, on any device.
+              aria-keyshortcuts={
+                keys && `${keys.replace("Mod", "Control")} ${keys.replace("Mod", "Meta")}`
+              }
               disabled={readOnly}
               onClick={() => apply(edit)}
             >
@@ -88,7 +90,7 @@ export function WriteView({ value, onChange, readOnly }: NoteEditorProps) {
         <Hint label="Proportional font">
           <Toggle
             size="sm"
-            className="ml-auto aria-pressed:bg-accent aria-pressed:text-primary"
+            className="ml-auto"
             aria-label="Proportional font"
             pressed={font === "sans"}
             onPressedChange={(on) => editorFont.set(on ? "sans" : "mono")}
@@ -100,7 +102,7 @@ export function WriteView({ value, onChange, readOnly }: NoteEditorProps) {
       <Textarea
         ref={bodyRef}
         className={cn(
-          "min-h-0 flex-1 resize-none p-3.5 text-base/[1.6] field-sizing-fixed",
+          "min-h-0 flex-1 resize-none p-3.5 text-base/[1.6] tab-4 field-sizing-fixed",
           font === "mono" ? "font-mono" : "font-sans",
         )}
         aria-label="Body"

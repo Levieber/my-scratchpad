@@ -8,8 +8,8 @@ import { keys, POLL_MS, queryClient } from "@/web/lib/queries";
 
 /**
  * The list for a search, as it will be once the outbox is sent (`withPending`, applied on every
- * read, so an answer from before an edit never shows over it). While a new search loads, the
- * last one stays on screen.
+ * read, so an answer from before an edit never shows over it). While a new search, or a longer
+ * page of it, loads, the last one stays on screen (`loading`).
  */
 export function useNotes(q: string, limit: number) {
   const pending = usePending();
@@ -20,14 +20,14 @@ export function useNotes(q: string, limit: number) {
     }),
     [pending, q, limit],
   );
-  const { data } = useQuery({
+  const { data, isPlaceholderData } = useQuery({
     queryKey: keys.list(q, limit),
     queryFn: () => api.list({ q, limit }),
     placeholderData: keepPreviousData,
     refetchInterval: POLL_MS,
     select,
   });
-  return data ?? { notes: [], canLoadMore: false };
+  return { ...(data ?? { notes: [], canLoadMore: false }), loading: isPlaceholderData };
 }
 
 const EMPTY: never[] = [];

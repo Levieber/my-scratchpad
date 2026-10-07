@@ -1,13 +1,11 @@
 import { ListEnd } from "@/web/components/notes/list-end";
 import { NoteCard } from "@/web/components/notes/note-card";
 import { NoteRow } from "@/web/components/notes/note-row";
+import { SectionLabel } from "@/web/components/shell/section-label";
 import type { Listed } from "@/web/hooks/listed.hook";
 import type { Note } from "@/web/lib/api";
 import { groupNotes } from "@/web/lib/listing";
 import { cn } from "@/web/lib/utils";
-
-const heading =
-  "mx-2.5 mt-3 mb-1 text-[0.6875rem] font-semibold tracking-wider text-muted-foreground uppercase group-first/section:mt-0";
 
 /**
  * The notes as rows (the list) or cards (the grid), grouped by when they changed, the pinned
@@ -42,7 +40,9 @@ export function NoteList({
     <>
       {sections.map((s) => (
         <section key={s.label} className={cn("group/section", grid && "mb-3")} aria-label={s.label}>
-          <h2 className={heading}>{s.label}</h2>
+          <SectionLabel className="mx-2.5 mt-3 mb-1 group-first/section:mt-0">
+            {s.label}
+          </SectionLabel>
           <ul className={list}>{s.notes.map((n) => item(n, s.pinned))}</ul>
         </section>
       ))}

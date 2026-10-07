@@ -1,5 +1,6 @@
 import { PAGES } from "@/shared/pages";
-import { Button } from "@/web/components/ui/button";
+import { QuietLink, QuietLinkButton } from "@/web/components/shell/quiet";
+import { ThemeSwitcher } from "@/web/components/shell/theme-switcher";
 import { useOnline } from "@/web/hooks/online.hook";
 import { usePending } from "@/web/hooks/pending.hook";
 import { go } from "@/web/hooks/route.hook";
@@ -15,33 +16,28 @@ export function ListFooter() {
   const { exporting, exportNotes } = useExport();
   const canExport = useImportLimits() !== null;
   return (
-    <footer className="flex justify-between gap-2 text-xs text-muted-foreground">
+    <footer className="flex aligned-column flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
       <output>
         <span
           aria-hidden="true"
-          className={cn("mr-1", online ? "text-success" : "text-destructive")}
-        >
-          ●
-        </span>
+          className={cn(
+            "mr-1.5 inline-block size-1.5 rounded-full align-middle",
+            online ? "bg-success" : "bg-destructive",
+          )}
+        />
         {online ? "online" : "offline"}
         {pending > 0 && ` · ${pending} ${pending === 1 ? "change" : "changes"} to sync`}
       </output>
-      <span className="flex gap-1">
+      <ThemeSwitcher className="ml-auto" />
+      <span className="flex gap-2.5">
         {canExport && (
           // What the list shows, as a file: the search in force, or everything without one.
-          <Button
-            variant="link"
-            size="xs"
-            className="px-1 font-normal text-muted-foreground underline"
-            disabled={!online || exporting}
-            onClick={() => exportNotes(asked, true)}
-          >
+          <QuietLinkButton disabled={!online || exporting} onClick={() => exportNotes(asked, true)}>
             {asked.trim() ? "Export these" : "Export all"}
-          </Button>
+          </QuietLinkButton>
         )}
         {/* A real link, so it opens in a new tab too; a plain click stays in the app. */}
-        <a
-          className="inline-flex min-h-6 min-w-6 items-center px-1 underline"
+        <QuietLink
           href={PAGES.settings}
           onClick={(e) => {
             if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -50,14 +46,10 @@ export function ListFooter() {
           }}
         >
           Settings
-        </a>
-        <a
-          className="inline-flex min-h-6 min-w-6 items-center px-1 underline"
-          href="/openapi.json"
-          target="_blank"
-        >
+        </QuietLink>
+        <QuietLink href="/openapi.json" target="_blank">
           API
-        </a>
+        </QuietLink>
       </span>
     </footer>
   );

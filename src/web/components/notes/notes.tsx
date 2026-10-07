@@ -27,7 +27,7 @@ export function Notes({
   const wide = useWide();
   const shown = (beside && layout !== "pages") || (layout === "table" && !wide) ? "list" : layout;
   return (
-    <nav className="flex-1 overflow-y-auto" aria-label="Notes" data-layout={shown}>
+    <nav className="min-h-0 flex-1 scroll-column" aria-label="Notes" data-layout={shown}>
       {unknown && !beside && (
         <p className="mx-2.5 mb-2 text-xs text-muted-foreground" role="note">
           This view is shown as “{unknown}” in a newer version of the app: update to see it. Here it

@@ -1,8 +1,9 @@
-import { Field } from "@base-ui/react/field";
 import { XIcon } from "lucide-react";
 import { useState } from "react";
 
 import type { HookName } from "@/shared/hooks";
+import { FormField } from "@/web/components/shell/form-field";
+import { Hint } from "@/web/components/shell/hint";
 import { Button } from "@/web/components/ui/button";
 import { Input } from "@/web/components/ui/input";
 import { useHookChoices, useHookSection } from "@/web/hooks/hooks-info.hook";
@@ -75,13 +76,16 @@ export function SelectionRow({
         }}
       >
         {/* Visible "Search" leads the name; the place, hidden, tells the rows apart. */}
-        <Field.Root
-          className="flex flex-[1_1_16rem] flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground"
-          invalid={Boolean(error)}
+        <FormField
+          inline
+          className="flex-[1_1_16rem]"
+          label={
+            <>
+              Search<span className="sr-only"> for {label}</span>
+            </>
+          }
+          error={error}
         >
-          <Field.Label>
-            Search<span className="sr-only"> for {label}</span>
-          </Field.Label>
           <Input
             className="w-auto flex-1"
             placeholder="hand-picked notes only"
@@ -89,14 +93,8 @@ export function SelectionRow({
             disabled={!online}
             onChange={(e) => setQuery(e.target.value)}
           />
-          {error && (
-            <Field.Error match className="basis-full text-xs text-destructive">
-              {error}
-            </Field.Error>
-          )}
-        </Field.Root>
-        <Field.Root className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Field.Label>Limit</Field.Label>
+        </FormField>
+        <FormField inline label="Limit">
           <Input
             className="w-20"
             type="number"
@@ -106,7 +104,7 @@ export function SelectionRow({
             disabled={!online}
             onChange={(e) => setLimit(e.target.value)}
           />
-        </Field.Root>
+        </FormField>
         <Button type="submit" disabled={!online || busy || !dirty}>
           Save
         </Button>
@@ -133,15 +131,17 @@ export function SelectionRow({
               {picked.has(n.id) && (
                 <>
                   <span className="text-xs text-muted-foreground">hand-picked</span>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={`Stop hand-picking ${n.title}`}
-                    disabled={!online || busy}
-                    onClick={() => void act(() => choices.unpick(n.id, scope))}
-                  >
-                    <XIcon />
-                  </Button>
+                  <Hint label="Stop hand-picking" disabled={!online || busy}>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={`Stop hand-picking ${n.title}`}
+                      disabled={!online || busy}
+                      onClick={() => void act(() => choices.unpick(n.id, scope))}
+                    >
+                      <XIcon />
+                    </Button>
+                  </Hint>
                 </>
               )}
             </li>

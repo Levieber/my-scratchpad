@@ -1,6 +1,7 @@
 import { useState } from "react";
 
-import { Badge } from "@/web/components/ui/badge";
+import { MetaBadge } from "@/web/components/shell/meta-badge";
+import { Row } from "@/web/components/shell/row";
 import { Button } from "@/web/components/ui/button";
 import { historyError, loadRevision, useDiff, useRevisions } from "@/web/hooks/history.hook";
 import type { FullRevision } from "@/web/lib/api";
@@ -67,35 +68,35 @@ export function History({
   if (!revisions) return <p className={cn("flex-1", meta)}>Loading history…</p>;
 
   return (
-    // Revisions on the left, the selected change on the right; stacked on a narrow screen.
+    // Revisions on the left, the selected change on the right; stacked where the editor is narrow
+    // (a phone, or a wide screen with the list beside it), as wide as the editor's own column.
     <section
-      className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,30%)_1fr] gap-3 wide:grid-cols-[minmax(160px,220px)_minmax(0,1fr)] wide:grid-rows-none"
+      className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,30%)_1fr] gap-3 @xl/editor:grid-cols-[minmax(160px,220px)_minmax(0,1fr)] @xl/editor:grid-rows-none"
       aria-label="History"
     >
       <ol className="overflow-y-auto">
         {revisions.map((r, i) => (
           <li key={r.id}>
-            <button
-              className="block w-full rounded-card border border-transparent px-2.5 py-2 text-left hover:border-border hover:bg-card aria-current:border-border aria-current:bg-card"
+            <Row
+              render={(props) => <button type="button" {...props} />}
+              current={r.id === selected}
+              className="block w-full px-2.5 py-2 text-left"
               aria-current={r.id === selected}
               onClick={() => setChosen(r.id)}
             >
               <span className="block text-sm font-semibold">
                 {ago(r.updated_at)}
                 {i === 0 && (
-                  <Badge
-                    variant="outline"
-                    className="ml-1.5 h-4 px-1.5 text-[0.6875rem] text-muted-foreground"
-                  >
+                  <MetaBadge variant="outline" className="ml-1.5">
                     current
-                  </Badge>
+                  </MetaBadge>
                 )}
               </span>
               <span className={meta}>
                 {r.author} · <span className="text-success">+{r.added}</span>{" "}
                 <span className="text-destructive">−{r.removed}</span>
               </span>
-            </button>
+            </Row>
           </li>
         ))}
       </ol>
@@ -121,7 +122,7 @@ export function History({
             ))}
             {diff.diff ? (
               <figure
-                className="m-0 flex-1 overflow-auto rounded-lg border border-border bg-card py-2 font-mono text-[0.8125rem]"
+                className="m-0 flex-1 overflow-auto rounded-lg border border-border bg-card py-2 font-mono text-caption"
                 aria-label="Changes to the text"
               >
                 {diffRows(diff.diff).map((row, i) => (

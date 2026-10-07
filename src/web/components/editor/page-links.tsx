@@ -1,13 +1,10 @@
 import { ChevronRightIcon, PlusIcon } from "lucide-react";
 
-import { Button } from "@/web/components/ui/button";
+import { QuietButton, QuietLinkButton } from "@/web/components/shell/quiet";
 import { openNote } from "@/web/hooks/editor.hook";
 import { newNote } from "@/web/hooks/focus";
 import { useBacklinks, usePath, useSubpages } from "@/web/hooks/pages.hook";
 import type { Note } from "@/web/lib/api";
-
-const link =
-  "min-w-0 truncate rounded-sm hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-primary";
 
 /** The pages above the open note, from the top down; each opens. Nothing for a note at the top. */
 export function Breadcrumbs({ note }: { note: Note | null }) {
@@ -18,9 +15,9 @@ export function Breadcrumbs({ note }: { note: Note | null }) {
       <ol className="flex min-w-0 flex-wrap items-center gap-x-1">
         {path.map((page) => (
           <li key={page.id} className="flex min-w-0 items-center gap-x-1">
-            <button className={`${link} min-h-6 max-w-48`} onClick={() => void openNote(page.id)}>
+            <QuietLinkButton className="max-w-48" onClick={() => void openNote(page.id)}>
               {page.title}
-            </button>
+            </QuietLinkButton>
             <ChevronRightIcon className="size-3 flex-none" aria-hidden="true" />
           </li>
         ))}
@@ -36,23 +33,14 @@ export function Subpages({ note }: { note: Note }) {
     <nav aria-label="Subpages" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
       {subpages.length > 0 && <span className="text-muted-foreground">Subpages:</span>}
       {subpages.map((page) => (
-        <button
-          key={page.id}
-          className={`${link} min-h-6 max-w-56 text-muted-foreground`}
-          onClick={() => void openNote(page.id)}
-        >
+        <QuietLinkButton key={page.id} className="max-w-56" onClick={() => void openNote(page.id)}>
           {page.title}
-        </button>
+        </QuietLinkButton>
       ))}
-      <Button
-        variant="ghost"
-        size="xs"
-        className="font-normal text-muted-foreground"
-        onClick={() => newNote("", note.id)}
-      >
+      <QuietButton onClick={() => newNote("", note.id)}>
         <PlusIcon />
         Subpage
-      </Button>
+      </QuietButton>
     </nav>
   );
 }
@@ -65,13 +53,9 @@ export function LinkedFrom({ note }: { note: Note }) {
     <nav aria-label="Linked from" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
       <span className="text-muted-foreground">Linked from:</span>
       {linking.map((n) => (
-        <button
-          key={n.id}
-          className={`${link} min-h-6 max-w-56 text-muted-foreground`}
-          onClick={() => void openNote(n.id)}
-        >
+        <QuietLinkButton key={n.id} className="max-w-56" onClick={() => void openNote(n.id)}>
           {n.title}
-        </button>
+        </QuietLinkButton>
       ))}
     </nav>
   );

@@ -9,5 +9,5 @@ minimumReleaseAge = 86400 # 1 day in seconds
 root = "test"
 
 [serve.static]
-# Compiles Tailwind in the CSS of the PWA's HTML import (src/web/index.css), in dev and at startup.
-plugins = ["bun-plugin-tailwind"]
+# Compiles Tailwind (scripts/tailwind.ts) in the CSS of the PWA's HTML import (src/web/index.css), in dev and at startup.
+plugins = ["./scripts/tailwind.ts"]

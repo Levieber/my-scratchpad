@@ -36,6 +36,7 @@ API summary for agents: `GET /llms.txt`; full contract: `GET /openapi.json`.
 
 - [docs/self-hosting.md](docs/self-hosting.md) — run it on your machine, a server or Railway, and connect clients.
 - [docs/architecture.md](docs/architecture.md) — the API-first rule and how it's enforced, routes, error codes, migrations, tooling.
+- [docs/design-system.md](docs/design-system.md) — the PWA's tokens, components and patterns: colors and the theme, radius and type scales, focus, scrollbars, chips, long lists, limits.
 - [docs/deployment.md](docs/deployment.md) — configuration, running, Railway (IaC + Railpack).
 - [docs/export-format.md](docs/export-format.md) — the export archive: its format, versions and what an import does with it.
 - [docs/effect.md](docs/effect.md) — why everything but the PWA is written with Effect, the decisions behind it, and what it cost.

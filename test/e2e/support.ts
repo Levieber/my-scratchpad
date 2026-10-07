@@ -53,7 +53,12 @@ export function useApp(): App {
 
   beforeAll(async () => {
     app.server = await testServer();
-    app.browser = await chromium.launch({ executablePath: chrome! });
+    // Scrollbars drawn, as a person sees them: headless Chrome hides them by default, and with
+    // them the gutters the layout keeps for them (test/e2e/scroll.test.ts).
+    app.browser = await chromium.launch({
+      executablePath: chrome!,
+      ignoreDefaultArgs: ["--hide-scrollbars"],
+    });
   }, 30_000);
   afterAll(async () => {
     await Promise.all(contexts.map((c) => c.close().catch(() => {})));
@@ -157,6 +162,28 @@ export async function eventually<T>(check: () => Promise<T> | T, timeout = 5_000
     }
   }
 }
+
+/** Every element scrolling vertically right now (the page itself included), as `tag[aria-label]` with its box and its scrollbar's width. */
+export const scrollers = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("*")]
+      .filter((el) => {
+        if (el.scrollHeight <= el.clientHeight + 1) return false;
+        return (
+          el === document.scrollingElement || /auto|scroll/.test(getComputedStyle(el).overflowY)
+        );
+      })
+      .map((el) => {
+        const { left, right } = el.getBoundingClientRect();
+        const label = el.getAttribute("aria-label");
+        return {
+          name: `${el.tagName.toLowerCase()}${label ? `[${label}]` : ""}`,
+          left: Math.round(left),
+          right: Math.round(right),
+          scrollbar: el.offsetWidth - el.clientWidth,
+        };
+      }),
+  );
 
 // What a pointer or a finger aims at. An inline link in a sentence would be exempt (WCAG 2.5.8);
 // the app has none.

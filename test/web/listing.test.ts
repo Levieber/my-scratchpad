@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
 
 import type { Note } from "@/shared/domain";
-import { cardBody, groupNotes, preview, tableValue, toggled, visibleTags } from "@/web/lib/listing";
+import {
+  cardBody,
+  groupNotes,
+  matchTags,
+  preview,
+  tableValue,
+  toggled,
+  visibleFirst,
+} from "@/web/lib/listing";
 
 const note = (patch: Partial<Note>): Note => ({
   id: "x",
@@ -90,15 +98,41 @@ describe("groupNotes", () => {
   });
 });
 
-describe("visibleTags", () => {
+describe("visibleFirst", () => {
   const tags = ["a", "b", "c", "d"].map((tag, i) => ({ tag, count: 10 - i }));
+  const among = (chosen: string[]) => (t: { tag: string }) => chosen.includes(t.tag);
 
-  test("shows the most used tags up to the limit", () => {
-    expect(visibleTags(tags, [], 2).map((t) => t.tag)).toEqual(["a", "b"]);
+  test("shows the first items up to the limit", () => {
+    expect(visibleFirst(tags, 2, among([])).map((t) => t.tag)).toEqual(["a", "b"]);
   });
 
-  test("always shows the selected tags", () => {
-    expect(visibleTags(tags, ["d", "a"], 2).map((t) => t.tag)).toEqual(["a", "b", "d"]);
+  test("always shows the selected ones, in their order", () => {
+    expect(visibleFirst(tags, 2, among(["d", "a"])).map((t) => t.tag)).toEqual(["a", "b", "d"]);
+  });
+});
+
+describe("matchTags", () => {
+  // The API's order: most used first.
+  const tags = ["todo", "photography", "go", "cargo", "Golang"].map((tag, i) => ({
+    tag,
+    count: 10 - i,
+  }));
+  const names = (text: string) => matchTags(tags, text).map((t) => t.tag);
+
+  test("all of them for no text", () => {
+    expect(names("  ")).toEqual(["todo", "photography", "go", "cargo", "Golang"]);
+  });
+
+  test("those holding the text, whatever its case, starting with it first", () => {
+    expect(names("GO")).toEqual(["go", "Golang", "cargo"]);
+  });
+
+  test("a leading # is the tag's mark, not part of the text", () => {
+    expect(names("#to")).toEqual(["todo", "photography"]);
+  });
+
+  test("none when nothing holds it", () => {
+    expect(names("zzz")).toEqual([]);
   });
 });
 

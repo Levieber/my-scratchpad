@@ -2,10 +2,10 @@ import { lazy, Suspense } from "react";
 
 import { NoteMenu } from "@/web/components/notes/note-menu";
 import { NoteMeta } from "@/web/components/notes/note-meta";
+import { ClickableCard, CoverButton } from "@/web/components/shell/clickable-card";
 import { openNote } from "@/web/hooks/editor.hook";
 import type { Note } from "@/web/lib/api";
 import { cardBody, preview } from "@/web/lib/listing";
-import { cn } from "@/web/lib/utils";
 
 // The renderer's own chunk, the one the Read view loads; the plain preview shows until it has.
 const NoteMarkdown = lazy(() =>
@@ -26,22 +26,11 @@ export function NoteCard({
 }) {
   const body = cardBody(n);
   return (
-    <li
-      className={cn(
-        "group/row relative flex min-h-36 flex-col rounded-card border border-border bg-card p-3 hover:border-primary/50",
-        current && "border-primary",
-      )}
-    >
+    <ClickableCard render={<li />} current={current} className="min-h-36 p-3">
       <div className="flex items-start gap-1">
-        {/* The title's button covers the card (its ::after), so the whole card opens the note
-            and the card is still one button for the keyboard and screen readers. */}
-        <button
-          className="min-w-0 flex-1 text-left font-semibold wrap-anywhere after:absolute after:inset-0 after:rounded-card focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-primary"
-          aria-current={current}
-          onClick={() => void openNote(n.id)}
-        >
+        <CoverButton aria-current={current} onClick={() => void openNote(n.id)}>
           <span className="line-clamp-2">{n.title}</span>
-        </button>
+        </CoverButton>
         <NoteMenu note={n} className="relative z-10 -mt-1.5 -mr-1.5" />
       </div>
       {body && (
@@ -49,7 +38,7 @@ export function NoteCard({
         // a click anywhere opens the note.
         <div
           inert
-          className="pointer-events-none mt-1 max-h-40 overflow-hidden text-[0.8125rem] text-muted-foreground mask-b-from-70% [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-sm"
+          className="pointer-events-none mt-1 max-h-40 overflow-hidden text-caption text-muted-foreground mask-b-from-70% [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-sm"
         >
           <Suspense fallback={<p className="wrap-anywhere">{preview(n)}</p>}>
             <NoteMarkdown body={body} />
@@ -57,6 +46,6 @@ export function NoteCard({
         </div>
       )}
       <NoteMeta note={n} inPinned={inPinned} kind={kind} className="mt-auto pt-2" />
-    </li>
+    </ClickableCard>
   );
 }

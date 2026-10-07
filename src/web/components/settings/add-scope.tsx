@@ -1,14 +1,12 @@
-import { Field } from "@base-ui/react/field";
 import { useState } from "react";
 
 import { type HookName, normalizeScope } from "@/shared/hooks";
+import { FormField } from "@/web/components/shell/form-field";
 import { Button } from "@/web/components/ui/button";
 import { Input } from "@/web/components/ui/input";
 import { useHookChoices } from "@/web/hooks/hooks-info.hook";
 import { useOnline } from "@/web/hooks/online.hook";
 import { refusal } from "@/web/lib/failures";
-
-const addField = "flex flex-[1_1_12rem] flex-col gap-1 text-xs text-muted-foreground";
 
 /** A choice for one more place: a repository, a folder in it, or a folder outside any. */
 export function AddScope({ hook }: { hook: HookName }) {
@@ -39,8 +37,7 @@ export function AddScope({ hook }: { hook: HookName }) {
         }
       }}
     >
-      <Field.Root className={addField} invalid={Boolean(error)}>
-        <Field.Label>Repository or folder</Field.Label>
+      <FormField className="flex-[1_1_12rem]" label="Repository or folder" error={error}>
         <Input
           placeholder="my-repo, my-repo/folder, ~/work or /absolute/folder"
           value={scope}
@@ -50,21 +47,15 @@ export function AddScope({ hook }: { hook: HookName }) {
             setScope(e.target.value);
           }}
         />
-        {error && (
-          <Field.Error match className="text-xs text-destructive">
-            {error}
-          </Field.Error>
-        )}
-      </Field.Root>
-      <Field.Root className={addField}>
-        <Field.Label>Search</Field.Label>
+      </FormField>
+      <FormField className="flex-[1_1_12rem]" label="Search">
         <Input
           placeholder="e.g. #my-repo"
           value={query}
           disabled={!online}
           onChange={(e) => setQuery(e.target.value)}
         />
-      </Field.Root>
+      </FormField>
       <Button type="submit" variant="outline" disabled={!online || !scope.trim()}>
         Add
       </Button>

@@ -1,6 +1,7 @@
-/* The PWA's only stylesheet. Components style themselves with Tailwind utilities; this file holds
-   what they share: the palette, the breakpoint, and the few rules that are about elements rather
-   than components. */
+/* The PWA's only stylesheet, and the design system's tokens (docs/design-system.md). Components
+   style themselves with Tailwind utilities; this file holds what they share: the palette, the
+   radius and type scales, the breakpoint, the focus ring, and the few rules that are about
+   elements rather than components. */
 
 /* Only the PWA's sources: a full scan would also read repos/, thousands of vendored files. */
 @import "tailwindcss" source(none);
@@ -23,11 +24,15 @@
   --secondary-foreground: #c2410c;
   --destructive: #b91c1c;
   --success: #16a34a;
-  --radius: 10px;
+  /* A scrollbar's thumb: seen when looked for, quieter than a border on a card. */
+  --scrollbar: #cfcbc3;
+  --radius: 0.625rem;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
+/* Dark: chosen in the theme switcher (`data-theme` on <html>, lib/theme.ts), or the device's
+   setting while the choice is System. Written once, through the `dark` variant below. */
+:root {
+  @variant dark {
     --background: #1a1a19;
     --card: #222220;
     --popover: #262624;
@@ -41,6 +46,7 @@
     --secondary: #3a2a1f;
     --secondary-foreground: #fb923c;
     --destructive: #f87171;
+    --scrollbar: #4d4b46;
     color-scheme: dark;
   }
 }
@@ -64,12 +70,26 @@
   --color-destructive: var(--destructive);
   --color-success: var(--success);
   --color-ring: var(--primary);
+  --color-scrollbar: var(--scrollbar);
+  /* One radius, scaled: sm for small marks inside text (inline code, a checkbox), md for controls
+     (buttons, fields, toggles, menu items), lg for surfaces (rows, cards, panels, popovers), xl
+     for dialogs. Chips and pills are rounded-full. shadcn's components read these names. */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: calc(var(--radius) * 1);
+  --radius-xl: calc(var(--radius) * 1.4);
 }
 
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-  --radius-card: 10px;
+  /* The type scale is Tailwind's (xs 12, sm 14, base 16 px; the body is 15), plus three roles
+     it has no step for: a page's title, the secondary line under a note's title (previews,
+     filters, toolbars), and the small labels above a section or inside a badge. */
+  --text-title: 1.0625rem;
+  --text-title--letter-spacing: -0.01em;
+  --text-caption: 0.8125rem;
+  --text-label: 0.6875rem;
   /* Where the list and the editor sit side by side (`wide:`); below it, one at a time. */
   --breakpoint-wide: 721px;
   /* Small text keeps the page's line height, as it did before Tailwind: Tailwind's own, tighter
@@ -79,14 +99,75 @@
   --text-base--line-height: 1.5;
   --text-lg--line-height: 1.5;
   --text-xl--line-height: 1.5;
+  --text-title--line-height: 1.5;
+  --text-caption--line-height: 1.5;
+  --text-label--line-height: 1.5;
+}
+
+/* Tailwind's `dark:` (shadcn's components use it) and the dark palette follow the theme chosen
+   on this device, and the device's own setting while that is System (no data-theme). */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
 }
 
 /* Where hovering is certain: a wide screen with a mouse. Anything that waits for a hover hides
    behind it, so a phone (or a narrow window, or a phone that claims to hover) always shows it. */
 @custom-variant desktop-mouse (@media (hover: hover) and (pointer: fine) and (min-width: 721px));
 
+/* The focus ring every control shows, shadcn's (a 3 px halo of the ring color), for the controls
+   made here. `-inset` draws it inside the edge, for a row flush with a scrolling list, whose edge
+   would clip a halo; `-cover` draws it on the ::after that stretches a button over its card. */
+@utility focus-ring {
+  @apply outline-none focus-visible:ring-3 focus-visible:ring-ring/50;
+}
+@utility focus-ring-inset {
+  @apply outline-none focus-visible:inset-ring-3 focus-visible:inset-ring-ring/50;
+}
+@utility focus-ring-cover {
+  @apply outline-none focus-visible:after:inset-ring-3 focus-visible:after:inset-ring-ring/50;
+}
+
+/* A screen's content column: as wide as `--column` allows (none beside a note), centred, with
+   `--gutter` at either side. */
+@utility content-column {
+  margin-inline: auto;
+  width: 100%;
+  max-width: var(--column, none);
+  padding-inline: var(--gutter, 0);
+}
+
+/* A content column that scrolls: its scrollbar sits at the column's own edge, beside what it
+   scrolls, rather than at the window's. The gutter is kept even while nothing overflows, so the
+   contents don't shift when a list grows past the screen. Positioned, so what is placed absolutely
+   inside it (an `sr-only` label, say) scrolls with it rather than stretching the page. */
+@utility scroll-column {
+  @apply content-column relative overflow-y-auto scrollbar-gutter-stable;
+}
+
+/* A column above or below a scroll-column (the search, the footer): it keeps the same gutter, so
+   their edges line up. Only a scroll container keeps one, hence overflow-hidden, and with it the
+   column no longer shrinks below its contents in a flex column (min-height: auto is 0 there), so
+   it is flex-none too. */
+@utility aligned-column {
+  @apply content-column flex-none overflow-hidden scrollbar-gutter-stable;
+}
+
 @layer base {
+  /* Thin, and in the palette's colors: the platform's default bar (arrows and a white track on
+     Linux and Windows) is the loudest thing on a quiet page. Neither is inherited: every element. */
+  * {
+    @apply scrollbar-thin scrollbar-thumb-scrollbar scrollbar-track-transparent;
+  }
   html {
+    /* Every control shows its own pressed and focused state; the phone's grey flash adds nothing. */
+    -webkit-tap-highlight-color: transparent;
     /* iOS enlarges text on its own when the phone turns to landscape; the layout sets the sizes. */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;

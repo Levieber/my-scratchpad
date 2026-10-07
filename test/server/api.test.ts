@@ -346,22 +346,33 @@ describe("notes API", () => {
     );
   });
 
-  test("pins: at most three, in the order pinned, without touching the note", async () => {
+  test("pins: at most eight, in the order pinned, without touching the note", async () => {
     const ids: string[] = [];
-    for (const body of ["a", "b", "c", "d"])
+    for (const body of ["a", "b", "c", "d", "e", "f", "g", "h", "i"])
       ids.push((await call("POST", "/api/notes", { body })).data.id);
-    const [a, b, c, d] = ids as [string, string, string, string];
+    const [a, b, c, d, e, f, g, h, i] = ids as [
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+    ];
     const before = (await call("GET", `/api/notes/${b}`)).data;
 
-    for (const id of [b, a, c]) expect((await call("PUT", `/api/pins/${id}`)).status).toBe(204);
+    for (const id of [b, a, c, d, e, f, g, h])
+      expect((await call("PUT", `/api/pins/${id}`)).status).toBe(204);
     // Already pinned: no change, and no limit hit.
     expect((await call("PUT", `/api/pins/${a}`)).status).toBe(204);
     const pinned = async () => ((await call("GET", "/api/pins")).data as Note[]).map((n) => n.body);
-    expect(await pinned()).toEqual(["b", "a", "c"]);
+    expect(await pinned()).toEqual(["b", "a", "c", "d", "e", "f", "g", "h"]);
     expect((await call("GET", `/api/notes/${b}`)).data).toEqual(before);
     expect((await call("GET", `/api/notes/${b}/revisions`)).data).toHaveLength(1);
 
-    const refused = await call("PUT", `/api/pins/${d}`);
+    const refused = await call("PUT", `/api/pins/${i}`);
     expect([refused.status, refused.data.error]).toEqual([409, "pinLimit"]);
     for (const method of ["PUT", "DELETE"]) {
       const res = await call(method, "/api/pins/nope");
@@ -370,10 +381,10 @@ describe("notes API", () => {
 
     expect((await call("DELETE", `/api/pins/${a}`)).status).toBe(204);
     expect((await call("DELETE", `/api/pins/${a}`)).status).toBe(204);
-    expect((await call("PUT", `/api/pins/${d}`)).status).toBe(204);
+    expect((await call("PUT", `/api/pins/${i}`)).status).toBe(204);
     // A deleted note leaves its pin behind with it.
     await call("DELETE", `/api/notes/${c}`);
-    expect(await pinned()).toEqual(["b", "d"]);
+    expect(await pinned()).toEqual(["b", "d", "e", "f", "g", "h", "i"]);
   });
 
   test("patch, append, delete", async () => {

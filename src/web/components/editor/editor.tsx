@@ -31,7 +31,7 @@ export function Editor({
   const { draft, current, showHistory, saveState, saveError, mode, external } = useEditor();
   useLiveOpenNote();
   return (
-    <main className="flex min-h-0 flex-col gap-2.5 px-5 py-3.5 max-wide:px-4 max-wide:py-3">
+    <main className="@container/editor flex min-h-0 flex-col gap-2.5 px-5 py-3.5 max-wide:px-4 max-wide:py-3">
       <Breadcrumbs note={current} />
       <EditorToolbar listHidden={listHidden} onToggleList={onToggleList} />
       {showHistory && current ? (
@@ -61,7 +61,7 @@ export function Editor({
               <TabsTrigger value="write">Write</TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value={mode} className="flex min-h-0 flex-col gap-1.5">
+          <TabsContent value={mode} className="flex min-h-0 flex-col gap-1.5 rounded-md focus-ring">
             <NoteEditor mode={mode} value={draft.body} onChange={setBody} external={external} />
           </TabsContent>
         </Tabs>

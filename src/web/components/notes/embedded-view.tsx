@@ -3,7 +3,8 @@ import { shownLayout } from "@/shared/layouts";
 import { sameTitle } from "@/shared/links";
 import { NoteCard } from "@/web/components/notes/note-card";
 import { NoteRow } from "@/web/components/notes/note-row";
-import { Button } from "@/web/components/ui/button";
+import { ListMessage } from "@/web/components/shell/list-message";
+import { QuietButton } from "@/web/components/shell/quiet";
 import { useEditor } from "@/web/hooks/editor.hook";
 import { useNotes, useViews } from "@/web/hooks/notes.hook";
 import { useSearch } from "@/web/hooks/search.hook";
@@ -24,10 +25,10 @@ export function EmbeddedView({ embed }: { embed: Embed }) {
   return (
     <section
       aria-label={`Embedded view: ${label}`}
-      className="my-3 rounded-card border border-border p-2 text-base/normal"
+      className="my-3 rounded-lg border border-border p-2 text-base/normal"
     >
       {query === undefined ? (
-        <p className="p-1 text-xs text-muted-foreground">No saved view is named “{embed.view}”.</p>
+        <ListMessage className="p-1">No saved view is named “{embed.view}”.</ListMessage>
       ) : (
         <Shown
           query={query}
@@ -62,10 +63,7 @@ function Shown({
         <h3 className="min-w-0 flex-1 truncate text-xs font-semibold text-muted-foreground">
           {label}
         </h3>
-        <Button
-          variant="ghost"
-          size="xs"
-          className="font-normal text-muted-foreground"
+        <QuietButton
           onClick={() => {
             filter(query);
             // A phone shows the note or the list: the search is in the list.
@@ -73,10 +71,10 @@ function Shown({
           }}
         >
           Open as search
-        </Button>
+        </QuietButton>
       </header>
       {notes.length === 0 ? (
-        <p className="p-1 text-xs text-muted-foreground">No notes match.</p>
+        <ListMessage className="p-1">No notes match.</ListMessage>
       ) : (
         <ul
           className={cn(

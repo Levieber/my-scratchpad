@@ -4,12 +4,18 @@ import { useEffect, useRef } from "react";
 import { isHookName } from "@/shared/hooks";
 import { DataSection } from "@/web/components/settings/data-section";
 import { HookCard } from "@/web/components/settings/hook-card";
+import { SettingsSection } from "@/web/components/settings/settings-section";
+import { Hint } from "@/web/components/shell/hint";
+import { ThemeSwitcher } from "@/web/components/shell/theme-switcher";
 import { Button } from "@/web/components/ui/button";
 import { useHooksInfo } from "@/web/hooks/hooks-info.hook";
 import { useOnline } from "@/web/hooks/online.hook";
 import { go } from "@/web/hooks/route.hook";
 
-/** The settings page: which notes the agent hooks show, and taking the notes out or in. */
+/**
+ * The settings page: which notes the agent hooks show, this device's theme, and taking the notes
+ * out or in.
+ */
 export function Settings() {
   const { info, supported } = useHooksInfo();
   const online = useOnline();
@@ -26,35 +32,40 @@ export function Settings() {
   }, []);
 
   return (
-    <main className="mx-auto flex min-h-0 w-full max-w-205 flex-col gap-4 overflow-y-auto px-5 py-3.5 max-wide:px-4 max-wide:py-3">
+    // One scroll area, the page's column, its scrollbar at the column's edge as the list's is.
+    <main className="flex scroll-column flex-col gap-4 py-3.5 [--column:820px] [--gutter:1.25rem] max-wide:py-3 max-wide:[--gutter:1rem]">
       <header className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" aria-label="Back to notes" onClick={() => go("notes")}>
-          <ArrowLeftIcon />
-        </Button>
-        <h1
-          ref={headingRef}
-          tabIndex={-1}
-          className="flex-1 text-[1.0625rem] font-bold tracking-[-0.01em] outline-none"
-        >
+        <Hint label="Back to notes">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Back to notes"
+            onClick={() => go("notes")}
+          >
+            <ArrowLeftIcon />
+          </Button>
+        </Hint>
+        <h1 ref={headingRef} tabIndex={-1} className="flex-1 text-title font-bold outline-none">
           Settings
         </h1>
       </header>
 
-      <section aria-labelledby="agents-heading" className="flex flex-col gap-3">
-        <h2 id="agents-heading" className="font-semibold">
-          Agents
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Which notes the agent hooks put in front of Claude Code: titles when a session starts, and
-          references to check edits against at the end of a turn. A choice for a repository (named
-          by its git remote) or a folder adds to the one for everywhere, there only. Hand-picked
-          notes come first and are never cut.
-        </p>
-        {!online && (
-          <output className="text-sm text-destructive">
-            Offline: shown as last loaded. Changes need the server.
-          </output>
-        )}
+      <SettingsSection
+        id="appearance"
+        title="Appearance"
+        description="Theme on this device: its own setting, or always light or dark."
+      >
+        <ThemeSwitcher className="self-start" />
+      </SettingsSection>
+
+      <DataSection />
+
+      <SettingsSection
+        id="agents"
+        title="Agents"
+        description="Which notes the agent hooks put in front of Claude Code: titles when a session starts, and references to check edits against at the end of a turn. A choice for a repository (named by its git remote) or a folder adds to the one for everywhere, there only. Hand-picked notes come first and are never cut."
+        unavailable={!online && "Offline: shown as last loaded. Changes need the server."}
+      >
         {!supported ? (
           <p className="text-sm">This server keeps no hook choices yet: update it.</p>
         ) : !info ? (
@@ -66,9 +77,7 @@ export function Settings() {
               isHookName(h.name) && <HookCard key={h.name} hook={h} name={h.name} />,
           )
         )}
-      </section>
-
-      <DataSection />
+      </SettingsSection>
     </main>
   );
 }

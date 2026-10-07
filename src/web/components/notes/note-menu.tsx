@@ -8,6 +8,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 
+import { Button } from "@/web/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -70,13 +71,19 @@ export function NoteMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className={cn(
-          "grid size-9 flex-none place-items-center rounded-lg text-muted-foreground [-webkit-tap-highlight-color:transparent] hover:bg-accent hover:text-foreground data-popup-open:bg-accent data-popup-open:text-foreground desktop-mouse:size-7 desktop-mouse:opacity-0 desktop-mouse:group-hover/row:opacity-100 desktop-mouse:focus-visible:opacity-100 desktop-mouse:data-popup-open:opacity-100",
-          className,
-        )}
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "text-muted-foreground desktop-mouse:size-7 desktop-mouse:opacity-0 desktop-mouse:group-hover/row:opacity-100 desktop-mouse:focus-visible:opacity-100 desktop-mouse:data-popup-open:opacity-100",
+              className,
+            )}
+          />
+        }
         aria-label={`Options for "${n.title}"`}
       >
-        <EllipsisIcon className="size-4" />
+        <EllipsisIcon />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-auto min-w-44">
         <DropdownMenuItem disabled={pin.disabled} onClick={() => togglePin(n)}>

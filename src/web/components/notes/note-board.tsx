@@ -3,6 +3,7 @@ import { useState } from "react";
 import { BoardCard, DRAGGED } from "@/web/components/notes/board-card";
 import { GroupByPicker } from "@/web/components/notes/group-by";
 import { ListEnd } from "@/web/components/notes/list-end";
+import { SectionLabel } from "@/web/components/shell/section-label";
 import type { Listed } from "@/web/hooks/listed.hook";
 import { useViewOption } from "@/web/hooks/view-option.hook";
 import type { Note } from "@/web/lib/api";
@@ -50,7 +51,7 @@ export function NoteBoard({ listed }: { listed: Listed }) {
             key={c.key}
             aria-label={c.label}
             className={cn(
-              "flex min-w-0 flex-col rounded-card border border-transparent bg-muted/50 p-2",
+              "flex min-w-0 flex-col rounded-lg border border-transparent bg-muted/50 p-2",
               over === c.key && "border-primary",
             )}
             onDragOver={(e) => {
@@ -69,10 +70,10 @@ export function NoteBoard({ listed }: { listed: Listed }) {
               if (note && columnOf(columns, id) !== c) move(note, c);
             }}
           >
-            <h2 className="mx-1 mb-2 flex items-baseline gap-1.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+            <SectionLabel className="mx-1 mb-2 flex items-baseline gap-1.5">
               <span className="min-w-0 wrap-anywhere">{c.label}</span>
               <span className="font-normal">{c.notes.length}</span>
-            </h2>
+            </SectionLabel>
             <ul className="flex flex-col gap-2">
               {c.notes.map((n) => (
                 <BoardCard

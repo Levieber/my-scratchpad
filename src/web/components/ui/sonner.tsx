@@ -10,7 +10,7 @@ import {
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  // The app follows the system's light or dark mode (index.css); so do the toasts.
+  // The system theme unless the app passes the one chosen on this device (app.tsx, lib/theme.ts).
   return (
     <Sonner
       theme="system"

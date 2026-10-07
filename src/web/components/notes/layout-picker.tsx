@@ -45,11 +45,7 @@ export function LayoutPicker() {
         const Icon = ICONS[key];
         return (
           <Hint key={key} label={label}>
-            <ToggleGroupItem
-              value={key}
-              aria-label={label}
-              className="h-9 px-2.5 text-muted-foreground aria-pressed:bg-accent aria-pressed:text-foreground"
-            >
+            <ToggleGroupItem value={key} aria-label={label} className="h-9 px-2.5">
               <Icon />
             </ToggleGroupItem>
           </Hint>

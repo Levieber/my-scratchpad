@@ -2,6 +2,7 @@ import { Field } from "@base-ui/react/field";
 import { useRef, useState } from "react";
 
 import type { ImportResult } from "@/shared/archive";
+import { SettingsSection } from "@/web/components/settings/settings-section";
 import { Button } from "@/web/components/ui/button";
 import { Checkbox } from "@/web/components/ui/checkbox";
 import { useOnline } from "@/web/hooks/online.hook";
@@ -42,18 +43,12 @@ export function DataSection() {
   };
 
   return (
-    <section aria-labelledby="data-heading" className="flex flex-col gap-3">
-      <h2 id="data-heading" className="font-semibold">
-        Data
-      </h2>
-      <p className="text-sm text-muted-foreground">
-        Your notes are yours. Export them all, with their history, saved searches and pins, to keep
-        a backup or to move to another server; importing a file adds what it has and never changes a
-        note that is already here.
-      </p>
-      {!online && (
-        <output className="text-sm text-destructive">Export and import need the server.</output>
-      )}
+    <SettingsSection
+      id="data"
+      title="Data"
+      description="Your notes are yours. Export them all, with their history, saved searches and pins, to keep a backup or to move to another server; importing a file adds what it has and never changes a note that is already here."
+      unavailable={!online && "Export and import need the server."}
+    >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Button
           variant="outline"
@@ -100,7 +95,7 @@ export function DataSection() {
         </p>
       )}
       {outcome && "result" in outcome && <ImportOutcome result={outcome.result} />}
-    </section>
+    </SettingsSection>
   );
 }
 

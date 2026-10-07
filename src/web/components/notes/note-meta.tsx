@@ -1,6 +1,6 @@
 import { BotIcon, PinIcon } from "lucide-react";
 
-import { Badge } from "@/web/components/ui/badge";
+import { MetaBadge } from "@/web/components/shell/meta-badge";
 import { useHookPicks } from "@/web/hooks/hooks-info.hook";
 import { usePinOf } from "@/web/hooks/pins.hook";
 import type { Note } from "@/web/lib/api";
@@ -69,17 +69,14 @@ export function NoteMeta({
       <NoteMarks note={n} inPinned={inPinned} />
       {ago(n.updated_at)}
       {n.kind === "reference" && kind !== "reference" && (
-        <Badge
-          variant="outline"
-          className="ml-1.5 h-4 px-1.5 text-[0.6875rem] text-muted-foreground"
-        >
+        <MetaBadge variant="outline" className="ml-1.5">
           reference
-        </Badge>
+        </MetaBadge>
       )}
       {n.author !== "human" && (
-        <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[0.6875rem]">
+        <MetaBadge variant="secondary" className="ml-1.5">
           {n.author}
-        </Badge>
+        </MetaBadge>
       )}
       {tags.length > 0 && <span> · #{tags.join(" #")}</span>}
     </span>

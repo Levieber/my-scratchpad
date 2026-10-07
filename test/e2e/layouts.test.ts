@@ -131,7 +131,7 @@ describeE2E("layouts", () => {
     await app.api.create({ title: "Columns kept", body: "x", tags: ["colskept", "urgent"] });
     const page = await app.open(1280, "/?q=%23colskept&layout=board");
     await shownAs(page, "board");
-    await page.getByRole("button", { name: "Columns:" }).click();
+    await page.locator("button[aria-haspopup]", { hasText: /^Columns/ }).click();
     await page.getByRole("button", { name: "Tags", exact: true }).click();
     await page.getByLabel("A column per tag, in order").fill("urgent, later");
     await page.getByRole("button", { name: "Show" }).click();

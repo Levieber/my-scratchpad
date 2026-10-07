@@ -23,7 +23,7 @@ describeE2E("edits are never lost", () => {
     const context = await app.context();
     const page = await context.newPage();
     await page.goto("/");
-    await page.getByRole("button", { name: "+ New" }).click();
+    await page.getByRole("button", { name: "New", exact: true }).click();
 
     await context.setOffline(true);
     await page.getByPlaceholder(BODY).fill("offline thoughts");
@@ -39,7 +39,7 @@ describeE2E("edits are never lost", () => {
     const context = await app.context();
     const page = await context.newPage();
     await page.goto("/");
-    await page.getByRole("button", { name: "+ New" }).click();
+    await page.getByRole("button", { name: "New", exact: true }).click();
     // Closed straight away: the 600 ms autosave never runs, only beforeunload does.
     await page.getByPlaceholder(BODY).fill("typed then closed");
     await page.close({ runBeforeUnload: true });

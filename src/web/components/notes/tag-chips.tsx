@@ -1,22 +1,22 @@
-import { useState } from "react";
-
-import { parseQuery, toggleToken } from "@/shared/query";
-import { Button } from "@/web/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/web/components/ui/toggle-group";
+import { TagPicker } from "@/web/components/notes/tag-picker";
+import { ChipToggle } from "@/web/components/shell/chip";
+import { ToggleGroup } from "@/web/components/ui/toggle-group";
 import { useTags } from "@/web/hooks/notes.hook";
-import { useSearch } from "@/web/hooks/search.hook";
-import { toggled, visibleTags } from "@/web/lib/listing";
+import { useTagFilter } from "@/web/hooks/tag-filter.hook";
+import { useWide } from "@/web/hooks/wide.hook";
+import { visibleFirst } from "@/web/lib/listing";
 
-const TAG_LIMIT = 8;
-
-/** The tags as toggles that add or remove `#tag` in the search, so several tags combine. */
-export function TagChips() {
+/**
+ * The most used tags as chips, and the selected ones wherever they rank; every tag is one search
+ * away in the picker. A phone, or the column beside a note (`narrow`), shows fewer, so the list
+ * keeps the screen.
+ */
+export function TagChips({ narrow }: { narrow: boolean }) {
   const tags = useTags();
-  const { q, filter } = useSearch();
-  const [all, setAll] = useState(false);
+  const { selected, onValueChange } = useTagFilter();
+  const limit = useWide() && !narrow ? 8 : 4;
   if (tags.length === 0) return null;
-  const selected = parseQuery(q).tags;
-  const shown = all ? tags : visibleTags(tags, selected, TAG_LIMIT);
+  const shown = visibleFirst(tags, limit, (t) => selected.includes(t.tag));
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <ToggleGroup
@@ -25,33 +25,16 @@ export function TagChips() {
         spacing={1.5}
         className="flex-wrap"
         value={selected}
-        onValueChange={(next) => {
-          const tag = toggled(selected, next);
-          if (tag) filter(toggleToken(q, `#${tag}`));
-        }}
+        onValueChange={onValueChange}
       >
         {shown.map((t) => (
-          <ToggleGroupItem
-            key={t.tag}
-            value={t.tag}
-            variant="outline"
-            className="h-6 min-w-6 rounded-full px-2 text-xs text-muted-foreground aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:text-foreground"
-          >
-            #{t.tag} {t.count}
-          </ToggleGroupItem>
+          <ChipToggle key={t.tag} value={t.tag}>
+            #{t.tag}
+            <span className="text-muted-foreground tabular-nums">{t.count}</span>
+          </ChipToggle>
         ))}
       </ToggleGroup>
-      {tags.length > TAG_LIMIT && (
-        <Button
-          variant="outline"
-          size="xs"
-          className="border-dashed text-muted-foreground"
-          aria-expanded={all}
-          onClick={() => setAll(!all)}
-        >
-          {all ? "Fewer tags" : `+${tags.length - shown.length} more`}
-        </Button>
-      )}
+      {tags.length > shown.length && <TagPicker />}
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { useSearch } from "@/web/hooks/search.hook";
  */
 export function useListed() {
   const { q, asked, limit, loadMore } = useSearch();
-  const { notes, canLoadMore } = useNotes(asked, limit);
+  const { notes, canLoadMore, loading } = useNotes(asked, limit);
   const pinned = usePins();
   const currentId = useEditor().current?.id;
   const searching = q !== "";
@@ -21,6 +21,8 @@ export function useListed() {
     searching,
     canLoadMore,
     loadMore,
+    /** A new search, or the next page of this one, is on its way. */
+    loading,
     currentId,
     /** The kind filter in force, so it isn't repeated on every note. */
     kind: operatorValue(q, "kind"),

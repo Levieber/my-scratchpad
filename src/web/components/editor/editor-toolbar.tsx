@@ -3,10 +3,10 @@ import {
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
   PinIcon,
-  PinOffIcon,
   Trash2Icon,
 } from "lucide-react";
 
+import { DisclosureButton } from "@/web/components/shell/disclosure-button";
 import { Hint } from "@/web/components/shell/hint";
 import { Button } from "@/web/components/ui/button";
 import { Input } from "@/web/components/ui/input";
@@ -34,19 +34,21 @@ export function EditorToolbar({
 
   return (
     <header className="flex flex-wrap items-center gap-1">
-      <Button variant="ghost" size="icon" aria-label="Back to list" onClick={session.close}>
-        <ArrowLeftIcon />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="max-wide:hidden"
-        aria-label={listHidden ? "Show note list" : "Hide note list"}
-        aria-expanded={!listHidden}
-        onClick={onToggleList}
-      >
-        {listHidden ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
-      </Button>
+      <Hint label="Back to list">
+        <Button variant="ghost" size="icon" aria-label="Back to list" onClick={session.close}>
+          <ArrowLeftIcon />
+        </Button>
+      </Hint>
+      <Hint label={listHidden ? "Show note list" : "Hide note list"}>
+        <DisclosureButton
+          className="max-wide:hidden"
+          aria-label={listHidden ? "Show note list" : "Hide note list"}
+          aria-expanded={!listHidden}
+          onClick={onToggleList}
+        >
+          {listHidden ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
+        </DisclosureButton>
+      </Hint>
       <Input
         className="h-auto flex-[1_1_8rem] border-transparent bg-transparent pl-1 text-xl font-bold shadow-none dark:bg-transparent"
         aria-label="Title"
@@ -56,7 +58,7 @@ export function EditorToolbar({
       />
       <Hint label="Reference: reusable rules to check work against (practices, checklists)">
         <Toggle
-          className="text-[0.8125rem] text-muted-foreground aria-pressed:bg-accent aria-pressed:text-primary"
+          className="text-caption"
           pressed={draft.kind === "reference"}
           onPressedChange={(on) => session.edit({ kind: on ? "reference" : "note" })}
         >
@@ -65,13 +67,13 @@ export function EditorToolbar({
       </Hint>
       <Hint label={pin.hint} disabled={pin.disabled}>
         <Toggle
-          className="aria-pressed:bg-accent aria-pressed:text-primary"
-          aria-label={pin.pinned ? "Unpin" : "Pin"}
+          // One name, pressed or not: a toggle's state is aria-pressed, not a new name.
+          aria-label="Pin"
           pressed={pin.pinned}
           disabled={pin.disabled}
           onPressedChange={() => current && togglePin(current)}
         >
-          {pin.pinned ? <PinOffIcon /> : <PinIcon />}
+          <PinIcon />
         </Toggle>
       </Hint>
       <Hint
@@ -79,7 +81,7 @@ export function EditorToolbar({
         disabled={noHistory}
       >
         <Toggle
-          className="text-[0.8125rem] text-muted-foreground aria-pressed:bg-accent aria-pressed:text-primary"
+          className="text-caption"
           pressed={showHistory}
           disabled={noHistory}
           onPressedChange={() => void session.toggleHistory()}

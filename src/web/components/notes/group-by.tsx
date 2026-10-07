@@ -1,7 +1,8 @@
-import { Field } from "@base-ui/react/field";
 import { useState } from "react";
 
 import type { GroupBy } from "@/shared/layouts";
+import { ChipSelect } from "@/web/components/shell/chip";
+import { FormField } from "@/web/components/shell/form-field";
 import { Button } from "@/web/components/ui/button";
 import { Input } from "@/web/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/web/components/ui/popover";
@@ -50,14 +51,10 @@ export function GroupByPicker({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button variant="outline" size="xs" className="font-normal text-muted-foreground" />
-        }
-      >
-        Columns: {describeGroupBy(value)}
+      <PopoverTrigger render={<ChipSelect label="Columns" />}>
+        {describeGroupBy(value)}
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 max-w-[calc(100vw-2rem)]">
+      <PopoverContent align="start">
         <form
           className="flex flex-col gap-2.5"
           onSubmit={(e) => {
@@ -80,40 +77,33 @@ export function GroupByPicker({
             }}
           >
             {MODES.map(([key, label]) => (
-              <ToggleGroupItem
-                key={key}
-                value={key}
-                className="h-8 px-2.5 text-xs aria-pressed:bg-accent"
-              >
+              <ToggleGroupItem key={key} value={key} className="h-8 px-2.5 text-xs">
                 {label}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
           {mode === "prefix" && (
             <>
-              <Field.Root className="flex flex-col gap-1">
-                <Field.Label className="text-xs font-medium">Tags starting with</Field.Label>
+              <FormField label="Tags starting with">
                 <Input value={prefix} onChange={(e) => setPrefix(e.target.value)} />
-              </Field.Root>
-              <Field.Root className="flex flex-col gap-1">
-                <Field.Label className="text-xs font-medium">First columns, in order</Field.Label>
+              </FormField>
+              <FormField label="First columns, in order">
                 <Input
                   value={columns}
                   placeholder="todo, doing, done"
                   onChange={(e) => setColumns(e.target.value)}
                 />
-              </Field.Root>
+              </FormField>
             </>
           )}
           {mode === "tags" && (
-            <Field.Root className="flex flex-col gap-1">
-              <Field.Label className="text-xs font-medium">A column per tag, in order</Field.Label>
+            <FormField label="A column per tag, in order">
               <Input
                 value={tags}
                 placeholder="urgent, later"
                 onChange={(e) => setTags(e.target.value)}
               />
-            </Field.Root>
+            </FormField>
           )}
           {mode === "checklist" && (
             <p className="text-xs text-muted-foreground">

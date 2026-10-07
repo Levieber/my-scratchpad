@@ -2,8 +2,10 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import tailwind from "@scripts/tailwind";
+import { __unstable__loadDesignSystem } from "@tailwindcss/node";
+import { Scanner } from "@tailwindcss/oxide";
 import { ROOT } from "@test/support";
-import tailwind from "bun-plugin-tailwind";
 
 // What a phone and its owner's settings need from the styling, checked on the CSS the page
 // actually gets (Tailwind compiled from the components) and on the class lists of the components
@@ -26,6 +28,12 @@ beforeAll(async () => {
   if (!build.success || !sheet) throw new AggregateError(build.logs, "the PWA didn't build");
   css = await sheet.text();
 }, 30_000);
+
+test("the CSS is compiled by the Tailwind this project pins, not one bundled in a plugin", () => {
+  // bun-plugin-tailwind 0.1.2 carried 4.1.14 of its own, so newer utilities compiled to nothing.
+  const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+  expect(css).toContain(`tailwindcss v${pkg.dependencies.tailwindcss}`);
+});
 
 /** Every innermost rule as its selector (or at-rule) and declarations. */
 const rules = () =>
@@ -103,7 +111,8 @@ const height = (classes: string) =>
 describe("tap targets (WCAG 2.2: 24 x 24 px)", () => {
   // Each `size` of a shadcn control, as its cva lists it.
   const sizes = (file: string) => {
-    const block = /size:\s*\{([\s\S]*?)\n\s{6}\},/.exec(source(file))?.[1] ?? "";
+    // The `size` block, however it is indented: it ends at the first line holding only `},`.
+    const block = /size:\s*\{([\s\S]*?)\n\s*\},/.exec(source(file))?.[1] ?? "";
     return [...block.matchAll(/^\s*"?([\w-]+)"?:\s*"([^"]*)"/gm)].map(
       ([, name = "", classes = ""]) => ({
         name,
@@ -115,16 +124,21 @@ describe("tap targets (WCAG 2.2: 24 x 24 px)", () => {
   for (const file of [
     join("components", "ui", "button.tsx"),
     join("components", "ui", "toggle.tsx"),
+    join("components", "shell", "chip.tsx"),
   ])
     test(`every size of ${file} is at least 24 px tall`, () => {
       const all = sizes(file);
-      expect(all.length).toBeGreaterThan(2);
+      expect(all.length).toBeGreaterThan(1);
       expect(all.filter(({ classes }) => height(classes) < 24).map(({ name }) => name)).toEqual([]);
     });
 
   test("no Button, Toggle or toggle group item is made smaller where it is used", () => {
     const shrunk = sources.flatMap(({ file, text }) =>
-      [...text.matchAll(/<(Button|Toggle|ToggleGroupItem)\b(?:[^<>]|=>)*?className="([^"]*)"/g)]
+      [
+        ...text.matchAll(
+          /<(Button|Toggle|ToggleGroupItem|ChipToggle|ChipButton)\b(?:[^<>]|=>)*?className="([^"]*)"/g,
+        ),
+      ]
         .filter(([, , classes = ""]) => height(classes) > 0 && height(classes) < 24)
         .map(([, el, classes]) => `${file}: <${el} className="${classes}">`),
     );
@@ -134,8 +148,11 @@ describe("tap targets (WCAG 2.2: 24 x 24 px)", () => {
 
 describe("narrow screens", () => {
   test("a grid track of 1fr can't shrink below its content: columns use minmax(0, 1fr)", () => {
+    // shadcn's CardHeader makes room for a CardAction beside its title, which the app never puts
+    // in a card: that track is never laid out.
+    const unused = /card-action/;
     const bare = rules().flatMap(({ selector, declarations }) =>
-      /(^|\s)1fr(\s|$)/.test(declarations["grid-template-columns"] ?? "")
+      !unused.test(selector) && /(^|\s)1fr(\s|$)/.test(declarations["grid-template-columns"] ?? "")
         ? [`${selector}: ${declarations["grid-template-columns"]}`]
         : [],
     );
@@ -164,5 +181,100 @@ describe("hover", () => {
       .map(({ file, c }) => `${file}: ${c}`);
     expect(hidden).toEqual([]);
     expect(opacityClasses().some(({ c }) => c === "desktop-mouse:opacity-0")).toBe(true);
+  });
+});
+
+// The design system (docs/design-system.md): the app's own components take their radii, text
+// sizes, focus ring and scrollbars from the tokens in index.css, as shadcn's do. shadcn's own
+// files (components/ui/) are copied whole and left out.
+describe("design system", () => {
+  const ours = () => sources.filter(({ file }) => !file.startsWith(join("components", "ui")));
+  const theme = readFileSync(join(WEB, "index.css"), "utf8");
+  /** Every class in the app's own sources matching `pattern`, as `file: class`. */
+  const using = (pattern: RegExp) =>
+    ours().flatMap(({ file, text }) =>
+      [...text.matchAll(pattern)].map(([c]) => `${file}: ${c.trim()}`),
+    );
+
+  test("the radius scale is derived from --radius, which shadcn's components read too", () => {
+    for (const step of ["sm", "md", "lg", "xl"])
+      expect(theme).toMatch(
+        new RegExp(`--radius-${step}: calc\\(var\\(--radius\\) \\* [\\d.]+\\);`),
+      );
+  });
+
+  test("corners come from the radius scale, not a radius of their own", () => {
+    expect(using(/(^|[\s"'`])([\w-]+:)*rounded(-[a-z]+)*-(card|\[[^\]]+\])(?=[\s"'`]|$)/g)).toEqual(
+      [],
+    );
+  });
+
+  test("text sizes come from the type scale, not a size of their own", () => {
+    // Sized relative to the text around it (`text-[0.9em]`) is still the scale's.
+    expect(using(/(^|[\s"'`])([\w-]+:)*text-\[[\d.]+(rem|px)\]/g)).toEqual([]);
+  });
+
+  test("a hand-made control shows the same focus ring as shadcn's, from the focus-ring utilities", () => {
+    expect(using(/(^|[\s"'`])([\w-]+:)*focus-visible:([\w-]+:)*outline-(?!none)[\w-]+/g)).toEqual(
+      [],
+    );
+    expect(rules().some((r) => r.selector.includes(".focus-ring"))).toBe(true);
+  });
+
+  test("a pressed toggle looks the same everywhere: the look is Toggle's, not each use's", () => {
+    // The chips add a primary border to it (shell/chip.tsx); nothing else restyles it.
+    const pressed = using(/(^|[\s"'`])([\w-]+:)*aria-pressed:[\w/-]+/g).filter(
+      (c) => !c.startsWith(join("components", "shell", "chip.tsx")),
+    );
+    expect(pressed).toEqual([]);
+  });
+
+  test("a link looks like a link in one place: QuietLink, or a link inside a note", () => {
+    const own = [
+      join("components", "shell", "quiet.tsx"),
+      join("components", "editor", "markdown-elements.tsx"),
+    ];
+    const underlined = using(/(^|[\s"'`])([\w-]+:)*underline(?=[\s"'`]|$)/g).filter(
+      (c) => !own.some((file) => c.startsWith(file)),
+    );
+    expect(underlined).toEqual([]);
+  });
+
+  test("scrollbars are thin and take the palette's color, light and dark", () => {
+    // Tailwind's scrollbar utilities on every element (index.css, base layer).
+    const all = rules().find((r) => r.selector === "*" && r.declarations["scrollbar-width"]);
+    expect(all?.declarations).toMatchObject({
+      "scrollbar-width": "thin",
+      "--tw-scrollbar-thumb": "var(--scrollbar)",
+      "--tw-scrollbar-track": "transparent",
+      "scrollbar-color": "var(--tw-scrollbar-thumb) var(--tw-scrollbar-track)",
+    });
+    expect(theme.match(/--scrollbar:/g)).toHaveLength(2);
+  });
+
+  test("a scroll column keeps its scrollbar's gutter, and so does the column lined up with it", () => {
+    for (const utility of ["scroll-column", "aligned-column"])
+      expect(
+        rules().find((r) => r.selector === `.${utility}`)?.declarations["scrollbar-gutter"],
+      ).toBe("stable");
+  });
+
+  test("classes are written as Tailwind writes them, so a newer utility replaces an arbitrary value", async () => {
+    // Tailwind's own canonical form (what its editor extension suggests): `scrollbar-gutter-both`
+    // over `[scrollbar-gutter:stable_both-edges]`, `wrap-break-word` over the deprecated
+    // `break-words`. Through its unstable API: a Tailwind upgrade that moves it fails here first.
+    const system = await __unstable__loadDesignSystem(theme, { base: WEB });
+    const scanner = new Scanner({
+      sources: [
+        { base: WEB, pattern: "**/*.{ts,tsx}", negated: false },
+        { base: join(WEB, "components", "ui"), pattern: "**/*", negated: true },
+      ],
+    });
+    const valid = scanner.scan().filter((c) => system.candidatesToCss([c])[0]);
+    const rewritten = valid.flatMap((c) => {
+      const [canonical] = system.canonicalizeCandidates([c], { rem: 16 });
+      return canonical && canonical !== c ? [`${c} → ${canonical}`] : [];
+    });
+    expect(rewritten).toEqual([]);
   });
 });

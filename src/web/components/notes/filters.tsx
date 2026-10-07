@@ -1,5 +1,6 @@
 import { operatorValue, setOperator } from "@/shared/query";
-import { ToggleGroup, ToggleGroupItem } from "@/web/components/ui/toggle-group";
+import { ChipToggle } from "@/web/components/shell/chip";
+import { ToggleGroup } from "@/web/components/ui/toggle-group";
 import { useSearch } from "@/web/hooks/search.hook";
 import { toggled } from "@/web/lib/listing";
 
@@ -37,17 +38,16 @@ export function Filters() {
       }}
     >
       {ITEMS.map(([operator, value, label], i) => (
-        <ToggleGroupItem
+        <ChipToggle
           key={`${operator}:${value}`}
           value={`${operator}:${value}`}
-          variant="outline"
-          size="sm"
+          size="md"
           // The two halves read apart: a gap before the first author.
-          className="h-7 rounded-lg px-3 text-[0.8125rem] text-muted-foreground aria-pressed:border-primary aria-pressed:bg-accent aria-pressed:text-foreground data-[first-author=true]:ml-2.5"
-          data-first-author={i === 3}
+          className="data-first-author:ml-2.5"
+          data-first-author={i === 3 || undefined}
         >
           {label}
-        </ToggleGroupItem>
+        </ChipToggle>
       ))}
     </ToggleGroup>
   );

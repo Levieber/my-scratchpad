@@ -3,6 +3,10 @@ import { ChevronRightIcon } from "lucide-react";
 import { ListEnd } from "@/web/components/notes/list-end";
 import { NoteMenu } from "@/web/components/notes/note-menu";
 import { NoteMarks } from "@/web/components/notes/note-meta";
+import { DisclosureButton } from "@/web/components/shell/disclosure-button";
+import { Hint } from "@/web/components/shell/hint";
+import { ListMessage } from "@/web/components/shell/list-message";
+import { Row } from "@/web/components/shell/row";
 import { openNote } from "@/web/hooks/editor.hook";
 import type { Listed } from "@/web/hooks/listed.hook";
 import { MOST, useSubpages } from "@/web/hooks/pages.hook";
@@ -53,7 +57,7 @@ function Branch({
 }) {
   const notes = useSubpages(parent);
   if (parent === null && notes.length === 0)
-    return <li className="p-2.5 text-xs text-muted-foreground">No notes yet.</li>;
+    return <ListMessage render={<li />}>No notes yet.</ListMessage>;
   return (
     <>
       {notes.map((n) => (
@@ -61,9 +65,9 @@ function Branch({
       ))}
       {notes.length >= MOST && (
         // The server sends the latest; the rest would be missing without a word.
-        <li className="p-2.5 text-xs text-muted-foreground">
+        <ListMessage render={<li />}>
           The {MOST} most recently changed are shown here: search for the rest.
-        </li>
+        </ListMessage>
       )}
     </>
   );
@@ -82,28 +86,29 @@ function PageNode({
   const current = currentId === n.id;
   return (
     <li>
-      <div
+      <Row
+        current={current}
         // Deep trees stop indenting past a few levels, so a phone keeps room for the title.
         style={{ "--depth": Math.min(depth, 6) } as React.CSSProperties}
-        className={cn(
-          "group/row flex items-center gap-0.5 rounded-card pl-[calc(var(--depth)*1.25rem)] hover:bg-card",
-          current && "bg-card",
-        )}
+        className="flex items-center gap-0.5 pl-[calc(var(--depth)*1.25rem)]"
       >
         {n.subpages > 0 ? (
-          <button
-            className="grid size-7 flex-none place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
-            aria-expanded={open}
-            aria-label={`${open ? "Close" : "Open"} the pages under "${n.title}"`}
-            onClick={() => toggle(n.id)}
-          >
-            <ChevronRightIcon className={cn("size-4 transition-transform", open && "rotate-90")} />
-          </button>
+          <Hint label={open ? "Hide the pages under it" : "Show the pages under it"}>
+            <DisclosureButton
+              size="icon-sm"
+              className="text-muted-foreground"
+              aria-expanded={open}
+              aria-label={`${open ? "Close" : "Open"} the pages under "${n.title}"`}
+              onClick={() => toggle(n.id)}
+            >
+              <ChevronRightIcon className={cn("transition-transform", open && "rotate-90")} />
+            </DisclosureButton>
+          </Hint>
         ) : (
-          <span className="size-7 flex-none" />
+          <span className="size-8 flex-none" />
         )}
         <button
-          className="min-w-0 flex-1 rounded-md px-1.5 py-1.5 text-left text-sm wrap-anywhere focus-visible:outline-2 focus-visible:outline-primary"
+          className="min-w-0 flex-1 rounded-md px-1.5 py-1.5 text-left text-sm wrap-anywhere focus-ring-inset"
           aria-current={current}
           onClick={() => void openNote(n.id)}
         >
@@ -117,7 +122,7 @@ function PageNode({
           )}
         </button>
         <NoteMenu note={n} className="mr-0.5" />
-      </div>
+      </Row>
       {open && (
         <ul>
           <Branch parent={n.id} depth={depth + 1} currentId={currentId} />

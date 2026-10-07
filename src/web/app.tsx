@@ -6,6 +6,8 @@ import { TokenDialog } from "@/web/components/shell/token-dialog";
 import { Toaster } from "@/web/components/ui/sonner";
 import { TooltipProvider } from "@/web/components/ui/tooltip";
 import { SearchProvider } from "@/web/hooks/search.hook";
+import { useStore } from "@/web/hooks/store.hook";
+import { theme } from "@/web/lib/theme";
 
 // Query's devtools in development only: the production build drops this import unread.
 const Devtools =
@@ -17,6 +19,7 @@ const Devtools =
 
 /** The providers, the shell, and what overlays it (dialogs, toasts), portalled to the body. */
 export function App() {
+  const chosen = useStore(theme);
   return (
     <SearchProvider>
       <TooltipProvider delay={400}>
@@ -24,7 +27,9 @@ export function App() {
         <TokenDialog />
         <DeleteDialog />
         {/* Above the home indicator and beside a notch, wherever the phone puts them. */}
+        {/* The toasts follow the theme chosen here, which may not be the device's. */}
         <Toaster
+          theme={chosen}
           position="bottom-center"
           mobileOffset={{
             bottom: "max(16px, env(safe-area-inset-bottom))",

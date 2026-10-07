@@ -17,7 +17,8 @@
       "@/*": ["./src/*"],
       "@integrations/*": ["./integrations/*"],
       "@test/*": ["./test/*"],
-      "@public/*": ["./public/*"]
+      "@public/*": ["./public/*"],
+      "@scripts/*": ["./scripts/*"]
     }
   },
   "include": ["src", "integrations", "test", "scripts"]

@@ -22,3 +22,12 @@ export function pinState(
     };
   return { pinned, disabled: false, hint: "Keep at the top of the list" };
 }
+
+/**
+ * The pinned list once `note` is pinned (`pin`) or unpinned: the same note is never listed twice,
+ * however often it is pinned (a double click lands two pins before the list re-renders).
+ */
+export function withPin<N extends { id: string }>(pins: readonly N[], note: N, pin: boolean): N[] {
+  const others = pins.filter((n) => n.id !== note.id);
+  return pin ? (others.length === pins.length ? [...pins, note] : [...pins]) : others;
+}

@@ -23,7 +23,7 @@ export const LinkActions = createContext<((target: string) => void) | null>(null
 export const EmbedRenderer = createContext<((embed: Embed) => ReactNode) | null>(null);
 
 const PRE =
-  "my-2 overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm [&>code]:bg-transparent [&>code]:p-0 [&_.th-command]:text-primary [&_.th-comment]:text-muted-foreground [&_.th-comment]:italic [&_.th-deleted]:text-destructive [&_.th-function]:font-semibold [&_.th-heading]:font-semibold [&_.th-inserted]:text-success [&_.th-keyword]:text-primary [&_.th-literal]:text-destructive [&_.th-meta]:text-muted-foreground [&_.th-number]:text-destructive [&_.th-string]:text-success [&_.th-tag]:text-primary [&_.th-type]:font-semibold";
+  "my-2 overflow-x-auto rounded-md bg-muted p-3 font-mono text-sm tab-4 [&>code]:bg-transparent [&>code]:p-0 [&_.th-command]:text-primary [&_.th-comment]:text-muted-foreground [&_.th-comment]:italic [&_.th-deleted]:text-destructive [&_.th-function]:font-semibold [&_.th-heading]:font-semibold [&_.th-inserted]:text-success [&_.th-keyword]:text-primary [&_.th-literal]:text-destructive [&_.th-meta]:text-muted-foreground [&_.th-number]:text-destructive [&_.th-string]:text-success [&_.th-tag]:text-primary [&_.th-type]:font-semibold";
 
 function EmbedBlock(props: { "data-embed": string; "data-source": string }) {
   const render = useContext(EmbedRenderer);
@@ -59,7 +59,7 @@ function Link({ href, children, ...props }: ComponentProps<"a">) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-primary underline underline-offset-2"
+      className="rounded-sm text-primary underline underline-offset-2 focus-ring"
     >
       {children}
     </a>
@@ -75,7 +75,7 @@ function NoteLink({
   children?: ReactNode;
 }) {
   const open = useContext(LinkActions);
-  const look = "text-primary underline decoration-dotted underline-offset-2";
+  const look = "rounded-sm text-primary underline decoration-dotted underline-offset-2 focus-ring";
   if (!open) return <span className={look}>{children}</span>;
   return (
     <button type="button" className={`${look} cursor-pointer`} onClick={() => open(target)}>
@@ -123,7 +123,7 @@ export const elements: MarkdownComponents = {
   blockquote: styled("blockquote", "my-2 border-l-4 border-border pl-3 text-muted-foreground"),
   // Highlighted tokens (lib/highlight.ts) in the palette, so they follow light and dark.
   pre: styled("pre", PRE),
-  code: styled("code", "rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]"),
+  code: styled("code", "rounded-sm bg-muted px-1 py-0.5 font-mono text-[0.9em]"),
   table: Table,
   th: styled("th", "border border-border bg-muted px-2 py-1 text-left font-semibold"),
   td: styled("td", "border border-border px-2 py-1"),

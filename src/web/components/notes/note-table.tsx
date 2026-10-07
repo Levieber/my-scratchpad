@@ -16,6 +16,8 @@ import { isObject, TABLE_COLUMNS, type TableColumn } from "@/shared/layouts";
 import { ListEnd } from "@/web/components/notes/list-end";
 import { NoteMenu } from "@/web/components/notes/note-menu";
 import { NoteMarks, Progress } from "@/web/components/notes/note-meta";
+import { CoverButton } from "@/web/components/shell/clickable-card";
+import { Button } from "@/web/components/ui/button";
 import { openNote } from "@/web/hooks/editor.hook";
 import type { Listed } from "@/web/hooks/listed.hook";
 import { useViewOption } from "@/web/hooks/view-option.hook";
@@ -75,13 +77,10 @@ function Cell({
   switch (column) {
     case "title":
       return (
-        <button
-          className="text-left font-semibold wrap-anywhere after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-primary"
-          onClick={() => void openNote(n.id)}
-        >
+        <CoverButton className="after:rounded-none" onClick={() => void openNote(n.id)}>
           <NoteMarks note={n} inPinned={inPinned} />
           {n.title}
-        </button>
+        </CoverButton>
       );
     case "tags":
       return n.tags.length ? `#${n.tags.join(" #")}` : null;
@@ -118,7 +117,7 @@ export function NoteTable({ listed }: { listed: Listed }) {
 
   return (
     <>
-      <table className="w-full border-separate border-spacing-0 text-left text-[0.8125rem]">
+      <table className="w-full border-separate border-spacing-0 text-left text-caption">
         <thead className="sticky top-0 z-10 bg-background">
           <tr>
             {table.getFlatHeaders().map((header) => {
@@ -130,13 +129,16 @@ export function NoteTable({ listed }: { listed: Listed }) {
                   aria-sort={dir ? (dir === "asc" ? "ascending" : "descending") : undefined}
                   className="border-b border-border p-0 font-medium text-muted-foreground"
                 >
-                  <button
-                    className="inline-flex min-h-8 items-center gap-1 rounded-md px-2 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    // The cells' own padding, so a label starts where its column does.
+                    className="px-2 text-caption text-muted-foreground"
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     {LABELS[header.column.id as TableColumn]}
                     <Arrow className={cn("size-3.5", !dir && "invisible")} aria-hidden="true" />
-                  </button>
+                  </Button>
                 </th>
               );
             })}
@@ -150,7 +152,7 @@ export function NoteTable({ listed }: { listed: Listed }) {
             <tr
               key={row.id}
               aria-current={currentId === row.id}
-              className="group/row relative hover:bg-card aria-[current=true]:bg-card"
+              className="group/row relative hover:bg-card aria-current:bg-card"
             >
               {row.getAllCells().map((cell) => (
                 <td

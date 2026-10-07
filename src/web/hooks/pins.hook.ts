@@ -4,7 +4,7 @@ import { usePins } from "@/web/hooks/notes.hook";
 import { useUnsyncedIds } from "@/web/hooks/pending.hook";
 import { api, type Note } from "@/web/lib/api";
 import { handle } from "@/web/lib/failures";
-import { pinState } from "@/web/lib/pins";
+import { pinState, withPin } from "@/web/lib/pins";
 import { keys, queryClient } from "@/web/lib/queries";
 
 /** Whether a note can be pinned or unpinned right now (lib/pins.ts). */
@@ -24,9 +24,7 @@ export function usePinToggle() {
     onMutate: async ({ note, unpin }) => {
       await queryClient.cancelQueries({ queryKey: keys.pins });
       const before = queryClient.getQueryData<Note[]>(keys.pins);
-      queryClient.setQueryData<Note[]>(keys.pins, (p = []) =>
-        unpin ? p.filter((n) => n.id !== note.id) : [...p, note],
-      );
+      queryClient.setQueryData<Note[]>(keys.pins, (p = []) => withPin(p, note, !unpin));
       return { before };
     },
     onError: (e, _, context) => {
@@ -35,5 +33,10 @@ export function usePinToggle() {
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: keys.pins }),
   });
-  return (note: Note) => mutate({ note, unpin: pinned.some((n) => n.id === note.id) });
+  // Pinned or not as the cache has it now, not as of the last render: a second press before the
+  // list re-renders toggles back rather than pinning again.
+  return (note: Note) => {
+    const now = queryClient.getQueryData<Note[]>(keys.pins) ?? pinned;
+    mutate({ note, unpin: now.some((n) => n.id === note.id) });
+  };
 }

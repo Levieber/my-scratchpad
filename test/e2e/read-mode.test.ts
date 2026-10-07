@@ -70,13 +70,13 @@ describeE2E("Read and Write", () => {
     expect(await page.getByPlaceholder(BODY).inputValue()).toBe("Mode memory");
     // A new note opens in Write whatever was picked.
     await page.getByRole("tab", { name: "Read" }).click();
-    await page.getByRole("button", { name: "+ New" }).click();
+    await page.getByRole("button", { name: "New", exact: true }).click();
     await page.getByPlaceholder(BODY).waitFor();
   });
 
   test("the Write view's helpers: a checklist, Enter for the next item, Enter again to end it, bold", async () => {
     const page = await app.open();
-    await page.getByRole("button", { name: "+ New" }).click();
+    await page.getByRole("button", { name: "New", exact: true }).click();
     const body = page.getByPlaceholder(BODY);
     await body.focus();
     await page.getByRole("button", { name: "Checklist" }).click();

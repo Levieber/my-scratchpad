@@ -103,10 +103,26 @@ export function groupNotes(notes: Note[], now = new Date()): Group[] {
   return groups.filter((g) => g.notes.length);
 }
 
-/** The first `limit` tags (the API sorts them by use), plus the selected ones wherever they rank. */
-export function visibleTags(tags: Tag[], selected: string[], limit: number): Tag[] {
-  const top = tags.slice(0, limit);
-  return [...top, ...tags.slice(limit).filter((t) => selected.includes(t.tag))];
+/**
+ * The first `limit` items (the API sorts tags by use), plus the selected ones wherever they rank:
+ * what a row of chips shows before the rest goes behind a "more".
+ */
+export function visibleFirst<T>(items: T[], limit: number, selected: (item: T) => boolean): T[] {
+  return [...items.slice(0, limit), ...items.slice(limit).filter(selected)];
+}
+
+/**
+ * The tags holding `text` (a leading `#` is the tag's mark), whatever its case: those starting
+ * with it first, each part keeping the API's order (most used first).
+ */
+export function matchTags(tags: Tag[], text: string): Tag[] {
+  const t = text.trim().replace(/^#/, "").toLowerCase();
+  if (!t) return tags;
+  const starting = tags.filter((x) => x.tag.toLowerCase().startsWith(t));
+  const holding = tags.filter(
+    (x) => !x.tag.toLowerCase().startsWith(t) && x.tag.toLowerCase().includes(t),
+  );
+  return [...starting, ...holding];
 }
 
 /** The one value a toggle group's change pressed or released: in one list and not the other. */
