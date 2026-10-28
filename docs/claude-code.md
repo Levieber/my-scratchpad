@@ -58,6 +58,8 @@ The executable doesn't follow the source: **after changing or pulling code, run 
 
 The Stop hook fires at the end of every turn, not every task, so a long session gets one review per turn that edited files. Set `PAD_REVIEW=off` in the environment Claude Code starts from to disable it.
 
+Claude on the web, desktop and phone reaches the scratchpad through a connector instead: the same tools over HTTP, see [claude-ai.md](claude-ai.md).
+
 The MCP server, CLI and hooks all read the same client config, so `pad login <url> <token>` switches all three between the local server and Railway with no reinstall.
 
 Inside Claude Code shells, `pad` writes are attributed to `claude-code` automatically (Claude Code sets `CLAUDECODE=1`); `PAD_AUTHOR` overrides.

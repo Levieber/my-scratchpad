@@ -1,6 +1,6 @@
 # Scratchpad
 
-An API-first scratchpad shared by you and your AI agents. One HTTP API is the source of truth; the React PWA, the `pad` CLI and the Claude Code MCP server are thin clients of it, so people and agents read and write the same notes with the same ease. Every change is kept with its author and can be diffed or restored, and the PWA keeps working offline, merging its edits when it reconnects.
+An API-first scratchpad shared by you and your AI agents. One HTTP API is the source of truth; the React PWA, the `pad` CLI and the MCP server (for Claude Code, and as a connector for Claude on the web, desktop and phone) are thin clients of it, so people and agents read and write the same notes with the same ease. Every change is kept with its author and can be diffed or restored, and the PWA keeps working offline, merging its edits when it reconnects.
 
 ```
                 ┌──────────── Bun server (src/server.ts) ────────────┐
@@ -41,6 +41,7 @@ API summary for agents: `GET /llms.txt`; full contract: `GET /openapi.json`.
 - [docs/export-format.md](docs/export-format.md) — the export archive: its format, versions and what an import does with it.
 - [docs/effect.md](docs/effect.md) — why everything but the PWA is written with Effect, the decisions behind it, and what it cost.
 - [docs/claude-code.md](docs/claude-code.md) — `bun run setup:claude` and what it installs.
+- [docs/claude-ai.md](docs/claude-ai.md) — the scratchpad as a custom connector in Claude (web, desktop, mobile): the MCP server over HTTP and its OAuth.
 
 ## Contributing and license
 

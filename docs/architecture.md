@@ -4,11 +4,11 @@ One rule shapes everything: **the HTTP API is the only way in.** People (PWA, CL
 
 Everything but the PWA is written with Effect 4; why, and what it cost, is in [effect.md](effect.md).
 
-Each folder of `src/` is one responsibility, and what it may import is enforced (below). The three process entry points stay at the root, because installed things name their paths (`claude mcp add`, the systemd unit, Railway's start command, `bin`); each is a few lines of wiring.
+Each folder of `src/` is one responsibility, and what it may import is enforced (below). The four process entry points stay at the root, because installed things name their paths (`claude mcp add`, the systemd unit, Railway's start commands, `bin`); each is a few lines of wiring.
 
 ````
 src/
-  server.ts, cli.ts, mcp.ts   Entry points: `bun src/server.ts`, the `pad` executable, the MCP stdio server.
+  server.ts, cli.ts, mcp.ts, mcp-http.ts   Entry points: `bun src/server.ts`, the `pad` executable, the MCP server over stdio (Claude Code) and over HTTP (claude.ai's connectors).
   shared/       Pure code every process uses, the PWA included. Imports no process, no node:/bun.
     domain.ts     The API's shapes as Schemas (Note, NoteInput, Revision, View and its layouts' options); every client shares the types.
     validation.ts The sentences for a note that didn't decode (the API's 400 and `pad import`).
@@ -54,11 +54,14 @@ src/
   config/       Every env var and file under ~/.config/scratchpad, as Effect Config.
     env.ts        What they share (empty = unset, XDG folders, the port, reading a JSON file).
     server.ts, client.ts, hooks.ts   ServerConfig; ClientConfig (`pad login`); HookConfig (this machine's own hook searches, `pad hooks set --local`).
+    mcp-http.ts   McpHttpConfig: where the MCP server over HTTP listens, the origin claude.ai reaches it at, its signing secret.
   cli/          `pad` (effect/cli); cli.ts wires it.
     root.ts       The root command, `out`, `reported` (API errors → one line, exit 1), the author.
     flags.ts, format.ts   Shared flags; how a note is printed for a person.
     commands/     notes.ts, find.ts (search, tags, saved views), pins.ts (pin, unpin, pins), history.ts, transfer.ts, connection.ts (status, login, serve…), hooks.ts.
-  mcp/          tools.ts (names, descriptions, shapes), handlers.ts (what each does), server.ts (protocol, instructions); mcp.ts wires it.
+  mcp/          tools.ts (names, descriptions, shapes; `Notes`, plus the hooks tool for stdio), handlers.ts (what each does), server.ts (protocol, instructions, the stdio layer); mcp.ts wires it.
+    http.ts       The same server over Streamable HTTP for claude.ai's connectors: /mcp behind OAuth, /health, request logs; mcp-http.ts wires it. See docs/claude-ai.md.
+    oauth/        The OAuth 2.1 authorization server in front of /mcp: routes.ts (metadata, registration, approval, token, the bearer check), tokens.ts (signed client ids and tokens, PKCE), consent.ts (the approval page).
   web/          React PWA, bundled by Bun from the web/index.html import. Files are kebab-case.
     index.css     The only stylesheet: Tailwind, the palette (light and dark), the breakpoint, base rules.
     lib/          Plain logic, tested without React: api.ts (the API from a browser), outbox.ts (edits the server doesn't have yet, in localStorage), sync.ts (sending them, merging), pending.ts (what the outbox means for the lists), editor-session.ts (the open note: autosave through the outbox, what the server answers, Read or Write), note-markdown.ts + autolinks.ts (a body read for the Read view), checklist-edit.ts (a tick), text-edit.ts (the Write view's helpers), editor-prefs.ts (the mode and font this device prefers), layout-prefs.ts (the layout this device prefers), board.ts (a board's columns, and a note's tags once moved), retag.ts (tags changed from outside the form), routes.ts (the notes' address: `?q=…&layout=…&note=…`), queries.ts (the read cache: TanStack Query's client, its keys, how a landed write settles into it), session.ts (the app's one session, wired to the cache; the token), store.ts (a value React can follow), failures.ts (what no component words itself: the token dialog, toasts, logging), listing.ts, draft.ts, pins.ts, hooks.ts (when a note can be pinned or hand-picked), transfer.ts (what an export asks for, what is checked before a file is sent, the answer in sentences), download.ts (saving a file), storage.ts (localStorage), utils.ts (shadcn's `cn`).
@@ -75,7 +78,7 @@ test/             Mirrors src/ (server/, shared/, cli/, client/, mcp/, web/, int
 
 `test/architecture.test.ts` fails the build when an import crosses a boundary, and says why:
 
-- Clients (`src/web/**`, `cli.ts` and `cli/`, `mcp.ts` and `mcp/`, `client/`, `integrations/**`) never import `server/` (routes, storage, anything), `bun:sqlite`, at runtime: they go through HTTP. (`pad serve` may import the server: it launches it, it doesn't call it.)
+- Clients (`src/web/**`, `cli.ts` and `cli/`, `mcp.ts`, `mcp-http.ts` and `mcp/`, `client/`, `integrations/**`) never import `server/` (routes, storage, anything), `bun:sqlite`, at runtime: they go through HTTP. (`pad serve` may import the server: it launches it, it doesn't call it.)
 - `server/storage/**` knows nothing about HTTP: it imports nothing else of `server/`, `shared/errors.ts` or `effect/http`, and none of the clients.
 - `server/**` doesn't import the clients; it is what they talk to.
 - `shared/**` imports no process (`server`, `client`, `cli`, `mcp`, `config`, `web`, `integrations`) and no `node:`/`bun` module: the PWA uses it.

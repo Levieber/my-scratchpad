@@ -9,7 +9,7 @@ The reasoning is in `docs/architecture.md`, and for Effect in `docs/effect.md`. 
 
 ## The rule
 
-The HTTP API is the only way in. Each folder of `src/` is one responsibility: `shared/` (pure, used by everyone, imports no process), `server/` (the API; `server/storage/` is the only code that touches SQLite), `client/`, `config/`, `cli/`, `mcp/`, `web/`. Clients (`web/`, `cli.ts` + `cli/`, `mcp.ts` + `mcp/`, `client/`, `integrations/`) never import `server/` at runtime (type-only imports are fine). `web/` imports no `bun`/`node:` modules, not `config/`/`client/`, and no Effect. Storage imports nothing else of `server/`. The three entry points (`src/server.ts`, `cli.ts`, `mcp.ts`) stay at the root: installed units and registrations name them. `test/architecture.test.ts` enforces all of it.
+The HTTP API is the only way in. Each folder of `src/` is one responsibility: `shared/` (pure, used by everyone, imports no process), `server/` (the API; `server/storage/` is the only code that touches SQLite), `client/`, `config/`, `cli/`, `mcp/`, `web/`. Clients (`web/`, `cli.ts` + `cli/`, `mcp.ts` + `mcp-http.ts` + `mcp/`, `client/`, `integrations/`) never import `server/` at runtime (type-only imports are fine). `web/` imports no `bun`/`node:` modules, not `config/`/`client/`, and no Effect. Storage imports nothing else of `server/`. The four entry points (`src/server.ts`, `cli.ts`, `mcp.ts`, `mcp-http.ts`) stay at the root: installed units and registrations name them. The MCP server over HTTP (claude.ai's connectors) is a client too, in its own process and Railway service: its OAuth lives in `mcp/oauth/` and answers OAuth's `{ error, error_description }`, not the API's shape (`docs/claude-ai.md`). `test/architecture.test.ts` enforces all of it.
 
 ## Imports
 

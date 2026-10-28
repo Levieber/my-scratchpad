@@ -1,5 +1,5 @@
-// The tools Claude Code gets: names, descriptions and the shape of what each takes. What they do
-// is in handlers.ts.
+// The tools Claude gets: names, descriptions and the shape of what each takes. What they do is in
+// handlers.ts.
 import * as Tool from "effect/ai/Tool";
 import * as Toolkit from "effect/ai/Toolkit";
 import * as Schema from "effect/Schema";
@@ -174,7 +174,8 @@ const Hooks = tool(
   .annotate(Tool.Title, "Hook notes")
   .annotate(Tool.Readonly, true);
 
-export const Scratchpad = Toolkit.make(
+/** Everything about notes and views: what every MCP client gets, claude.ai's connectors too. */
+export const Notes = Toolkit.make(
   Search,
   Get,
   Create,
@@ -185,5 +186,8 @@ export const Scratchpad = Toolkit.make(
   Delete,
   Views,
   SaveView,
-  Hooks,
 );
+
+// The hooks run where Claude Code works, on the person's machine; a connector has no folder of its
+// own, so only the stdio server offers them.
+export const Scratchpad = Toolkit.merge(Notes, Toolkit.make(Hooks));

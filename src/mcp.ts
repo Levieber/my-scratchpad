@@ -23,11 +23,11 @@ McpServer.toolkit(Scratchpad).pipe(
   Layer.provide(
     Layer.unwrap(
       Effect.gen(function* () {
-        return Client.layer(yield* Author);
+        const author = yield* Author;
+        return Layer.merge(Client.layer(author), Server(author));
       }),
     ),
   ),
-  Layer.provide(Server),
   Layer.provide([ClientConfig.layer, HookConfig.layer, BunStdio.layer]),
   // stdout is the protocol; anything logged goes to stderr.
   Layer.provide(Layer.succeed(Logger.LogToStderr, true)),

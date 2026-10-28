@@ -8,7 +8,7 @@ import { HookConfig } from "@/config/hooks";
 import type { Note } from "@/shared/domain";
 import { HOOK_NAMES } from "@/shared/hooks";
 
-import { Scratchpad } from "./tools";
+import { Notes, Scratchpad } from "./tools";
 
 // Keep list output compact; full bodies only via scratchpad_get.
 const summary = (n: Note) => ({
@@ -24,6 +24,26 @@ const summary = (n: Note) => ({
   preview: n.body.length > 200 ? n.body.slice(0, 200) + "…" : n.body,
 });
 
+// The note tools, the same over stdio and over HTTP.
+const noteHandlers = (client: Client["Service"]) =>
+  Notes.of({
+    scratchpad_search: ({ query, tags, kind, author, parent, limit }) =>
+      Effect.map(
+        client.list({ q: query, tag: tags, kind, author, parent, limit: limit ?? 20 }),
+        (notes) => notes.map(summary),
+      ),
+    scratchpad_get: ({ id }) => client.get(id),
+    scratchpad_create: (input) => client.create(input),
+    scratchpad_append: ({ id, text }) => client.append(id, text),
+    scratchpad_update: ({ id, ...patch }) => client.update(id, patch),
+    scratchpad_history: ({ id, limit }) => client.revisions(id, { limit: limit ?? 20 }),
+    scratchpad_diff: ({ id, ...q }) => client.diff(id, q),
+    scratchpad_delete: ({ id }) => Effect.as(client.delete(id), { deleted: id }),
+    scratchpad_views: () => client.views(),
+    scratchpad_save_view: (view) => client.createView(view),
+  });
+
+/** The stdio server's: the note tools, and what the hooks show where Claude Code works. */
 export const Handlers = Scratchpad.toLayer(
   Effect.gen(function* () {
     const client = yield* Client;
@@ -53,21 +73,15 @@ export const Handlers = Scratchpad.toLayer(
     });
 
     return Scratchpad.of({
-      scratchpad_search: ({ query, tags, kind, author, parent, limit }) =>
-        Effect.map(
-          client.list({ q: query, tag: tags, kind, author, parent, limit: limit ?? 20 }),
-          (notes) => notes.map(summary),
-        ),
-      scratchpad_get: ({ id }) => client.get(id),
-      scratchpad_create: (input) => client.create(input),
-      scratchpad_append: ({ id, text }) => client.append(id, text),
-      scratchpad_update: ({ id, ...patch }) => client.update(id, patch),
-      scratchpad_history: ({ id, limit }) => client.revisions(id, { limit: limit ?? 20 }),
-      scratchpad_diff: ({ id, ...q }) => client.diff(id, q),
-      scratchpad_delete: ({ id }) => Effect.as(client.delete(id), { deleted: id }),
-      scratchpad_views: () => client.views(),
-      scratchpad_save_view: (view) => client.createView(view),
+      ...noteHandlers(client),
       scratchpad_hooks: ({ cwd }) => hooks(cwd ?? process.cwd()),
     });
+  }),
+);
+
+/** The HTTP server's (claude.ai's connectors): the note tools only. */
+export const NoteHandlers = Notes.toLayer(
+  Effect.gen(function* () {
+    return noteHandlers(yield* Client);
   }),
 );

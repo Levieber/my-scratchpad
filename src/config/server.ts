@@ -8,14 +8,10 @@ import * as Redacted from "effect/Redacted";
 
 import { DEFAULT_MAX_IMPORT_BYTES } from "@/shared/archive";
 
-import { optional, platformPort, port, xdg } from "./env";
+import { bindHost, optional, port, xdg } from "./env";
 
 export const ServerConfig = Config.all({
-  host: Config.all([optional("PAD_HOST"), platformPort]).pipe(
-    Config.map(([host, platform]) =>
-      Option.getOrElse(host, () => (Option.isSome(platform) ? "0.0.0.0" : "127.0.0.1")),
-    ),
-  ),
+  host: bindHost,
   port,
   db: Config.all([optional("PAD_DB"), xdg("XDG_DATA_HOME", ".local/share")]).pipe(
     Config.map(([db, data]) => Option.getOrElse(db, () => join(data, "scratchpad", "pad.db"))),

@@ -30,5 +30,34 @@ export default defineRailway(() => {
     },
   });
 
-  return project("scratchpad", { resources: [web] });
+  // claude.ai's connectors (web, desktop, mobile) reach the scratchpad here: the MCP server over
+  // HTTP (src/mcp-http.ts), with its own OAuth, calling the API like any other client. A service
+  // of its own because clients never run inside the server (docs/architecture.md); it has no
+  // volume and keeps nothing on disk.
+  const mcp = service("mcp", {
+    source: github("Levieber/my-scratchpad", { branch: "main" }),
+    build: { builder: "RAILPACK" },
+    start: "bun run start:mcp",
+    healthcheck: "/health",
+    healthcheckTimeout: 30,
+    deploy: {
+      // Authorization codes live in its memory between the approval and the token request, so
+      // both must reach the same instance.
+      numReplicas: 1,
+      restartPolicyType: "ON_FAILURE",
+      restartPolicyMaxRetries: 10,
+    },
+    env: {
+      NODE_ENV: "production",
+      // The API at its public domain: always reachable, whatever the private network supports.
+      PAD_URL: "https://${{web.RAILWAY_PUBLIC_DOMAIN}}",
+      // The same secret as the API's, read from it rather than set twice.
+      PAD_TOKEN: web.env.PAD_TOKEN,
+      PAD_AUTHOR: "claude",
+      // Signs the connectors' tokens; set once in Railway (changing it signs them all out).
+      PAD_OAUTH_SECRET: preserve(),
+    },
+  });
+
+  return project("scratchpad", { resources: [web, mcp] });
 });
