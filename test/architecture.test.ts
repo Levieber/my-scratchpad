@@ -29,6 +29,7 @@ const CLIENTS = [
   "src/cli.ts",
   "src/cli/**/*.ts",
   "src/mcp.ts",
+  "src/mcp-http.ts",
   "src/mcp/**/*.ts",
   "src/client/**/*.ts",
   "integrations/**/*.ts",

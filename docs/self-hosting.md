@@ -52,6 +52,8 @@ pad login https://pad.example.com <token>    # CLI, MCP server and Claude Code h
 bun run setup:claude                         # optional: wire up Claude Code (see claude-code.md)
 ```
 
+Claude on the web, desktop and phone connects through a custom connector: `bun run start:mcp` beside the server, behind HTTPS (see [claude-ai.md](claude-ai.md)).
+
 Agents attribute their writes with `X-Pad-Author: <name>`; the PWA asks for the token the first time it gets a 401.
 
 ## Back up, or move to another server

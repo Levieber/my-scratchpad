@@ -11,6 +11,7 @@ import * as Redacted from "effect/Redacted";
 
 import { ClientConfig } from "@/config/client";
 import { HookConfig } from "@/config/hooks";
+import { McpHttpConfig } from "@/config/mcp-http";
 import { ServerConfig } from "@/config/server";
 
 const env = (vars: Record<string, string>) =>
@@ -131,5 +132,53 @@ describe("client config", () => {
     const config = await load({ XDG_CONFIG_HOME: "/nonexistent", PAD_PORT: "7000" });
     expect(config.url).toBe("http://127.0.0.1:7000");
     expect(Option.isNone(config.token)).toBe(true);
+  });
+});
+
+describe("MCP over HTTP config", () => {
+  const mcp = (vars: Record<string, string> = {}) =>
+    Effect.runPromise(McpHttpConfig.parse(env(vars)));
+
+  test("locally: loopback on 7778, where the API's 7777 isn't, attributed to claude", async () => {
+    expect(await mcp({ PAD_PORT: "7777" })).toMatchObject({
+      host: "127.0.0.1",
+      port: 7778,
+      publicUrl: "http://127.0.0.1:7778",
+      author: "claude",
+    });
+    expect(await mcp({ PAD_MCP_PORT: "9001" })).toMatchObject({
+      port: 9001,
+      publicUrl: "http://127.0.0.1:9001",
+    });
+  });
+
+  test("on Railway: the platform's port on every interface, at the service's own domain", async () => {
+    expect(
+      await mcp({
+        PORT: "8080",
+        PAD_MCP_PORT: "9001",
+        RAILWAY_PUBLIC_DOMAIN: "mcp.up.railway.app",
+      }),
+    ).toMatchObject({ host: "0.0.0.0", port: 8080, publicUrl: "https://mcp.up.railway.app" });
+  });
+
+  test("PAD_MCP_URL wins, as an origin; a path or junk fails instead of being used", async () => {
+    const config = await mcp({
+      PAD_MCP_URL: "https://pad-mcp.example.com/",
+      RAILWAY_PUBLIC_DOMAIN: "x.up.railway.app",
+    });
+    expect(config.publicUrl).toBe("https://pad-mcp.example.com");
+    expect((await mcp({ PAD_MCP_URL: "" })).publicUrl).toBe("http://127.0.0.1:7778");
+    for (const bad of ["https://pad.example.com/mcp", "pad.example.com", "ftp://pad.example.com"])
+      expect(
+        Exit.isFailure(await Effect.runPromiseExit(McpHttpConfig.parse(env({ PAD_MCP_URL: bad })))),
+      ).toBe(true);
+  });
+
+  test("the signing secret is optional and redacted", async () => {
+    expect(Option.isNone((await mcp()).oauthSecret)).toBe(true);
+    const { oauthSecret } = await mcp({ PAD_OAUTH_SECRET: "rotate-me" });
+    expect(Option.map(oauthSecret, Redacted.value)).toEqual(Option.some("rotate-me"));
+    expect(Bun.inspect({ oauthSecret })).not.toContain("rotate-me");
   });
 });

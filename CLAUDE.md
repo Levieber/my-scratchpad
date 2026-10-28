@@ -34,7 +34,7 @@ Area-specific guidance lives in project skills (`.claude/skills/`). Each condens
 | `architecture` | adding endpoints/commands/tools, errors, migrations, writing Effect code, lint, a boundary fails, PWA styling | `docs/architecture.md`, `docs/effect.md`, `docs/design-system.md` |
 | `deployment`   | env vars, config, start/build scripts, Railway                                                                | `docs/deployment.md`                                              |
 
-The Claude Code integration itself is described in `docs/claude-code.md`. `README.md` is a short index for people; put detail in `docs/`.
+The Claude Code integration itself is described in `docs/claude-code.md`; Claude's connectors (the MCP server over HTTP, `src/mcp-http.ts`, and its OAuth) in `docs/claude-ai.md`. `README.md` is a short index for people; put detail in `docs/`.
 
 ## Vendored Repositories
 

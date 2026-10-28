@@ -16,6 +16,7 @@
     "build:icons": "bun scripts/build-icons.ts",
     "build:pad": "bun scripts/build.ts pad",
     "mcp": "bun src/mcp.ts",
+    "start:mcp": "NODE_ENV=production bun src/mcp-http.ts",
     "typecheck": "tsc --noEmit",
     "lint": "bun run --parallel \"lint:check:*\"",
     "lint:check:quality": "oxlint --disable-nested-config",

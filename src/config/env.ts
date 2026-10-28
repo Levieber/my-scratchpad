@@ -19,6 +19,13 @@ export const xdg = (name: string, fallback: string) =>
 // Railway (and most PaaS) inject PORT and expect the app on 0.0.0.0.
 export const platformPort = Config.option(Config.Port("PORT"));
 
+/** `PAD_HOST`, else every interface on a platform (it sets PORT), else loopback. */
+export const bindHost = Config.all([optional("PAD_HOST"), platformPort]).pipe(
+  Config.map(([host, platform]) =>
+    Option.getOrElse(host, () => (Option.isSome(platform) ? "0.0.0.0" : "127.0.0.1")),
+  ),
+);
+
 export const port = Config.all([Config.option(Config.Port("PAD_PORT")), platformPort]).pipe(
   Config.map(([own, platform]) =>
     Option.getOrElse(
