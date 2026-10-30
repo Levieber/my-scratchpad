@@ -171,20 +171,29 @@ describe("PWA Content-Security-Policy", () => {
 // loads Bun's bundler and Tailwind's compiler: that costs ~80 MB of RSS for as long as it runs.
 describe("a prebuilt PWA", () => {
   const dir = mkdtempSync(join(tmpdir(), "pad-prebuilt-"));
-  const HTML = `<!doctype html><html><head><title>Prebuilt</title>
+  const HEAD = `<!doctype html><html><head><title>Prebuilt</title>
 <link rel="apple-touch-icon" href="/icon-1a2b.png"><link rel="stylesheet" href="/chunk-c3d4.css">
-<script type="module" src="/chunk-e5f6.js"></script></head><body><div id="root"></div></body></html>`;
+<script type="module" src="/chunk-e5f6.js"></script>`;
+  const HTML = `${HEAD}</head><body><div id="root"></div></body></html>`;
+  // As Bun splits the PWA: the entry imports a chunk it needs at once and another when a part
+  // opens, which in turn imports one more.
+  const ENTRY = `import{a}from"/chunk-a1a1.js";const S=()=>import("/chunk-b2b2.js");console.log('app')`;
   let prebuilt: TestServer;
   const fetchPrebuilt = (path: string) => fetch(new URL(path, prebuilt.url));
 
   beforeAll(async () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "index.html"), HTML);
-    writeFileSync(join(dir, "chunk-e5f6.js"), "console.log('app')");
+    writeFileSync(join(dir, "chunk-e5f6.js"), ENTRY);
+    writeFileSync(join(dir, "chunk-a1a1.js"), "export const a=1");
+    writeFileSync(join(dir, "chunk-b2b2.js"), `import"/chunk-c3c3.js";export const S=1`);
+    writeFileSync(join(dir, "chunk-c3c3.js"), "export const c=1");
     writeFileSync(join(dir, "chunk-c3d4.css"), "body{margin:0}");
     writeFileSync(join(dir, "icon-1a2b.png"), PNG);
-    // Not named by the page: whatever else lies in the folder (the compiled `pad` once did) is not ours to serve.
+    // Not named by the page or its scripts: whatever else lies in the folder (the compiled `pad`
+    // once did; an executable's holds the server's code) is not ours to serve.
     writeFileSync(join(dir, "pad"), "an executable");
+    writeFileSync(join(dir, "chunk-d4d4.js"), "the server's own code");
     prebuilt = await testServer({ prebuilt: dir });
   });
   afterAll(async () => {
@@ -192,7 +201,10 @@ describe("a prebuilt PWA", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test("every page's address serves the built page, under the policy", async () => {
+  test("every page's address serves the built page, under the policy, prefetching what loads later", async () => {
+    // The lazy chunks only: fetched when the browser is idle, not run, so they cost no memory
+    // until used and the service worker has them offline. What the entry imports loads anyway.
+    const page = `${HEAD}<link rel="prefetch" crossorigin href="/chunk-b2b2.js"><link rel="prefetch" crossorigin href="/chunk-c3c3.js"></head><body><div id="root"></div></body></html>`;
     for (const path of Object.values(PAGES)) {
       const res = await fetchPrebuilt(path);
       expect([path, res.status, res.headers.get("content-type")]).toEqual([
@@ -200,7 +212,7 @@ describe("a prebuilt PWA", () => {
         200,
         "text/html;charset=utf-8",
       ]);
-      expect(await res.text()).toBe(HTML);
+      expect(await res.text()).toBe(page);
       expect(res.headers.get("content-security-policy")).toBe(contentSecurityPolicy(false));
       // The page names hashed files; the page itself is what changes with a deploy.
       expect(res.headers.get("cache-control")).toBe("no-cache");
@@ -210,6 +222,9 @@ describe("a prebuilt PWA", () => {
   test("what the page names is served for good, under its hashed name", async () => {
     const wanted: [string, string][] = [
       ["/chunk-e5f6.js", "text/javascript"],
+      ["/chunk-a1a1.js", "text/javascript"],
+      ["/chunk-b2b2.js", "text/javascript"],
+      ["/chunk-c3c3.js", "text/javascript"],
       ["/chunk-c3d4.css", "text/css"],
       ["/icon-1a2b.png", "image/png"],
     ];
@@ -222,15 +237,18 @@ describe("a prebuilt PWA", () => {
       ]);
       expect(res.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
     }
-    expect(await (await fetchPrebuilt("/chunk-e5f6.js")).text()).toBe("console.log('app')");
+    expect(await (await fetchPrebuilt("/chunk-e5f6.js")).text()).toBe(ENTRY);
   });
 
-  test("a file the page doesn't name is not served", async () => {
-    const res = await fetchPrebuilt("/pad");
-    expect([res.status, ((await res.json()) as { error: string }).error]).toEqual([
-      404,
-      "notFound",
-    ]);
+  test("a file neither the page nor its scripts name is not served", async () => {
+    for (const path of ["/pad", "/chunk-d4d4.js"]) {
+      const res = await fetchPrebuilt(path);
+      expect([path, res.status, ((await res.json()) as { error: string }).error]).toEqual([
+        path,
+        404,
+        "notFound",
+      ]);
+    }
   });
 
   test("the API and the PWA's own files are untouched", async () => {
@@ -253,6 +271,16 @@ describe("building the PWA before serving it", () => {
         200,
         "public, max-age=31536000, immutable",
       ]);
+      // Split: Settings, History, the table and the markdown renderer are chunks of their own,
+      // prefetched and served.
+      const lazy = [...page.matchAll(/<link rel="prefetch" crossorigin href="([^"]+)">/g)].map(
+        (m) => m[1]!,
+      );
+      expect(lazy.length).toBeGreaterThanOrEqual(4);
+      const statuses = await Promise.all(
+        lazy.map(async (path) => [path, (await fetch(new URL(path, server.url))).status]),
+      );
+      expect(statuses).toEqual(lazy.map((path) => [path, 200]));
     } finally {
       await server.stop();
     }

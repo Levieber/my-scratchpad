@@ -14,8 +14,8 @@ export const PREBUILT = join(ROOT, "dist", "web");
 
 /**
  * Builds the PWA into `PREBUILT` and succeeds with that folder, or with nothing when it can't:
- * a compiled `pad` has no source tree to build from, and a tree that can't be written to has
- * nowhere to build into. The server then bundles on demand as it always did, so this is only ever
+ * a tree that can't be written to has nowhere to build into. (An executable has no source tree,
+ * and needs none: it carries the PWA built, pages.ts.) The server then bundles on demand as it always did, so this is only ever
  * an optimisation. Built at each start rather than at deploy, so a pulled change is never served
  * as the old build.
  */

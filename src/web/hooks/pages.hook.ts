@@ -1,7 +1,7 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-import { NOTE_ID } from "@/shared/domain";
+import { NOTE_ID } from "@/shared/ids";
 import { sameTitle } from "@/shared/links";
 import { openNote } from "@/web/hooks/editor.hook";
 import { newNote } from "@/web/hooks/focus";

@@ -11,7 +11,7 @@ It offers the same tools as Claude Code's server (search, get, create, append, u
 
 ## Setting it up on Railway
 
-`.railway/railway.ts` declares the `mcp` service next to `web`: same repository, started with `bun run start:mcp`, no volume. It reads `PAD_TOKEN` from `web` and calls the API at `web`'s public domain. Once the IaC is applied (see [deployment.md](deployment.md#railway)):
+`.railway/railway.ts` declares the `mcp` service next to `web`: same repository, started with `sh scripts/start.sh mcp` (`bun run start:mcp`: the MCP server built into an executable at start, see [deployment.md](deployment.md#running)), no volume. It reads `PAD_TOKEN` from `web` and calls the API at `web`'s public domain. Once the IaC is applied (see [deployment.md](deployment.md#railway)):
 
 ```sh
 railway variables --service mcp --set "PAD_OAUTH_SECRET=$(openssl rand -hex 32)"   # signs the connectors' tokens

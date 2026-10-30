@@ -88,7 +88,8 @@ After=network.target
 [Service]
 WorkingDirectory=${REPO}
 Environment=NODE_ENV=production
-ExecStart=${BUN} src/server.ts
+Environment=PATH=${dirname(BUN)}:/usr/bin:/bin
+ExecStart=/bin/sh ${join(REPO, "scripts/start.sh")} server
 Restart=on-failure
 
 [Install]

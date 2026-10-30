@@ -33,7 +33,7 @@ bun run start        # http://127.0.0.1:7777; the database is ~/.local/share/scr
    ```
 
 4. Put a reverse proxy with HTTPS (Caddy, nginx, Cloudflare Tunnel) in front. The token travels in a header, so never expose the plain HTTP port.
-5. Keep it running with your service manager. A systemd unit is enough: `ExecStart=/usr/local/bin/bun run start`, `WorkingDirectory=<the clone>`, and the variables above in `Environment=` or an `EnvironmentFile=`.
+5. Keep it running with your service manager. A systemd unit is enough: `ExecStart=/bin/sh <the clone>/scripts/start.sh server`, `WorkingDirectory=<the clone>`, a `PATH` that finds `bun`, and the variables above in `Environment=` or an `EnvironmentFile=`. The script builds the server into one executable and becomes it; `bun run start` does the same but stays resident above it, ~10 MB for nothing ([deployment.md](deployment.md#running)).
 
 Back up by copying `pad.db` (with its `-wal` file, or after stopping the server). Schema changes ship as migrations that run on startup, so updating is `git pull && bun install` and a restart.
 

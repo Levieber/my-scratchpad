@@ -8,10 +8,11 @@ export default defineRailway(() => {
     // Deploys on every push to main (needs the Railway GitHub app to have access to the repo).
     source: github("Levieber/my-scratchpad", { branch: "main" }),
     // No Dockerfile, so Railpack builds it and picks Bun up from bun.lock. There is no server
-    // build step: `start` runs src/server.ts, which builds the PWA itself before serving it
-    // (src/server/pwa-build.ts), so nothing here depends on what Railpack's build does.
+    // build step: the start script builds the server into one executable, the PWA inside it, and
+    // becomes it (scripts/start.sh), so nothing here depends on what Railpack's build does. Run
+    // directly rather than as `bun run start`, which would stay resident beside it (~10 MB).
     build: { builder: "RAILPACK" },
-    start: "bun run start",
+    start: "sh scripts/start.sh server",
     healthcheck: "/api/health",
     healthcheckTimeout: 30,
     volumeMounts: { "/data": data },
@@ -37,7 +38,8 @@ export default defineRailway(() => {
   const mcp = service("mcp", {
     source: github("Levieber/my-scratchpad", { branch: "main" }),
     build: { builder: "RAILPACK" },
-    start: "bun run start:mcp",
+    // As `web` does: built into an executable at start, run without `bun run` above it.
+    start: "sh scripts/start.sh mcp",
     healthcheck: "/health",
     healthcheckTimeout: 30,
     deploy: {

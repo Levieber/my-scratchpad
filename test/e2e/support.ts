@@ -46,13 +46,16 @@ export type App = {
   };
 };
 
-/** One server and one browser for the file; each test opens the contexts it needs. */
-export function useApp(): App {
+/**
+ * One server and one browser for the file; each test opens the contexts it needs. `prebuilt`
+ * builds the PWA as it ships and says where, for a server that serves that build.
+ */
+export function useApp({ prebuilt }: { prebuilt?: () => Promise<string> } = {}): App {
   const app = {} as App;
   const contexts: BrowserContext[] = [];
 
   beforeAll(async () => {
-    app.server = await testServer();
+    app.server = await testServer({ prebuilt: await prebuilt?.() });
     // Scrollbars drawn, as a person sees them: headless Chrome hides them by default, and with
     // them the gutters the layout keeps for them (test/e2e/scroll.test.ts).
     app.browser = await chromium.launch({

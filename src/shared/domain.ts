@@ -2,13 +2,12 @@
 // every client (the PWA included, type-only) shares the types derived from them.
 import * as Schema from "effect/Schema";
 
+import { NOTE_ID } from "./ids";
 import { KIND_NAMES } from "./kinds";
 import { type Layout, TABLE_COLUMNS } from "./layouts";
 
 export const Kind = Schema.Literals(KIND_NAMES);
 
-/** What the API accepts as a client-chosen id: URL-safe and long enough not to collide by accident. */
-export const NOTE_ID = /^[A-Za-z0-9_-]{8,64}$/;
 export const NoteId = Schema.String.pipe(Schema.check(Schema.isPattern(NOTE_ID)));
 
 export const Progress = Schema.Struct({ done: Schema.Number, total: Schema.Number });

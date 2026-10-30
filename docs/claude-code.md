@@ -54,7 +54,7 @@ pad hooks reset [hook] [--here|--scope x]        # back to the default there
 
 The hooks run on every session, edit and turn, so `pad` and the hooks are one executable: `bun run build:pad` compiles `src/cli.ts` with bytecode into `dist/pad` (~86 MB, Bun's runtime included), and the hooks are its `pad hook <name>` commands. A hook or `pad` run takes ~25 ms that way, against ~100 ms from source (see [effect.md](effect.md)). The PWA and the files `pad serve` needs are inside it too; `test/binary.test.ts` builds it and checks that.
 
-The executable doesn't follow the source: **after changing or pulling code, run `bun run build:pad`** (the `~/.local/bin/pad` link picks the new one up), or `pad` and the hooks keep running the old code. `bun src/cli.ts …` always runs the source. The MCP server and the systemd service run from source, so they start once and need no rebuild.
+The executable doesn't follow the source: **after changing or pulling code, run `bun run build:pad`** (the `~/.local/bin/pad` link picks the new one up), or `pad` and the hooks keep running the old code. `bun src/cli.ts …` always runs the source. The MCP server runs from source, and the systemd service builds its own executable each time it starts (`scripts/start.sh`), so neither needs a rebuild: restart the service (`systemctl --user restart scratchpad`) to serve pulled code.
 
 The Stop hook fires at the end of every turn, not every task, so a long session gets one review per turn that edited files. Set `PAD_REVIEW=off` in the environment Claude Code starts from to disable it.
 

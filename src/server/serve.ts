@@ -14,7 +14,7 @@ import { ServerConfig } from "@/config/server";
 import { Store } from "@/server/storage/store";
 
 import { logsLayer, requestLogging } from "./observability";
-import { pageRoutes } from "./pages";
+import { embeddedPwa, pageRoutes } from "./pages";
 import { buildPwa } from "./pwa-build";
 import { routes } from "./routes";
 
@@ -86,12 +86,15 @@ export const main = Effect.gen(function* () {
   if (!LOOPBACK.has(config.host) && Option.isNone(config.token))
     return yield* new UnsafeListen({ host: config.host });
   const token = Option.getOrUndefined(config.token);
-  // In production only: development keeps Bun's dev server and its HMR.
-  const prebuilt = config.production ? yield* buildPwa : undefined;
+  // In production only: development keeps Bun's dev server and its HMR. An executable carries the
+  // PWA built already (scripts/builds.ts).
+  const prebuilt = config.production && !embeddedPwa ? yield* buildPwa : undefined;
   if (config.production)
-    yield* prebuilt
-      ? Effect.log("PWA built ahead of time")
-      : Effect.logWarning("PWA not prebuilt: Bun will bundle it on the first request");
+    yield* embeddedPwa
+      ? Effect.log("PWA built into the executable")
+      : prebuilt
+        ? Effect.log("PWA built ahead of time")
+        : Effect.logWarning("PWA not prebuilt: Bun will bundle it on the first request");
   const live = serverLayer({
     token,
     hostname: config.host,

@@ -133,9 +133,90 @@ describe("compiled pad", () => {
         ["/icon.svg", 200],
         [script, 200],
       ]);
+      // The production build: without it, React's development build and Query's devtools
+      // (their `tsqd-` classes) shipped too, half again as much to download and run.
+      expect((await (await fetch(new URL(script, base))).text()).includes("tsqd-")).toBe(false);
     } finally {
       proc.kill("SIGINT");
       await proc.exited;
     }
   });
+});
+
+const upAt = async (url: string) => {
+  for (let i = 0; i < 50; i++) {
+    if (
+      await fetch(url).then(
+        (r) => r.ok,
+        () => false,
+      )
+    )
+      return;
+    await Bun.sleep(100);
+  }
+};
+
+// What production runs (scripts/start.sh): each server built into an executable of its own.
+describe("the servers as executables", () => {
+  const build = (target: string) =>
+    Bun.spawnSync(["bun", "scripts/build.ts", target, `--outfile=${join(dir, `pad-${target}`)}`], {
+      cwd: ROOT,
+    }).exitCode;
+
+  test("the API serves the PWA it carries, its lazy chunks prefetched and served", async () => {
+    expect(build("server")).toBe(0);
+    const port = "7797";
+    const proc = Bun.spawn([join(dir, "pad-server")], {
+      env: {
+        ...process.env,
+        PAD_PORT: port,
+        PAD_DB: join(dir, "server.db"),
+        PAD_TOKEN: "",
+        NODE_ENV: "production",
+      },
+      stdout: "pipe",
+      stderr: "ignore",
+    });
+    try {
+      const base = `http://127.0.0.1:${port}`;
+      await upAt(`${base}/api/health`);
+      const page = await (await fetch(base)).text();
+      const files = [...page.matchAll(/(?:src|href)="(\/[^"]+\.(?:js|css))"/g)].map((m) => m[1]!);
+      const lazy = files.filter((f) => page.includes(`rel="prefetch" crossorigin href="${f}"`));
+      expect(lazy.length).toBeGreaterThanOrEqual(4);
+      const statuses = await Promise.all(
+        ["/sw.js", ...files].map(async (path) => [path, (await fetch(new URL(path, base))).status]),
+      );
+      expect(statuses).toEqual(["/sw.js", ...files].map((path) => [path, 200]));
+    } finally {
+      proc.kill("SIGINT");
+      await proc.exited;
+    }
+    // Built already: nothing to build at start, and nothing bundled on the first request.
+    expect(await new Response(proc.stdout).text()).toContain("PWA built into the executable");
+  }, 60_000);
+
+  test("the MCP server over HTTP starts and answers its health check", async () => {
+    expect(build("mcp")).toBe(0);
+    const port = "7798";
+    const proc = Bun.spawn([join(dir, "pad-mcp")], {
+      env: {
+        ...process.env,
+        PAD_MCP_PORT: port,
+        PORT: "",
+        PAD_URL: server.url.origin,
+        PAD_TOKEN: "test-token",
+        NODE_ENV: "production",
+      },
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    try {
+      await upAt(`http://127.0.0.1:${port}/health`);
+      expect((await fetch(`http://127.0.0.1:${port}/health`)).status).toBe(200);
+    } finally {
+      proc.kill("SIGINT");
+      await proc.exited;
+    }
+  }, 60_000);
 });

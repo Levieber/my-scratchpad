@@ -1,7 +1,7 @@
 import { ARCHIVE_FORMAT, ARCHIVE_VERSION } from "@/shared/archive";
-import { NOTE_ID } from "@/shared/domain";
 import { ERROR_CODES } from "@/shared/errors";
 import { HOOK_NAMES, MAX_INCLUDE } from "@/shared/hooks";
+import { NOTE_ID } from "@/shared/ids";
 import { KIND_NAMES, KINDS } from "@/shared/kinds";
 import { LAYOUT_KEYS, LAYOUTS_VERSION, TABLE_COLUMNS } from "@/shared/layouts";
 import { DIALECT } from "@/shared/markdown";

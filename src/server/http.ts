@@ -20,8 +20,9 @@ import type {
   ViewNotFound,
 } from "@/server/storage/errors";
 import type { ListQuery } from "@/server/storage/notes";
-import { NOTE_ID, type Note, NoteInput } from "@/shared/domain";
+import { type Note, NoteInput } from "@/shared/domain";
 import { ERROR_MESSAGES, type ErrorBody, type ErrorCode } from "@/shared/errors";
+import { NOTE_ID } from "@/shared/ids";
 import { isKind, KIND_NAMES } from "@/shared/kinds";
 import { parseQuery } from "@/shared/query";
 import { failedField, inputProblem } from "@/shared/validation";
