@@ -9,7 +9,7 @@ Scratchpad is one process and one SQLite file. Running it yourself means you own
 | Where                      | Good for                            | What you do                                                       |
 | -------------------------- | ----------------------------------- | ----------------------------------------------------------------- |
 | Your machine (loopback)    | one person, one computer            | `bun run start`; no token needed while it listens on `127.0.0.1`  |
-| A server you control (VPS) | reaching it from phone and laptop   | run it behind HTTPS with `PAD_TOKEN` set; see below               |
+| A server you control (VPS) | reaching it from phone and laptop   | Docker or a clone, behind HTTPS with `PAD_TOKEN` set; see below   |
 | Railway                    | the same, without managing a server | the repo's IaC in `.railway/`; see [deployment.md](deployment.md) |
 
 A hosted version run by the maintainer is not available yet. If it appears, it will be the same software behind the same API, so the clients only need `pad login <url> <token>` to use either.
@@ -21,6 +21,17 @@ git clone <your fork or this repo> && cd my-scratchpad
 bun install
 bun run start        # http://127.0.0.1:7777; the database is ~/.local/share/scratchpad/pad.db
 ```
+
+## With Docker
+
+The `Dockerfile` builds an image holding the server and the MCP server over HTTP, each compiled into one executable (about 50 MB of memory once running). It listens on every interface, so it needs a token, and keeps the database on `/data`:
+
+```sh
+docker build -t scratchpad .
+docker run -d -p 7777:7777 -v scratchpad:/data -e PAD_TOKEN=<token> scratchpad
+```
+
+Put HTTPS in front of it as below. The MCP server for Claude's connectors is the same image: `docker run -p 7778:7778 -e PAD_URL=<the API> -e PAD_TOKEN=<token> scratchpad /app/pad-mcp`.
 
 ## On a server
 

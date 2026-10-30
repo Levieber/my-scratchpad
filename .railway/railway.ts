@@ -7,12 +7,11 @@ export default defineRailway(() => {
   const web = service("web", {
     // Deploys on every push to main (needs the Railway GitHub app to have access to the repo).
     source: github("Levieber/my-scratchpad", { branch: "main" }),
-    // No Dockerfile, so Railpack builds it and picks Bun up from bun.lock. There is no server
-    // build step: the start script builds the server into one executable, the PWA inside it, and
-    // becomes it (scripts/start.sh), so nothing here depends on what Railpack's build does. Run
-    // directly rather than as `bun run start`, which would stay resident beside it (~10 MB).
-    build: { builder: "RAILPACK" },
-    start: "sh scripts/start.sh server",
+    // Built from the Dockerfile: the server compiled into one executable, the PWA inside it, in an
+    // image that holds only that. A deploy starts it as it is (~40 ms), and a build that fails
+    // fails the deploy instead of starting something else.
+    build: { builder: "DOCKERFILE", dockerfilePath: "Dockerfile" },
+    start: "/app/pad-server",
     healthcheck: "/api/health",
     healthcheckTimeout: 30,
     volumeMounts: { "/data": data },
@@ -37,9 +36,9 @@ export default defineRailway(() => {
   // volume and keeps nothing on disk.
   const mcp = service("mcp", {
     source: github("Levieber/my-scratchpad", { branch: "main" }),
-    build: { builder: "RAILPACK" },
-    // As `web` does: built into an executable at start, run without `bun run` above it.
-    start: "sh scripts/start.sh mcp",
+    // The same image as `web`'s, which carries both executables.
+    build: { builder: "DOCKERFILE", dockerfilePath: "Dockerfile" },
+    start: "/app/pad-mcp",
     healthcheck: "/health",
     healthcheckTimeout: 30,
     deploy: {
