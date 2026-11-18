@@ -3,19 +3,21 @@
 Claude Code starts the MCP server as a process on your machine (`src/mcp.ts`, see [claude-code.md](claude-code.md)). Claude on the web, the desktop app and the phone can't: a **custom connector** is a remote MCP server that Anthropic's servers call over HTTPS, signing in with OAuth. `src/mcp-http.ts` is that server. It is a client of the API like the others, so it changes nothing about where the notes live or who may reach them.
 
 ```
- claude.ai ──OAuth + /mcp──▶ mcp service (src/mcp-http.ts) ──PAD_TOKEN──▶ web service (the API) ──▶ SQLite
- (web, desktop, mobile)      Streamable HTTP, its own OAuth          HTTP, like pad and the PWA
+ claude.ai ──OAuth + /mcp──▶ MCP server (src/mcp-http.ts) ──PAD_TOKEN──▶ the API ──▶ SQLite
+ (web, desktop, mobile)      its own domain and port,         HTTP over loopback,
+                             Streamable HTTP, its own OAuth   like pad and the PWA
 ```
 
 It offers the same tools as Claude Code's server (search, get, create, append, update, history, diff, delete, views, save view) except `scratchpad_hooks`, which describes what the hooks show in a folder of your machine. Writes are attributed to `claude` (`PAD_AUTHOR`), so the PWA and `pad history` tell them apart from Claude Code's.
 
 ## Setting it up on Railway
 
-`.railway/railway.ts` declares the `mcp` service next to `web`: same repository, the same image (the `Dockerfile`) started as `/app/pad-mcp`, no volume; from a clone, `bun run start:mcp`. It reads `PAD_TOKEN` from `web` and calls the API at `web`'s public domain. Once the IaC is applied (see [deployment.md](deployment.md#railway)):
+On Railway it runs in the `web` service's process, beside the API (`/app/pad-services`, `src/services.ts`): its own port (`PAD_MCP_PORT`, 7778) behind its own domain, the API's `PAD_TOKEN`, and calls to the API over loopback. One process because Railway counts Bun's runtime once per container ([deployment.md](deployment.md#per-container-as-railway-counts-it)); it stays a client all the same, reaching the API only over HTTP. From a clone, alone, `bun run start:mcp`. Once the IaC is applied (see [deployment.md](deployment.md#railway)):
 
 ```sh
-railway variables --service mcp --set "PAD_OAUTH_SECRET=$(openssl rand -hex 32)"   # signs the connectors' tokens
-railway domain --service mcp                                                       # its public https address
+railway domain --service web --port 7778                       # its public https address
+railway variables --service web --set "PAD_MCP_URL=https://<that domain>" \
+  --set "PAD_OAUTH_SECRET=$(openssl rand -hex 32)"              # its origin; signs the connectors' tokens
 ```
 
 Then, in Claude: **Settings → Connectors → Add custom connector**, name it Scratchpad and give it `https://<the mcp domain>/mcp`. Leave the advanced OAuth fields empty: Claude registers itself. On Team and Enterprise plans an owner adds it for the organization first. **Connect** opens this server's page, which asks for your `PAD_TOKEN`; **Allow** sends you back to Claude, connected. A connector added on the web is there on the desktop and the phone too.
