@@ -88,22 +88,24 @@ And in a container, as Railway runs it: before, Bun, `node_modules` and the sour
 
 `docker stats` is no measure here: it moves with the page cache (one image read 18 and 52 MiB on two runs).
 
-### Per container, as Railway counts it
-
-Railway's memory graph (and bill) is the container's cgroup `memory.current`, page cache included, not what the processes hold. Most of it is Bun itself: its runtime's code is 82 MB of each ~115 MB executable, and a container starting it on a host that hasn't read the file yet is charged for most of it (`inactive_file`, read ahead around the pages it maps; the process never `read()`s it, and `--smol`, a plain `bun` running a bundle or stripping change nothing). Measured on the image, cold (the executables evicted from the page cache first with `dd iflag=nocache`, as a fresh host has them) and loaded (300 notes written, 400 searches and lists, the PWA and an export, 600 MCP requests). Production read 122 + 124 MB for the two services before, which the first row reproduces:
-
-| `memory.current`, both servers                 | Cold           | Loaded         |
-| ---------------------------------------------- | -------------- | -------------- |
-| Two services (`pad-server`, `pad-mcp`)         | 240 MB         | 272 MB         |
-| One container, two processes of one executable | 143 MB         | 163 MB         |
-| One process (`pad-services`)                   | 131 MB (−45 %) | 150 MB (−45 %) |
-
-Of the one process's 150 MB, 107 are the executable's pages and 39 what it holds (`anon`). The bar for a change here was a quarter off. What fell short: `trim` for compiled executables (only in Bun's canary, and ignored without a word by 1.4; −20 % on its own), `--smol` (nothing), and mounting the MCP server on the API's port (the OAuth routes and the PWA's pages sharing one origin, for no memory beyond the two-port process).
-
 - **Where a server's memory goes.** Bare Bun serving one route is 17 MB; importing `effect/Effect` makes it 31 MB, the HTTP, platform and SQL modules 48 MB, all of this project's server code 50 MB. So the startup cost is Effect's module graph as Bun loads it from source, file by file; one minified bundle loads less of it, and our own modules are ~2 MB, too little for lazy imports in the server to matter. An executable with bytecode measured 53 MB, without bytecode 55, a plain minified bundle run by `bun` 49: chosen is the executable, which needs no working directory to find its PWA (the plain bundle's HTML import resolves its files from the current one), carries the PWA built, and starts in ~40 ms once built. `bun --smol` changed nothing.
 - **What the server grows to.** Full list answers grow the heap to its working size (about 25 MB more over the first thousand), then slowly, about 1.7 MB per thousand more; an export is a transient peak (about 38 MB for three in a row), given back afterwards.
 - **The PWA in chunks.** What opens later (Settings, History, the table, the markdown renderer and its highlighter) is behind `React.lazy` and built as chunks of its own (`splitting`, `scripts/builds.ts`). The page names them as `<link rel="prefetch">` (`builtFiles` in `src/server/pages.ts`): the browser fetches them when idle without running them, and the service worker, which caches only what passes through it, has them for when the device is offline (`test/e2e/chunks.test.ts`). Effect is kept out of the bundle by `test/web/bundle.test.ts`, which sees what an import chain pulls in: one regex taken from `shared/domain.ts` had pulled in 78 KB of Schema.
 - **Not done, measured**: streaming the export would lower its peak, but it reads in one transaction so its pages agree, and holding SQLite's one connection while a slow client downloads would stall every other request; an export is rare and its memory comes back. `cn`'s configurable build (73 KB minified) is a choice recorded in `src/web/lib/utils.ts`.
+
+### Per container, as Railway counts it
+
+Railway's memory graph and bill are the container's cgroup `memory.current`, page cache included, not what its processes hold, so that is the measure here (not RSS, not `docker stats`). Most of it is Bun's runtime: its code is 82 MB of each ~115 MB executable, and a container starting it on a host that hasn't read the file yet is charged for most of it (`inactive_file`, read ahead around the pages it maps; the process never `read()`s it). `--smol`, a plain `bun` running a bundle, and stripping the binary change none of it; it is paid once per container, whatever runs in it.
+
+So the API and the MCP server run as one process (`src/services.ts`): one runtime, one heap. Measured on the image, cold (the executables evicted from the page cache first with `dd iflag=nocache`, as a fresh host has them) and loaded (300 notes written, 400 searches and lists, the PWA and an export, 600 MCP requests):
+
+| `memory.current`, both servers                | Cold   | Loaded |
+| --------------------------------------------- | ------ | ------ |
+| A service each (`pad-server`, `pad-mcp`)      | 240 MB | 272 MB |
+| One container, a process each, one executable | 143 MB | 163 MB |
+| One process (`pad-services`)                  | 131 MB | 150 MB |
+
+Of the one process's 150 MB, 107 are the executable's pages and 39 what it holds (`anon`). The MCP server keeps a port and an origin of its own: on the API's port its OAuth routes would share one origin with the PWA's pages, for no memory saved. Bun's `trim` for compiled executables would take another ~20 % off the runtime's pages, but only its canary has it; 1.4 ignores the option without a word.
 
 ## Railway
 
@@ -113,8 +115,7 @@ It declares one service, `web`, deployed from `github.com/Levieber/my-scratchpad
 
 - a 1 GB volume at `/data` holding the SQLite file — that volume _is_ the database, so exactly one replica;
 - a `/api/health` healthcheck, which reads the database: a deploy whose volume can't be queried never goes live (see [Observability](architecture.md#observability));
-- `PAD_TOKEN` via `preserve()`: set once in Railway, never in the repo. The server refuses to start publicly without it.
-
+- `PAD_TOKEN` via `preserve()`: set once in Railway, never in the repo. The server refuses to start publicly without it;
 - for the MCP server, `PAD_MCP_URL` (its domain's https origin, its OAuth issuer) and `PAD_OAUTH_SECRET` via `preserve()`. The one replica holds its authorization codes in memory too. It calls the API over loopback: no egress, and no private network needed. The healthcheck is the API's; the MCP server failing to start ends the process, so a deploy fails with it.
 
 ```sh
@@ -130,11 +131,10 @@ pad login https://<domain> "$TOKEN"              # CLI, MCP and hook now use Rai
 
 # claude.ai's connectors, once: a second domain, targeting port 7778
 railway domain --service web --port 7778
+railway domain update <that domain> --service web --domain <name>   # optional: name it yourself
 railway variables --service web --set "PAD_MCP_URL=https://<that domain>" \
   --set "PAD_OAUTH_SECRET=$(openssl rand -hex 32)"  # then add https://<that domain>/mcp in Claude
 ```
-
-From the two services this replaced (`web` and `mcp`), once, before applying: copy the `mcp` service's `PAD_OAUTH_SECRET` to `web` and set `PAD_MCP_URL` there to the `mcp` service's domain; apply (which removes `mcp`); then give that domain to `web` with target port 7778 in the dashboard. Same origin, same secret: the connectors already added keep working.
 
 `railway config plan` never changes anything. `railway config apply` does, so read the plan first.
 
