@@ -15,7 +15,8 @@ It offers the same tools as Claude Code's server (search, get, create, append, u
 On Railway it runs in the `web` service's process, beside the API (`/app/pad-services`, `src/services.ts`): its own port (`PAD_MCP_PORT`, 7778) behind its own domain, the API's `PAD_TOKEN`, and calls to the API over loopback. One process because Railway counts Bun's runtime once per container ([deployment.md](deployment.md#per-container-as-railway-counts-it)); it stays a client all the same, reaching the API only over HTTP. From a clone, alone, `bun run start:mcp`. Once the IaC is applied (see [deployment.md](deployment.md#railway)):
 
 ```sh
-railway domain --service web --port 7778                       # its public https address
+# its public https address: web → Settings → Networking → Generate Domain, port 7778, in the
+# dashboard (the CLI generates one Railway domain per service, and we
 railway variables --service web --set "PAD_MCP_URL=https://<that domain>" \
   --set "PAD_OAUTH_SECRET=$(openssl rand -hex 32)"              # its origin; signs the connectors' tokens
 ```

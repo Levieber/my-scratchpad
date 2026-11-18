@@ -129,9 +129,10 @@ railway variables --service web --set "PAD_TOKEN=$TOKEN"
 railway domain --service web
 pad login https://<domain> "$TOKEN"              # CLI, MCP and hook now use Railway
 
-# claude.ai's connectors, once: a second domain, targeting port 7778
-railway domain --service web --port 7778
-railway domain update <that domain> --service web --domain <name>   # optional: name it yourself
+# claude.ai's connectors, once: a second domain, targeting port 7778. The CLI generates one
+# Railway domain per service, so this one comes from the dashboard: web → Settings → Networking →
+# Generate Domain, port 7778.
+railway domain update <that domain> --service web --domain <name>   #
 railway variables --service web --set "PAD_MCP_URL=https://<that domain>" \
   --set "PAD_OAUTH_SECRET=$(openssl rand -hex 32)"  # then add https://<that domain>/mcp in Claude
 ```
