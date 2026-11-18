@@ -14,7 +14,6 @@ export default defineRailway(() => {
       numReplicas: 1,
       restartPolicyType: "ON_FAILURE",
       restartPolicyMaxRetries: 10,
-      sleepApplication: true,
     },
     env: {
       NODE_ENV: "production",
