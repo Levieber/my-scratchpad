@@ -3,6 +3,8 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { Client as McpClient } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { ROOT, type TestServer, testServer } from "@test/support";
 import * as Effect from "effect/Effect";
 
@@ -218,5 +220,99 @@ describe("the servers as executables", () => {
       proc.kill("SIGINT");
       await proc.exited;
     }
+  }, 60_000);
+
+  // What Railway runs: both in one process. The platform's PORT must go to the API alone, and the
+  // MCP server's calls must reach the API beside it, whatever PAD_URL says.
+  test("both servers in one process: each on its port, MCP's tools calling the API beside it", async () => {
+    expect(build("services")).toBe(0);
+    const [apiPort, mcpPort] = ["7799", "7800"];
+    const token = "services-token";
+    const mcpBase = `http://127.0.0.1:${mcpPort}`;
+    const proc = Bun.spawn([join(dir, "pad-services")], {
+      env: {
+        ...process.env,
+        PORT: apiPort,
+        PAD_PORT: "",
+        PAD_MCP_PORT: mcpPort,
+        PAD_MCP_URL: mcpBase,
+        PAD_URL: "http://127.0.0.1:9",
+        PAD_DB: join(dir, "services.db"),
+        PAD_TOKEN: token,
+        NODE_ENV: "production",
+      },
+      stdout: "ignore",
+      stderr: "ignore",
+    });
+    try {
+      await upAt(`http://127.0.0.1:${apiPort}/api/health`);
+      await upAt(`${mcpBase}/health`);
+
+      // The owner approves a connector, as claude.ai would have them do.
+      const callback = "https://claude.ai/api/mcp/auth_callback";
+      const verifier = "v".repeat(43);
+      const { client_id } = (await (
+        await fetch(`${mcpBase}/register`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            client_name: "Claude",
+            redirect_uris: [callback],
+            token_endpoint_auth_method: "none",
+          }),
+        })
+      ).json()) as { client_id: string };
+      const consent = await fetch(`${mcpBase}/authorize`, {
+        method: "POST",
+        redirect: "manual",
+        body: new URLSearchParams({
+          response_type: "code",
+          client_id,
+          redirect_uri: callback,
+          code_challenge: new Bun.CryptoHasher("sha256").update(verifier).digest("base64url"),
+          code_challenge_method: "S256",
+          state: "s",
+          resource: `${mcpBase}/mcp`,
+          decision: "allow",
+          token,
+        }),
+      });
+      const code = new URL(consent.headers.get("location") ?? "").searchParams.get("code") ?? "";
+      const { access_token } = (await (
+        await fetch(`${mcpBase}/token`, {
+          method: "POST",
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code,
+            client_id,
+            code_verifier: verifier,
+            redirect_uri: callback,
+          }),
+        })
+      ).json()) as { access_token: string };
+
+      const client = new McpClient({ name: "test", version: "0" });
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL(`${mcpBase}/mcp`), {
+          requestInit: { headers: { authorization: `Bearer ${access_token}` } },
+        }),
+      );
+      const created = await client.callTool({
+        name: "scratchpad_create",
+        arguments: { body: "# Through loopback\nfrom the MCP half" },
+      });
+      await client.close();
+      expect(created.isError).toBeFalsy();
+      const notes = (await (
+        await fetch(`http://127.0.0.1:${apiPort}/api/notes?q=loopback`, {
+          headers: { authorization: `Bearer ${token}` },
+        })
+      ).json()) as { title: string; author: string }[];
+      expect(notes).toMatchObject([{ title: "Through loopback", author: "claude" }]);
+    } finally {
+      proc.kill("SIGTERM");
+    }
+    // A redeploy's SIGTERM is a clean stop for both, not a crash the restart policy counts.
+    expect(await proc.exited).toBe(0);
   }, 60_000);
 });

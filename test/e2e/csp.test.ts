@@ -26,8 +26,18 @@ describeE2E("Content-Security-Policy", () => {
     await page.goto("/");
     await page.getByRole("navigation", { name: "Notes" }).waitFor();
 
+    // `ready` resolves once there is an active worker, which may still be "activating" while its
+    // activate handler (cache cleanup, clients.claim) runs: wait for it to finish, not just start.
     expect(
-      await page.evaluate(() => navigator.serviceWorker.ready.then((r) => r.active?.state)),
+      await page.evaluate(async () => {
+        const worker = (await navigator.serviceWorker.ready).active;
+        if (!worker || worker.state === "activated") return worker?.state;
+        return new Promise<string>((resolve) =>
+          worker.addEventListener("statechange", () => {
+            if (worker.state !== "activating") resolve(worker.state);
+          }),
+        );
+      }),
     ).toBe("activated");
     const loaded = await page.evaluate(async () =>
       Promise.all(

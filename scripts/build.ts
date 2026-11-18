@@ -6,6 +6,7 @@
 //   bun scripts/build.ts pad [--outfile=path]      `pad`, one executable with bytecode (dist/pad)
 //   bun scripts/build.ts server [--outfile=path]   the server alone, the same way (dist/pad-server)
 //   bun scripts/build.ts mcp [--outfile=path]      the MCP server over HTTP alone (dist/pad-mcp)
+//   bun scripts/build.ts services [--outfile=path] both in one process, one runtime (dist/pad-services)
 //   bun scripts/build.ts web                       the PWA alone (dist/web), which the server serves in production
 import { parseArgs } from "node:util";
 
@@ -20,6 +21,7 @@ const BUILDS = {
   pad: (out = "dist/pad") => executable("src/cli.ts", out),
   server: (out = "dist/pad-server") => executable("src/server.ts", out, { split: true }),
   mcp: (out = "dist/pad-mcp") => executable("src/mcp-http.ts", out),
+  services: (out = "dist/pad-services") => executable("src/services.ts", out, { split: true }),
   web: () => web("dist/web"),
 };
 
@@ -28,7 +30,7 @@ const config = Object.hasOwn(BUILDS, target)
   ? BUILDS[target as keyof typeof BUILDS](values.outfile)
   : undefined;
 if (!config) {
-  console.error(`Unknown build "${target}": pad, server, mcp or web`);
+  console.error(`Unknown build "${target}": pad, server, mcp, services or web`);
   process.exit(2);
 }
 

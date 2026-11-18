@@ -3,13 +3,14 @@ import type { KnipConfig } from "knip";
 const knipConfig = {
   // Entries knip can't find from package.json scripts: the PWA (reached through an HTML import:
   // its script and its stylesheet), the service worker (registered by URL), the servers (built
-  // and started by scripts/start.sh, a shell script), and the Claude Code hook and installer.
+  // by scripts/build.ts and started by scripts/start.sh or the Dockerfile), and the Claude Code hook and installer.
   entry: [
     "src/web/main.tsx",
     "src/web/index.css",
     "public/sw.js",
     "src/server.ts",
     "src/mcp-http.ts",
+    "src/services.ts",
     "integrations/claude-code/*.ts",
   ],
   // A module's own vocabulary is exported for readers; only what nothing at all uses is dead.

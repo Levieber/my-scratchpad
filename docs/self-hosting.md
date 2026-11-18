@@ -24,14 +24,14 @@ bun run start        # http://127.0.0.1:7777; the database is ~/.local/share/scr
 
 ## With Docker
 
-The `Dockerfile` builds an image holding the server and the MCP server over HTTP, each compiled into one executable (about 50 MB of memory once running). It listens on every interface, so it needs a token, and keeps the database on `/data`:
+The `Dockerfile` builds an image holding two executables: the server alone (`/app/pad-server`, the default, about 50 MB of memory once running), and the server with the MCP server over HTTP in the same process (`/app/pad-services`). It listens on every interface, so it needs a token, and keeps the database on `/data`:
 
 ```sh
 docker build -t scratchpad .
 docker run -d -p 7777:7777 -v scratchpad:/data -e PAD_TOKEN=<token> scratchpad
 ```
 
-Put HTTPS in front of it as below. The MCP server for Claude's connectors is the same image: `docker run -p 7778:7778 -e PAD_URL=<the API> -e PAD_TOKEN=<token> scratchpad /app/pad-mcp`.
+Put HTTPS in front of it as below. For Claude's connectors too, run `/app/pad-services` instead and give the MCP server a domain of its own: `docker run -d -p 7777:7777 -p 7778:7778 -v scratchpad:/data -e PAD_TOKEN=<token> -e PAD_MCP_URL=https://<its domain> scratchpad /app/pad-services`.
 
 ## On a server
 

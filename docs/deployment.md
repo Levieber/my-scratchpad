@@ -25,6 +25,8 @@ The MCP server over HTTP (`src/mcp-http.ts`, for claude.ai's connectors, see [cl
 | `PAD_MCP_URL`           | `https://$RAILWAY_PUBLIC_DOMAIN`, else loopback | the origin claude.ai reaches it at (no path): the OAuth issuer and resource |
 | `PAD_OAUTH_SECRET`      | derived from `PAD_TOKEN`                        | signs the connectors' tokens; a new one signs every connector out           |
 
+In one process with the API (`src/services.ts`, `/app/pad-services`) it never sees `PORT` or `RAILWAY_PUBLIC_DOMAIN`, which are the API's: it listens on `PAD_MCP_PORT` (else 7778), needs `PAD_MCP_URL` for its own https origin, and calls the API at `http://127.0.0.1:<the API's port>` whatever `PAD_URL` says.
+
 ## Logs
 
 With `NODE_ENV=production` (Railway) the server logs one JSON object per line: a `request` line per request (`requestId`, `method`, `path`, `status`, `durationMs`; no query string, no token) and the cause of every failure, all sharing the `requestId` that is also the response's `x-request-id` header and, when Railway sent one, its `x-railway-request-id`. Find the error behind a 5xx from the platform's access log:
@@ -41,7 +43,8 @@ Locally the log stays human-readable.
 - `bun run dev` — HMR, and browser console output streamed to the terminal.
 - `bun run start` — `sh scripts/start.sh server`: sets `NODE_ENV=production`, builds the server into one executable with bytecode, the PWA inside it (`scripts/build.ts server` → `dist/pad-server`, under a second, in a process of its own), and `exec`s it, so the shell is replaced and nothing stays beside it. It builds at every start, so a pulled change is never served as the old build, and needs nothing from the platform's build step. If the build fails it runs `bun src/server.ts` instead. Run from source in production, the server first builds the PWA into `dist/web` in a process of its own and serves it from disk (`src/server/pwa-build.ts`), so the bundler and Tailwind's compiler (the plugin `bunfig.toml` names) never stay in it; where it can't (a tree that can't be written) it logs a warning and Bun bundles on the first request. SIGINT/SIGTERM (a Railway redeploy) shut it down gracefully: requests are interrupted, the database is closed and the process exits 0 (`teardown` in `src/server/serve.ts`). Exiting non-zero on a signal would make the on-failure restart policy report every redeploy as a crash.
 - `bun run start:mcp` — `sh scripts/start.sh mcp`: the MCP server over HTTP, built and run the same way (`dist/pad-mcp`). It keeps nothing on disk and shuts down on a signal as the server does.
-- On Railway, and wherever the `Dockerfile` is built, the executables are compiled with the image and started as they are (`/app/pad-server`, `/app/pad-mcp`); `scripts/start.sh` is for running from a clone (`bun run start`, the systemd unit). Called directly, it stays nowhere: `bun run` waits for its script, so it stays resident beside the server (~10 MB) for nothing.
+- `bun scripts/build.ts services` — both in one executable (`dist/pad-services`, from `src/services.ts`), run as one process: the API on its port, the MCP server on `PAD_MCP_PORT`. Either one failing to start ends the process; a signal stops both and exits 0.
+- On Railway, and wherever the `Dockerfile` is built, the executables are compiled with the image and started as they are (`/app/pad-server`, the API alone and the image's default; `/app/pad-services`, both, which Railway runs); `scripts/start.sh` is for running from a clone (`bun run start`, the systemd unit). Called directly, it stays nowhere: `bun run` waits for its script, so it stays resident beside the server (~10 MB) for nothing.
 - `bun run build` — bundle the PWA into `dist/web` (`scripts/build.ts web`), in chunks; run it to inspect the output and its size. `scripts/builds.ts` holds what each build bundles, and the tests build the PWA from it, so what they check is what ships.
 
 ## Memory and egress
@@ -90,17 +93,30 @@ And in a container, as Railway runs it: before, Bun, `node_modules` and the sour
 - **The PWA in chunks.** What opens later (Settings, History, the table, the markdown renderer and its highlighter) is behind `React.lazy` and built as chunks of its own (`splitting`, `scripts/builds.ts`). The page names them as `<link rel="prefetch">` (`builtFiles` in `src/server/pages.ts`): the browser fetches them when idle without running them, and the service worker, which caches only what passes through it, has them for when the device is offline (`test/e2e/chunks.test.ts`). Effect is kept out of the bundle by `test/web/bundle.test.ts`, which sees what an import chain pulls in: one regex taken from `shared/domain.ts` had pulled in 78 KB of Schema.
 - **Not done, measured**: streaming the export would lower its peak, but it reads in one transaction so its pages agree, and holding SQLite's one connection while a slow client downloads would stall every other request; an export is rare and its memory comes back. `cn`'s configurable build (73 KB minified) is a choice recorded in `src/web/lib/utils.ts`.
 
+### Per container, as Railway counts it
+
+Railway's memory graph and bill are the container's cgroup `memory.current`, page cache included, not what its processes hold, so that is the measure here (not RSS, not `docker stats`). Most of it is Bun's runtime: its code is 82 MB of each ~115 MB executable, and a container starting it on a host that hasn't read the file yet is charged for most of it (`inactive_file`, read ahead around the pages it maps; the process never `read()`s it). `--smol`, a plain `bun` running a bundle, and stripping the binary change none of it; it is paid once per container, whatever runs in it.
+
+So the API and the MCP server run as one process (`src/services.ts`): one runtime, one heap. Measured on the image, cold (the executables evicted from the page cache first with `dd iflag=nocache`, as a fresh host has them) and loaded (300 notes written, 400 searches and lists, the PWA and an export, 600 MCP requests):
+
+| `memory.current`, both servers                | Cold   | Loaded |
+| --------------------------------------------- | ------ | ------ |
+| A service each (`pad-server`, `pad-mcp`)      | 240 MB | 272 MB |
+| One container, a process each, one executable | 143 MB | 163 MB |
+| One process (`pad-services`)                  | 131 MB | 150 MB |
+
+Of the one process's 150 MB, 107 are the executable's pages and 39 what it holds (`anon`). The MCP server keeps a port and an origin of its own: on the API's port its OAuth routes would share one origin with the PWA's pages, for no memory saved. Bun's `trim` for compiled executables would take another ~20 % off the runtime's pages, but only its canary has it; 1.4 ignores the option without a word.
+
 ## Railway
 
-Infrastructure as Code in `.railway/railway.ts`; `.railway/package.json` pins the `railway/iac` DSL and `.railway/` is its own mini-project (own tsconfig, ignored by the root tsconfig and knip). Don't add `railway.json`/`railway.toml` — config-as-code is deprecated and stops being read on 2026-12-01. Both services are built from the `Dockerfile`: a build stage with Bun (pinned there, the version the project is tested with; move it with Bun upgrades), the dependencies and the source compiles `dist/pad-server` and `dist/pad-mcp` (`scripts/builds.ts`), and the image keeps only those two on Debian slim (467 MB, against 900 MB for Bun, `node_modules` and the source as Railpack built it). So a deploy starts the executable itself, the compile's memory never reaches the running container, and a build that fails fails the deploy. `.dockerignore` lets in only what the build stage copies.
+Infrastructure as Code in `.railway/railway.ts`; `.railway/package.json` pins the `railway/iac` DSL and `.railway/` is its own mini-project (own tsconfig, ignored by the root tsconfig and knip). Don't add `railway.json`/`railway.toml` — config-as-code is deprecated and stops being read on 2026-12-01. The service is built from the `Dockerfile`: a build stage with Bun (pinned there, the version the project is tested with; move it with Bun upgrades), the dependencies and the source compiles `dist/pad-server` and `dist/pad-services` (`scripts/builds.ts`), and the image keeps only those two on Debian slim (467 MB, against 900 MB for Bun, `node_modules` and the source as Railpack built it). So a deploy starts the executable itself, the compile's memory never reaches the running container, and a build that fails fails the deploy. `.dockerignore` lets in only what the build stage copies.
 
-It declares two services, both deployed from `github.com/Levieber/my-scratchpad` on every push to `main`. `web` is the API and the PWA, the image's `/app/pad-server`, with:
+It declares one service, `web`, deployed from `github.com/Levieber/my-scratchpad` on every push to `main`: the image's `/app/pad-services`, the API and the PWA on the `PORT` Railway gives it, and the MCP server over HTTP for claude.ai's connectors ([claude-ai.md](claude-ai.md)) on `PAD_MCP_PORT` (7778), each behind a domain of its own. One process rather than a service each, because Railway counts Bun's runtime once per container (see [Per container](#per-container-as-railway-counts-it)). It has:
 
 - a 1 GB volume at `/data` holding the SQLite file — that volume _is_ the database, so exactly one replica;
 - a `/api/health` healthcheck, which reads the database: a deploy whose volume can't be queried never goes live (see [Observability](architecture.md#observability));
-- `PAD_TOKEN` via `preserve()`: set once in Railway, never in the repo. The server refuses to start publicly without it.
-
-`mcp` is the MCP server over HTTP for claude.ai's connectors ([claude-ai.md](claude-ai.md)), the same image's `/app/pad-mcp`: no volume, one replica (authorization codes are held in its memory), a `/health` check, `PAD_TOKEN` read from `web` (`${{web.PAD_TOKEN}}`), `PAD_URL` at `web`'s public domain, and `PAD_OAUTH_SECRET` via `preserve()`. It calls `web` through the public domain rather than the private network: that works in every Railway environment (older ones route only IPv6 privately, and the server binds IPv4), for a few KB of egress per tool call.
+- `PAD_TOKEN` via `preserve()`: set once in Railway, never in the repo. The server refuses to start publicly without it;
+- for the MCP server, `PAD_MCP_URL` (its domain's https origin, its OAuth issuer) and `PAD_OAUTH_SECRET` via `preserve()`. The one replica holds its authorization codes in memory too. It calls the API over loopback: no egress, and no private network needed. The healthcheck is the API's; the MCP server failing to start ends the process, so a deploy fails with it.
 
 ```sh
 bun install --cwd .railway                       # once, to fetch the DSL package
@@ -113,9 +129,11 @@ railway variables --service web --set "PAD_TOKEN=$TOKEN"
 railway domain --service web
 pad login https://<domain> "$TOKEN"              # CLI, MCP and hook now use Railway
 
-# claude.ai's connectors (the mcp service), once:
-railway variables --service mcp --set "PAD_OAUTH_SECRET=$(openssl rand -hex 32)"
-railway domain --service mcp                     # then add https://<that domain>/mcp in Claude
+# claude.ai's connectors, once: a second domain, targeting port 7778
+railway domain --service web --port 7778
+railway domain update <that domain> --service web --domain <name>   # optional: name it yourself
+railway variables --service web --set "PAD_MCP_URL=https://<that domain>" \
+  --set "PAD_OAUTH_SECRET=$(openssl rand -hex 32)"  # then add https://<that domain>/mcp in Claude
 ```
 
 `railway config plan` never changes anything. `railway config apply` does, so read the plan first.

@@ -4,11 +4,12 @@ One rule shapes everything: **the HTTP API is the only way in.** People (PWA, CL
 
 Everything but the PWA is written with Effect 4; why, and what it cost, is in [effect.md](effect.md).
 
-Each folder of `src/` is one responsibility, and what it may import is enforced (below). The four process entry points stay at the root, because installed things name their paths (`claude mcp add`, the systemd unit, Railway's start commands, `bin`); each is a few lines of wiring.
+Each folder of `src/` is one responsibility, and what it may import is enforced (below). The process entry points stay at the root, because installed things name their paths (`claude mcp add`, the systemd unit, Railway's start command, `bin`); each is a few lines of wiring.
 
 ````
 src/
   server.ts, cli.ts, mcp.ts, mcp-http.ts   Entry points: `bun src/server.ts` (built into one executable in production, `scripts/start.sh`), the `pad` executable, the MCP server over stdio (Claude Code) and over HTTP (claude.ai's connectors).
+  services.ts   The API and the MCP server over HTTP in one process, each on its port, the MCP server calling the API over loopback: what Railway runs (`/app/pad-services`), so the container holds one Bun runtime (docs/deployment.md).
   shared/       Pure code every process uses, the PWA included. Imports no process, no node:/bun.
     domain.ts     The API's shapes as Schemas (Note, NoteInput, Revision, View and its layouts' options); every client shares the types.
     validation.ts The sentences for a note that didn't decode (the API's 400 and `pad import`).
