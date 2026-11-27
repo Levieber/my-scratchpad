@@ -68,10 +68,13 @@ export function Editor({
       )}
       {/* A note the server hasn't seen yet has nothing under it, and nowhere to file under. */}
       {current && !showHistory && (
-        <>
+        // A page with dozens of subpages or backlinks would otherwise take the editor's height,
+        // down to nothing on a phone: past a share of the screen, they scroll. The padding keeps
+        // a focused link's ring from being clipped at the scroll area's edge.
+        <div className="-m-1 flex max-h-[30dvh] flex-none flex-col gap-2.5 overflow-y-auto p-1">
           <Subpages note={current} />
           <LinkedFrom note={current} />
-        </>
+        </div>
       )}
       <footer className="flex justify-between gap-2 text-xs text-muted-foreground">
         <span>
